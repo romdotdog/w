@@ -2,88 +2,82 @@ use crate::span::Span;
 
 #[derive(Debug)]
 pub struct Token {
-	t: TokenType,
-	span: Span
+    t: TokenType,
+    span: Span,
 }
 
 impl Token {
-	pub fn new(t: TokenType, span: Span) -> Self {
-		Token {
-			t, span
-		}
-	}
+    pub fn new(t: TokenType, span: Span) -> Self {
+        Token { t, span }
+    }
 }
 
 #[derive(Debug)]
 pub enum TokenType {
-	Fn,
-	
-	Semicolon,
-	Colon,
-	Period,
-	LeftParen,
-	RightParen,
-	LeftBracket,
-	RightBracket,
-	
-	I32,
+    Fn,
 
-	// TBD at parse-time
-	Plus,
-	Minus,
+    Semicolon,
+    Colon,
+    Period,
+    LeftParen,
+    RightParen,
+    LeftBracket,
+    RightBracket,
 
-	Op {
-		t: Op,
-		is_assignment: bool
-	},
+    I32,
 
-	Integer(i64),
-	Float(f64),
-	
-	String(String),
-	Char(char),
-	Identifier(String)
+    // TBD at parse-time
+    Plus,
+    Minus,
+
+    Op { t: Op, is_assignment: bool },
+
+    Integer(i64),
+    Float(f64),
+
+    String(String),
+    Char(char),
+    Identifier(String),
 }
 
 #[derive(Debug)]
 pub enum Op {
-	/// Identity: used for the vanilla equals assignment
-	/// a = 1
-	Id,
+    /// Identity: used for the vanilla equals assignment
+    /// a = 1
+    Id,
 
-	Lt,
-	Le,
-	Gt,
-	Ge,
-	/// ==
-	EqC,
-	Neq,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    /// ==
+    EqC,
+    Neq,
 
-	Add,
-	Sub,
+    Add,
+    Sub,
 
-	/// can be used as unary as deref
-	Mul,
+    /// can be used as unary as deref
+    Mul,
 
-	Div,
-	Mod,
+    Div,
+    Mod,
 
-	Xor,
+    Xor,
 
-	/// can be used as unary as deref
-	And,
-	Or,
-	Rsh,
-	Lsh,
+    /// can be used as unary as deref
+    And,
+    Or,
+    Rsh,
+    Lsh,
 
-	// -- UnOp -- 
+    // -- UnOp --
+    Inc,
+    Dec,
 
-	Inc,
-	Dec,
+    /// shorthand for -1 - x
+    BNot,
 
-	/// shorthand for -1 - x
-	BNot,
-
-	/// shorthand for x ^ 1
-	LNot,
+    /// shorthand for x ^ 1
+    LNot,
 }
