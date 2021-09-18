@@ -14,10 +14,6 @@ pub enum Token {
     F32,
     F64,
 
-    // TBD at parse-time
-    Plus,
-    Minus,
-
     Op { t: Op, is_assignment: bool },
 
     Integer(i64),

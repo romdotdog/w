@@ -1,8 +1,8 @@
-use w::{lexer::Lexer, parser::Parser};
+use w::Session;
 
 #[test]
 fn basic_fn() {
     let file = std::fs::read_to_string("tests/fn.w").unwrap();
-    let mut t = Parser::new(&file);
-    println!("{:#?}", t.expr());
+    let mut t = Session::new().parse(&file).parse();
+    println!("{:#?}", t);
 }

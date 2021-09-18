@@ -7,7 +7,7 @@
         AIP - Above Ident Priority
 */
 
-use crate::span::Span;
+use crate::{span::Span, Session};
 
 mod token;
 pub use token::{Op, Token};
@@ -15,6 +15,8 @@ pub use token::{Op, Token};
 use std::str::Chars;
 
 pub struct Lexer<'a> {
+    session: &'a Session,
+
     stream: Chars<'a>,
     buffer: Option<char>,
     token_buffer: Option<Token>,
@@ -26,8 +28,10 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(stream: &'a str) -> Self {
+    pub fn new(session: &'a Session, stream: &'a str) -> Self {
         Lexer {
+            session,
+
             stream: stream.chars(),
             buffer: None,
             token_buffer: None,
@@ -38,7 +42,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn span(&self) -> Span {
+    pub fn span(&self) -> Span {
         Span::new(self.start, self.end)
     }
 
