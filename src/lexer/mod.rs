@@ -83,8 +83,6 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn skip_white(&mut self) {}
-
     fn try_aip(&mut self, c: char) -> Option<Token> {
         macro_rules! op {
             ($t: ident) => {
