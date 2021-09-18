@@ -90,7 +90,19 @@ impl<'a> Parser<'a> {
             Some(Token::Integer(f)) => Atom::Integer(f),
             Some(Token::Ident(s)) => Atom::Ident(s),
             Some(Token::LeftBracket) => self.block(),
-            _ => todo!(),
+            t => {
+                self.session.error(Diagnostic::new(
+                    self.lex.span(),
+                    Message::ExpectedGot(Lexeme::PrimaryExpr, t.into()),
+                ));
+
+                loop {
+                    match self.lex.next() {
+                        Some(Token::Semicolon) | None => break Atom::Null,
+                        _ => {}
+                    }
+                }
+            }
         }
     }
 

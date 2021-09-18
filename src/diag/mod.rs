@@ -17,6 +17,8 @@ impl Diagnostic {
 pub enum Lexeme {
     // Tokens
     Fn,
+    Return,
+    If,
     Semicolon,
     Colon,
     LeftParen,
@@ -29,6 +31,7 @@ pub enum Lexeme {
     F64,
     Op,
     Integer,
+    UInteger,
     Float,
     String,
     Char,
@@ -36,12 +39,15 @@ pub enum Lexeme {
 
     // Misc
     Eof,
+    PrimaryExpr,
 }
 
 impl From<Token> for Lexeme {
     fn from(t: Token) -> Self {
         match t {
             Token::Fn => Lexeme::Fn,
+            Token::If => Lexeme::If,
+            Token::Return => Lexeme::Return,
             Token::Semicolon => Lexeme::Semicolon,
             Token::Colon => Lexeme::Colon,
             Token::LeftParen => Lexeme::LeftParen,
@@ -52,7 +58,8 @@ impl From<Token> for Lexeme {
             Token::I64 => Lexeme::I64,
             Token::F32 => Lexeme::F32,
             Token::F64 => Lexeme::F64,
-            Token::Op { t, is_assignment } => Lexeme::Op,
+            Token::Op { .. } => Lexeme::Op,
+            Token::UInteger(_) => Lexeme::UInteger,
             Token::Integer(_) => Lexeme::Integer,
             Token::Float(_) => Lexeme::Float,
             Token::String(_) => Lexeme::String,

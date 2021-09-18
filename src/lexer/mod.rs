@@ -49,6 +49,8 @@ impl<'a> Lexer<'a> {
     fn keyword(s: String) -> Token {
         match s.as_str() {
             "fn" => Token::Fn,
+            "return" => Token::Return,
+            "if" => Token::If,
             "i32" => Token::I32,
             "i64" => Token::I64,
             "f32" => Token::F32,
@@ -81,6 +83,8 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    fn skip_white(&mut self) {}
+
     fn try_aip(&mut self, c: char) -> Option<Token> {
         macro_rules! op {
             ($t: ident) => {
@@ -93,7 +97,7 @@ impl<'a> Lexer<'a> {
 
         Some(match c {
             ':' => Token::Colon,
-            ';' => Token::Colon,
+            ';' => Token::Semicolon,
             '{' => Token::LeftBracket,
             '}' => Token::RightBracket,
             '(' => Token::LeftParen,
@@ -101,6 +105,7 @@ impl<'a> Lexer<'a> {
 
             '*' => op!(Mul),
             '/' => op!(Div),
+
             '%' => op!(Mod),
             '^' => op!(Xor),
             '&' => op!(And),
@@ -316,8 +321,13 @@ impl<'a> Lexer<'a> {
                 if float == Floatable::True {
                     Token::Float(num.parse::<f64>().unwrap())
                 } else {
-                    let num = i64::from_str_radix(&num, radix);
-                    Token::Integer(num.unwrap())
+                    let numi = i64::from_str_radix(&num, radix);
+                    if let Ok(i) = numi {
+                        Token::Integer(i)
+                    } else {
+                        let numu = u64::from_str_radix(&num, radix);
+                        Token::UInteger(numu.unwrap())
+                    }
                 }
             }
             _ => return self.try_aip(c),
@@ -359,6 +369,26 @@ impl<'a> Iterator for Lexer<'a> {
 
         let c = loop {
             match self.nextc() {
+                Some('/') => match self.nextc() {
+                    Some('/') => loop {
+                        match self.nextc() {
+                            Some('\n') => break,
+                            None => return None,
+                            _ => {}
+                        }
+                    },
+                    Some('*') => loop {
+                        match self.nextc() {
+                            Some('*') => match self.nextc() {
+                                Some('/') => break,
+                                _ => {}
+                            },
+                            None => todo!(),
+                            _ => {}
+                        }
+                    },
+                    _ => break '/',
+                },
                 Some(c) if !c.is_whitespace() => break c,
                 None => return None,
                 _ => {}

@@ -10,6 +10,7 @@ pub mod span;
 use std::cell::RefCell;
 
 use diag::Diagnostic;
+use lexer::Lexer;
 use parser::Parser;
 
 pub struct Session {
@@ -23,6 +24,10 @@ impl Session {
             warnings: RefCell::new(Vec::new()),
             errors: RefCell::new(Vec::new()),
         }
+    }
+
+    pub fn lexer<'a>(&'a self, src: &'a str) -> Lexer<'a> {
+        Lexer::new(self, src)
     }
 
     pub fn parse<'a>(&'a self, src: &'a str) -> Parser<'a> {
