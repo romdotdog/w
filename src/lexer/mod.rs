@@ -10,7 +10,7 @@
 use crate::span::Span;
 
 mod token;
-pub use token::{Op, Token, TokenType};
+pub use token::{Op, Token};
 
 use std::str::Chars;
 
@@ -20,6 +20,9 @@ pub struct Lexer<'a> {
     token_buffer: Option<Token>,
 
     p: isize,
+
+    start: usize,
+    end: usize,
 }
 
 impl<'a> Lexer<'a> {
@@ -29,14 +32,24 @@ impl<'a> Lexer<'a> {
             buffer: None,
             token_buffer: None,
             p: -1,
+
+            start: 0,
+            end: 0,
         }
     }
 
-    fn keyword(s: String) -> TokenType {
+    fn span(&self) -> Span {
+        Span::new(self.start, self.end)
+    }
+
+    fn keyword(s: String) -> Token {
         match s.as_str() {
-            "fn" => TokenType::Fn,
-            "i32" => TokenType::I32,
-            _ => TokenType::Identifier(s),
+            "fn" => Token::Fn,
+            "i32" => Token::I32,
+            "i64" => Token::I64,
+            "f32" => Token::F32,
+            "f64" => Token::F64,
+            _ => Token::Ident(s),
         }
     }
 
@@ -64,10 +77,10 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn try_aip(&mut self, c: char) -> Option<TokenType> {
+    fn try_aip(&mut self, c: char) -> Option<Token> {
         macro_rules! op {
             ($t: ident) => {
-                TokenType::Op {
+                Token::Op {
                     t: Op::$t,
                     is_assignment: self.try_take_equals(),
                 }
@@ -75,12 +88,12 @@ impl<'a> Lexer<'a> {
         }
 
         Some(match c {
-            ':' => TokenType::Colon,
-            ';' => TokenType::Colon,
-            '{' => TokenType::LeftBracket,
-            '}' => TokenType::RightBracket,
-            '(' => TokenType::LeftParen,
-            ')' => TokenType::RightParen,
+            ':' => Token::Colon,
+            ';' => Token::Colon,
+            '{' => Token::LeftBracket,
+            '}' => Token::RightBracket,
+            '(' => Token::LeftParen,
+            ')' => Token::RightParen,
 
             '*' => op!(Mul),
             '/' => op!(Div),
@@ -93,7 +106,7 @@ impl<'a> Lexer<'a> {
                 let c2 = self.nextc();
                 match self.nextc() {
                     Some('\'') => {
-                        TokenType::Char(c2.expect("reached <eof>, expected character in quote"))
+                        Token::Char(c2.expect("reached <eof>, expected character in quote"))
                     }
                     Some(c3) => panic!("unexpected character {}, expected '", c3),
                     None => panic!("reached <eof>, expected '"),
@@ -162,7 +175,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
 
-                TokenType::String(res)
+                Token::String(res)
             }
 
             '>' | '<' | '=' | '!' | '+' | '-' => {
@@ -221,6 +234,7 @@ impl<'a> Lexer<'a> {
                         self.buffer = c2;
                         Op::Add
                     }
+
                     ('-', _) => {
                         self.buffer = c2;
                         Op::Sub
@@ -232,7 +246,7 @@ impl<'a> Lexer<'a> {
                     }
                 };
 
-                TokenType::Op {
+                Token::Op {
                     t,
                     is_assignment: match is_assignment {
                         Assignment::Unset => self.try_take_equals(),
@@ -245,7 +259,7 @@ impl<'a> Lexer<'a> {
         })
     }
 
-    fn try_bip(&mut self, c: char) -> Option<TokenType> {
+    fn try_bip(&mut self, c: char) -> Option<Token> {
         Some(match c {
             '.' | '0'..='9' => {
                 #[derive(PartialEq)]
@@ -296,10 +310,10 @@ impl<'a> Lexer<'a> {
                 }
 
                 if float == Floatable::True {
-                    TokenType::Float(num.parse::<f64>().unwrap())
+                    Token::Float(num.parse::<f64>().unwrap())
                 } else {
                     let num = i64::from_str_radix(&num, radix);
-                    TokenType::Integer(num.unwrap())
+                    Token::Integer(num.unwrap())
                 }
             }
             _ => return self.try_aip(c),
@@ -307,15 +321,17 @@ impl<'a> Lexer<'a> {
     }
 
     fn try_tk_aip(&mut self, c: char) -> Option<Token> {
-        let start = self.p;
-        self.try_aip(c)
-            .map(|t| Token::new(t, Span::new(start as usize, self.p as usize)))
+        self.start = self.p as usize;
+        let r = self.try_aip(c);
+        self.end = self.p as usize;
+        r
     }
 
     fn try_tk_bip(&mut self, c: char) -> Option<Token> {
-        let start = self.p;
-        self.try_bip(c)
-            .map(|t| Token::new(t, Span::new(start as usize, self.p as usize)))
+        self.start = self.p as usize;
+        let r = self.try_bip(c);
+        self.end = self.p as usize;
+        r
     }
 
     fn nextc(&mut self) -> Option<char> {
@@ -323,9 +339,9 @@ impl<'a> Lexer<'a> {
         self.buffer.take().or_else(|| self.stream.next())
     }
 
-    pub fn insert(&mut self, t: char) {
-        assert!(self.buffer.is_none());
-        self.buffer = Some(t);
+    pub fn insert(&mut self, t: Option<Token>) {
+        assert!(self.token_buffer.is_none());
+        self.token_buffer = t;
     }
 }
 
@@ -347,7 +363,7 @@ impl<'a> Iterator for Lexer<'a> {
 
         self.try_tk_bip(c).or_else(|| {
             let mut ident = String::from(c);
-            let start = self.p;
+            self.start = self.p as usize;
 
             while let Some(c2) = self.nextc() {
                 if c2.is_whitespace() {
@@ -362,10 +378,8 @@ impl<'a> Iterator for Lexer<'a> {
                 ident.push(c2);
             }
 
-            Some(Token::new(
-                Lexer::keyword(ident),
-                Span::new(start as usize, self.p as usize - 1),
-            ))
+            self.end = self.p as usize - 1;
+            Some(Lexer::keyword(ident))
         })
     }
 }

@@ -1,10 +1,8 @@
-use w::lexer::Lexer;
+use w::{lexer::Lexer, parser::Parser};
 
 #[test]
 fn basic_fn() {
-	let file = std::fs::read_to_string("tests/fn.w").unwrap();
-	let lex = Lexer::new(&file);
-	for t in lex {
-		println!("{:?}", t);
-	}
+    let file = std::fs::read_to_string("tests/fn.w").unwrap();
+    let mut t = Parser::new(&file);
+    println!("{:#?}", t.expr());
 }
