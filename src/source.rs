@@ -48,7 +48,7 @@ impl Source {
         while hi - lo > 1 {
             let mid = (hi - lo) / 2 + lo;
 
-            if self.line_pos[lo] >= i && i < self.line_pos[mid] {
+            if self.line_pos[lo] <= i && i < self.line_pos[mid] {
                 hi = mid;
             } else {
                 lo = mid;
@@ -57,6 +57,6 @@ impl Source {
 
         // must use this crate since identifiers are catch-all
         let col = UnicodeSegmentation::graphemes(&self.src[self.line_pos[lo]..i], true).count();
-        (lo + 1, col + 1, (self.line_pos[lo], self.line_pos[lo + 1]))
+        (hi, col + 1, (self.line_pos[lo], self.line_pos[hi]))
     }
 }

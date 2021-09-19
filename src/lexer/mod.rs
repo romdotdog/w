@@ -413,7 +413,7 @@ impl<'a> Iterator for Lexer<'a> {
                 ident.push(c2);
             }
 
-            self.end = self.p as usize - 1;
+            self.end = self.p as usize;
             Some(Lexer::keyword(ident))
         })
     }

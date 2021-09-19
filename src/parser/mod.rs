@@ -78,7 +78,17 @@ impl<'a> Parser<'a> {
                 None => {}
             }
 
-            last = Some(self.expr());
+            match self.next() {
+                Some(Token::RightBracket) => {
+                    last = None;
+                    break;
+                }
+                t => {
+                    self.token_buffer = t;
+                    last = Some(self.expr())
+                }
+            }
+
             match self.next() {
                 Some(Token::Semicolon) => continue,
                 Some(Token::RightBracket) => break,

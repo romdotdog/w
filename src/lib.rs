@@ -68,8 +68,8 @@ impl Session {
                 line,
                 col,
                 v,
-                &src.content()[sol..eol],
-                " ".repeat(i - start_pos),
+                &src.content()[sol..eol].trim_end(),
+                " ".repeat(start_pos - sol),
                 "^".repeat(v.span.end - start_pos),
             )
         }
