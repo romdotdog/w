@@ -1,4 +1,4 @@
-use crate::lexer::Op;
+use crate::{lexer::Op, span::Span};
 
 #[derive(Debug)]
 pub enum TopLevel {
@@ -8,7 +8,7 @@ pub enum TopLevel {
 type BAtom = Box<Atom>;
 
 #[derive(Debug)]
-pub enum Atom {
+pub enum AtomVariant {
     Integer(i64),
     Float(f64),
     Ident(String),
@@ -18,23 +18,36 @@ pub enum Atom {
     BinOp(BAtom, Op, BAtom),
     UnOp(Op, BAtom),
 
-    Reinterpret(Type, BAtom),
-    Cast(Type, BAtom),
+    Reinterpret(BAtom),
+    Cast(BAtom),
 
     Block(Vec<Atom>, BAtom),
     If(BAtom, BAtom, Option<BAtom>),
 }
 
 #[derive(Debug)]
+pub struct Atom {
+    pub v: AtomVariant,
+    pub span: Span,
+    pub t: Type,
+}
+
+impl Atom {
+    pub fn new(v: AtomVariant, span: Span, t: Type) -> Self {
+        Atom { v, span, t }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum Type {
     Auto,
+    Null,
     I32,
     I64,
     U32,
     U64,
     F32,
     F64,
-    User(String),
 }
 
 impl From<String> for Type {
@@ -46,7 +59,7 @@ impl From<String> for Type {
             "u64" => Type::U64,
             "f32" => Type::F32,
             "f64" => Type::F64,
-            _ => Type::User(s),
+            _ => todo!(),
         }
     }
 }

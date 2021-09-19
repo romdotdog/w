@@ -13,7 +13,7 @@ mod ast;
 pub use ast::Atom;
 use ast::TopLevel;
 
-use self::ast::Type;
+use self::ast::{AtomVariant, Type};
 
 pub struct Parser<'a> {
     session: &'a Session,
@@ -60,15 +60,17 @@ impl<'a> Parser<'a> {
 
     pub fn block(&mut self) -> Atom {
         let mut r = Vec::new();
-        let mut last = Atom::Null;
+        let start = self.lex.span();
+
+        let mut last = None;
 
         loop {
             match last {
-                Atom::Null => {}
-                t => r.push(t),
+                Some(t) => r.push(t),
+                None => {}
             }
 
-            last = self.expr();
+            last = Some(self.expr());
             match self.lex.next() {
                 Some(Token::Semicolon) => continue,
                 _ => {
@@ -78,22 +80,31 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Atom::Block(r, Box::new(last))
+        let span = start.to(self.lex.span());
+        let last = last.unwrap_or_else(|| Atom::new(AtomVariant::Null, span, Type::Null));
+        let t = last.t;
+        Atom::new(AtomVariant::Block(r, Box::new(last)), span, t)
     }
 
     fn recover(&mut self) -> Atom {
+        let start = self.lex.span();
         loop {
             match self.lex.next() {
-                Some(Token::Semicolon) | None => break Atom::Null,
+                Some(Token::Semicolon) | None => {
+                    break Atom::new(AtomVariant::Null, start.to(self.lex.span()), Type::Null)
+                }
                 _ => {}
             }
         }
     }
 
     fn recover_fn(&mut self) -> Atom {
+        let start = self.lex.span();
         loop {
             match self.lex.next() {
-                Some(Token::Fn) | None => break Atom::Null,
+                Some(Token::Fn) | None => {
+                    break Atom::new(AtomVariant::Null, start.to(self.lex.span()), Type::Null)
+                }
                 _ => {}
             }
         }
@@ -102,27 +113,52 @@ impl<'a> Parser<'a> {
     fn primaryexpr(&mut self) -> Atom {
         match self.lex.next() {
             Some(Token::LeftParen) => {
+                let start = self.lex.span();
                 let e = self.expr();
                 expect_or_error!(self, RightParen);
 
                 match e {
-                    Atom::Ident(s) => Atom::Cast(s.into(), Box::new(self.primaryexpr())),
-                    _ => Atom::Paren(Box::new(e)),
+                    Atom {
+                        v: AtomVariant::Ident(s),
+                        ..
+                    } => {
+                        let operand = Box::new(self.primaryexpr());
+                        Atom::new(
+                            AtomVariant::Cast(operand),
+                            start.to(self.lex.span()),
+                            s.into(),
+                        )
+                    }
+                    _ => {
+                        let t = e.t;
+                        Atom::new(
+                            AtomVariant::Paren(Box::new(e)),
+                            start.to(self.lex.span()),
+                            t,
+                        )
+                    }
                 }
             }
-            Some(Token::Float(f)) => Atom::Float(f),
-            Some(Token::Integer(f)) => Atom::Integer(f),
-            Some(Token::Ident(s)) => Atom::Ident(s),
+            Some(Token::Float(f)) => Atom::new(AtomVariant::Float(f), self.lex.span(), Type::Auto),
+            Some(Token::Integer(f)) => {
+                Atom::new(AtomVariant::Integer(f), self.lex.span(), Type::Auto)
+            }
+            Some(Token::Ident(s)) => Atom::new(AtomVariant::Ident(s), self.lex.span(), Type::Auto),
             Some(Token::LeftBracket) => self.block(),
             Some(Token::Op { t: Op::Lt, .. }) => match self.lex.next() {
                 Some(Token::Ident(s)) => {
+                    let start = self.lex.span();
                     expect_or_error!(
                         self,
                         |t| { Message::ExpectedGot(Lexeme::RightAngBracket, t.into()) },
                         Some(Token::Op { t: Op::Gt, .. }) => t
                     );
 
-                    Atom::Reinterpret(s.into(), Box::new(self.primaryexpr()))
+                    Atom::new(
+                        AtomVariant::Reinterpret(Box::new(self.primaryexpr())),
+                        start.to(self.lex.span()),
+                        s.into(),
+                    )
                 }
                 t => {
                     self.session.error(Diagnostic::new(
@@ -134,6 +170,7 @@ impl<'a> Parser<'a> {
                 }
             },
             Some(Token::If) => {
+                let start = self.lex.span();
                 let cond = Box::new(self.expr());
                 let body = Box::new(self.expr());
                 let mut else_body = None;
@@ -143,7 +180,13 @@ impl<'a> Parser<'a> {
                     }
                     t => self.lex.insert(t),
                 }
-                Atom::If(cond, body, else_body)
+
+                // TODO: body return checking
+                Atom::new(
+                    AtomVariant::If(cond, body, else_body),
+                    start.to(self.lex.span()),
+                    Type::Null,
+                )
             }
             _ => self.recover(),
         }
@@ -189,7 +232,6 @@ impl<'a> Parser<'a> {
                                 }
                             } =>
                             {
-                                println!("{:?}", t);
                                 self.lex.insert(l);
                                 rhs = self.subexpr(
                                     rhs,
@@ -205,7 +247,12 @@ impl<'a> Parser<'a> {
                         }
                     }
 
-                    lhs = Atom::BinOp(Box::new(lhs), t, Box::new(rhs));
+                    let span = lhs.span.to(rhs.span);
+                    lhs = Atom::new(
+                        AtomVariant::BinOp(Box::new(lhs), t, Box::new(rhs)),
+                        span,
+                        Type::Auto,
+                    );
                 }
                 _ => {
                     self.lex.insert(l);
