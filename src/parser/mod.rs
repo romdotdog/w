@@ -7,7 +7,7 @@ use crate::{
     diag::{Diagnostic, Lexeme, Message},
     lexer::{Lexer, Op, Token},
     parser::ast::Type,
-    Session,
+    Session, SourceRef,
 };
 
 mod ast;
@@ -49,7 +49,7 @@ macro_rules! expect_or_error {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(session: &'a Session, src: &'a str) -> Self {
+    pub fn new(session: &'a Session, src: SourceRef) -> Self {
         Parser {
             session,
             lex: Lexer::new(session, src),

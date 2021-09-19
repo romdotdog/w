@@ -4,42 +4,49 @@ pub mod parser;
 pub mod source;
 pub mod span;
 
-/**
-    TODO:
-    * remove RefCell overhead
-*/
-use std::cell::RefCell;
-
+use appendlist::AppendList;
 use diag::Diagnostic;
 use lexer::Lexer;
 use parser::Parser;
 use source::Source;
 
 pub struct Session {
-    sources: Vec<Source>,
-    warnings: RefCell<Vec<Diagnostic>>,
-    errors: RefCell<Vec<Diagnostic>>,
+    sources: AppendList<Source>,
+    warnings: AppendList<Diagnostic>,
+    errors: AppendList<Diagnostic>,
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct SourceRef(usize);
 
 impl Session {
     pub fn new() -> Self {
         Session {
-            sources: Vec::new(),
-            warnings: RefCell::new(Vec::new()),
-            errors: RefCell::new(Vec::new()),
+            sources: AppendList::new(),
+            warnings: AppendList::new(),
+            errors: AppendList::new(),
         }
     }
 
-    pub fn lexer<'a>(&'a self, src: &'a str) -> Lexer<'a> {
+    pub fn lexer<'a>(&'a self, src: SourceRef) -> Lexer<'a> {
         Lexer::new(self, src)
     }
 
-    pub fn parse<'a>(&'a self, src: &'a str) -> Parser<'a> {
+    pub fn parse<'a>(&'a self, src: SourceRef) -> Parser<'a> {
         Parser::new(self, src)
     }
 
+    pub fn register_source(&self, name: String, src: String) -> SourceRef {
+        let r = self.sources.len();
+        self.sources.push(Source::new(name, src));
+        SourceRef(r)
+    }
+
+    pub fn get_source(&self, i: &SourceRef) -> &Source {
+        self.sources.get(i.0).unwrap()
+    }
+
     pub fn error(&self, diag: Diagnostic) {
-        let mut w = self.errors.borrow_mut();
-        w.push(diag);
+        self.errors.push(diag);
     }
 }

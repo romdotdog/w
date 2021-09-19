@@ -14,4 +14,5 @@ name = "lexer"
 harness = false
 
 [dependencies]
-unicode-segmentation = "1.8.0"
+unicode-segmentation = "1.8"
+appendlist = "1.4"

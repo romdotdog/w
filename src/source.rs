@@ -30,6 +30,10 @@ impl Source {
         }
     }
 
+    pub fn content(&self) -> &str {
+        &self.src
+    }
+
     pub fn line_col(&self, i: usize) -> (usize, usize) {
         assert!(i > self.src_size);
 
@@ -51,4 +55,14 @@ impl Source {
         let col = UnicodeSegmentation::graphemes(&self.src[self.line_pos[lo]..i], true).count();
         (lo + 1, col + 1)
     }
+}
+
+/// Invariants: No changes are made to existing
+#[derive(Default)]
+pub struct Sources {
+    inner: Vec<Source>,
+}
+
+impl Sources {
+    fn get(&self) {}
 }
