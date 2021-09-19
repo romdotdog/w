@@ -6,10 +6,20 @@ pub struct Diagnostic {
     message: Message,
 }
 
+pub enum DiagnosticStyle {
+    Error,
+    Warning,
+    Pedantic,
+}
+
 impl Diagnostic {
     pub fn new(span: Span, message: Message) -> Self {
         Diagnostic { span, message }
     }
+
+    // TODO: Limit to non-wasm targets
+    // Diagnostics will be handled on the JS side
+    pub fn print(span: Span, message: Message) {}
 }
 
 // TODO: Remove
@@ -22,7 +32,6 @@ pub enum Lexeme {
     Else,
     Semicolon,
     Comma,
-    Exclamation,
     Colon,
     LeftParen,
     RightParen,
@@ -55,7 +64,6 @@ impl From<Token> for Lexeme {
             Token::Semicolon => Lexeme::Semicolon,
             Token::Comma => Lexeme::Comma,
             Token::Colon => Lexeme::Colon,
-            Token::Exclamation => Lexeme::Exclamation,
             Token::LeftParen => Lexeme::LeftParen,
             Token::RightParen => Lexeme::LeftParen,
             Token::LeftBracket => Lexeme::LeftParen,

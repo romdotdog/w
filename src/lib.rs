@@ -1,6 +1,7 @@
 pub mod diag;
 pub mod lexer;
 pub mod parser;
+pub mod source;
 pub mod span;
 
 /**
@@ -12,8 +13,10 @@ use std::cell::RefCell;
 use diag::Diagnostic;
 use lexer::Lexer;
 use parser::Parser;
+use source::Source;
 
 pub struct Session {
+    sources: Vec<Source>,
     warnings: RefCell<Vec<Diagnostic>>,
     errors: RefCell<Vec<Diagnostic>>,
 }
@@ -21,6 +24,7 @@ pub struct Session {
 impl Session {
     pub fn new() -> Self {
         Session {
+            sources: Vec::new(),
             warnings: RefCell::new(Vec::new()),
             errors: RefCell::new(Vec::new()),
         }

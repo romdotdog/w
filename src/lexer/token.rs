@@ -8,7 +8,6 @@ pub enum Token {
     Semicolon,
     Colon,
     Comma,
-    Exclamation,
     LeftParen,
     RightParen,
     LeftBracket,

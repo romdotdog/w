@@ -80,7 +80,7 @@ impl From<String> for TypeVariant {
             "u64" => TypeVariant::U64,
             "f32" => TypeVariant::F32,
             "f64" => TypeVariant::F64,
-            _ => panic!("{}", s),
+            _ => todo!(),
         }
     }
 }

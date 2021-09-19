@@ -94,7 +94,6 @@ impl<'a> Lexer<'a> {
             ':' => Token::Colon,
             ';' => Token::Semicolon,
             ',' => Token::Comma,
-            '!' => Token::Exclamation,
             '{' => Token::LeftBracket,
             '}' => Token::RightBracket,
             '(' => Token::LeftParen,

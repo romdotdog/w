@@ -189,8 +189,10 @@ impl<'a> Parser<'a> {
                 match self.next() {
                     Some(Token::Op { t: Op::Gt, .. }) => {}
                     t1 => {
-                        if t1 == Some(Token::Exclamation) {
-                            op = Op::Reinterpret;
+                        // !
+                        match t1 {
+                            Some(Token::Op { t: Op::LNot, .. }) => op = Op::Reinterpret,
+                            _ => {}
                         }
 
                         expect_or_error!(
