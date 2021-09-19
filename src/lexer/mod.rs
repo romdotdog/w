@@ -51,8 +51,11 @@ impl<'a> Lexer<'a> {
             "fn" => Token::Fn,
             "return" => Token::Return,
             "if" => Token::If,
+            "else" => Token::Else,
             "i32" => Token::I32,
             "i64" => Token::I64,
+            "u32" => Token::U32,
+            "u64" => Token::U64,
             "f32" => Token::F32,
             "f64" => Token::F64,
             _ => Token::Ident(s),
@@ -319,12 +322,11 @@ impl<'a> Lexer<'a> {
                 if float == Floatable::True {
                     Token::Float(num.parse::<f64>().unwrap())
                 } else {
-                    let numi = i64::from_str_radix(&num, radix);
-                    if let Ok(i) = numi {
-                        Token::Integer(i)
+                    let num = u64::from_str_radix(&num, radix).unwrap();
+                    if num < i64::MAX as u64 {
+                        Token::Integer(num as i64)
                     } else {
-                        let numu = u64::from_str_radix(&num, radix);
-                        Token::UInteger(numu.unwrap())
+                        Token::UInteger(num)
                     }
                 }
             }

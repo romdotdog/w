@@ -5,15 +5,19 @@ pub enum TopLevel {
     Fn(String, Atom),
 }
 
+type BAtom = Box<Atom>;
+
 #[derive(Debug)]
 pub enum Atom {
     Integer(i64),
     Float(f64),
     Ident(String),
-    Block(Vec<Atom>, Box<Atom>),
     Null,
 
-    Paren(Box<Atom>),
-    BinOp(Box<Atom>, Op, Box<Atom>),
-    UnOp(Op, Box<Atom>),
+    Paren(BAtom),
+    BinOp(BAtom, Op, BAtom),
+    UnOp(Op, BAtom),
+
+    Block(Vec<Atom>, BAtom),
+    If(BAtom, BAtom, Option<BAtom>),
 }

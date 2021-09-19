@@ -3,6 +3,7 @@ pub enum Token {
     Fn,
     Return,
     If,
+    Else,
 
     Semicolon,
     Colon,
@@ -13,6 +14,8 @@ pub enum Token {
 
     I32,
     I64,
+    U32,
+    U64,
     F32,
     F64,
 
