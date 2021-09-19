@@ -7,6 +7,7 @@ pub enum Token {
 
     Semicolon,
     Colon,
+    Exclamation,
     LeftParen,
     RightParen,
     LeftBracket,
@@ -61,6 +62,9 @@ pub enum Op {
     Inc,
     Dec,
 
+    Reinterpret,
+    Cast,
+
     /// shorthand for -1 - x
     BNot,
 
@@ -71,14 +75,21 @@ pub enum Op {
 impl Op {
     pub fn is_unary(&self) -> bool {
         match self {
-            Op::LNot | Op::BNot | Op::And | Op::Mul | Op::Sub | Op::Add => true,
+            Op::LNot
+            | Op::BNot
+            | Op::And
+            | Op::Mul
+            | Op::Sub
+            | Op::Add
+            | Op::Reinterpret
+            | Op::Cast => true,
             _ => false,
         }
     }
 
     pub fn is_binary(&self) -> bool {
         match self {
-            Op::LNot | Op::BNot => false,
+            Op::LNot | Op::BNot | Op::Reinterpret | Op::Cast => false,
             _ => true,
         }
     }
@@ -101,10 +112,14 @@ impl Op {
 
             // is_assignment is always on
             Op::Id => unreachable!(),
+
+            // complete if this will ever be hit
             Op::Inc => todo!(),
             Op::Dec => todo!(),
             Op::BNot => todo!(),
             Op::LNot => todo!(),
+            Op::Reinterpret => todo!(),
+            Op::Cast => todo!(),
         }
     }
 }

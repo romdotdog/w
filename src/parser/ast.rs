@@ -1,8 +1,13 @@
 use crate::{lexer::Op, span::Span};
 
+/*
+    TODO:
+    * Remove Debug derives
+*/
+
 #[derive(Debug)]
 pub enum TopLevel {
-    Fn(String, Atom, Type),
+    Fn(String, Atom, TypeVariant),
 }
 
 type BAtom = Box<Atom>;
@@ -17,9 +22,6 @@ pub enum AtomVariant {
     Paren(BAtom),
     BinOp(BAtom, Op, BAtom),
     UnOp(Op, BAtom),
-
-    Reinterpret(BAtom),
-    Cast(BAtom),
 
     Block(Vec<Atom>, BAtom),
     If(BAtom, BAtom, Option<BAtom>),
@@ -39,7 +41,26 @@ impl Atom {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum Type {
+pub struct Type {
+    v: TypeVariant,
+    indir: u8,
+}
+
+impl Type {
+    pub fn new(v: TypeVariant, indir: u8) -> Self {
+        Type { v, indir }
+    }
+
+    pub fn auto() -> Self {
+        Type {
+            v: TypeVariant::Auto,
+            indir: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TypeVariant {
     Auto,
     Null,
     I32,
@@ -50,15 +71,15 @@ pub enum Type {
     F64,
 }
 
-impl From<String> for Type {
+impl From<String> for TypeVariant {
     fn from(s: String) -> Self {
         match s.as_str() {
-            "i32" => Type::I32,
-            "i64" => Type::I64,
-            "u32" => Type::U32,
-            "u64" => Type::U64,
-            "f32" => Type::F32,
-            "f64" => Type::F64,
+            "i32" => TypeVariant::I32,
+            "i64" => TypeVariant::I64,
+            "u32" => TypeVariant::U32,
+            "u64" => TypeVariant::U64,
+            "f32" => TypeVariant::F32,
+            "f64" => TypeVariant::F64,
             _ => todo!(),
         }
     }
