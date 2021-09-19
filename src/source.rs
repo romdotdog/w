@@ -30,12 +30,16 @@ impl Source {
         }
     }
 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     pub fn content(&self) -> &str {
         &self.src
     }
 
-    pub fn line_col(&self, i: usize) -> (usize, usize) {
-        assert!(i > self.src_size);
+    pub fn line_col(&self, i: usize) -> (usize, usize, (usize, usize)) {
+        assert!(i < self.src_size);
 
         // binary search
         let mut lo = 0;
@@ -53,16 +57,6 @@ impl Source {
 
         // must use this crate since identifiers are catch-all
         let col = UnicodeSegmentation::graphemes(&self.src[self.line_pos[lo]..i], true).count();
-        (lo + 1, col + 1)
+        (lo + 1, col + 1, (self.line_pos[lo], self.line_pos[lo + 1]))
     }
-}
-
-/// Invariants: No changes are made to existing
-#[derive(Default)]
-pub struct Sources {
-    inner: Vec<Source>,
-}
-
-impl Sources {
-    fn get(&self) {}
 }

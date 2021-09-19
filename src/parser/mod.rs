@@ -25,6 +25,7 @@ pub struct Parser<'a> {
 macro_rules! expect_or_error {
     ($parser: ident, |$t: ident| $error: block, $( $pattern:pat )|+ $( if $guard: expr )? => $r: ident) => {{
 		let mut errored = false;
+		let start = $parser.lex.span();
 		loop {
 			let $t = $parser.next();
 			match $t {
@@ -32,7 +33,7 @@ macro_rules! expect_or_error {
 				None => todo!(),
 				_ if errored => {}
 				$t => {
-					$parser.session.error(Diagnostic::new($parser.lex.span(), $error));
+					$parser.session.error(Diagnostic::new(start.to($parser.lex.span()), $error));
 					errored = true;
 				}
 			}

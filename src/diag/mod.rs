@@ -2,24 +2,23 @@ use crate::{lexer::Token, span::Span};
 use std::fmt::Display;
 
 pub struct Diagnostic {
-    span: Span,
-    message: Message,
-}
-
-pub enum DiagnosticStyle {
-    Error,
-    Warning,
-    Pedantic,
+    pub span: Span,
+    pub message: Message,
 }
 
 impl Diagnostic {
     pub fn new(span: Span, message: Message) -> Self {
         Diagnostic { span, message }
     }
+}
 
-    // TODO: Limit to non-wasm targets
-    // Diagnostics will be handled on the JS side
-    pub fn print(span: Span, message: Message) {}
+// TODO: Refactor
+impl Display for Diagnostic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.message {
+            Message::ExpectedGot(e, g) => write!(f, "expected {:?}, got {:?}", e, g),
+        }
+    }
 }
 
 // TODO: Remove

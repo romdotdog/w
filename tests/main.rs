@@ -7,5 +7,6 @@ fn basic_fn() {
     let sess = Session::new();
     let entry = sess.register_source("fn.w".to_owned(), file);
     let t = sess.parse(entry).parse();
-    println!("{:#?}", t);
+    //println!("{:#?}", t);
+    sess.diagnostics();
 }

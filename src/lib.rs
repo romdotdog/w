@@ -43,10 +43,35 @@ impl Session {
     }
 
     pub fn get_source(&self, i: &SourceRef) -> &Source {
-        self.sources.get(i.0).unwrap()
+        &self.sources[i.0]
     }
 
     pub fn error(&self, diag: Diagnostic) {
         self.errors.push(diag);
+    }
+
+    // TODO: Limit to non-wasm targets
+    // Diagnostics will be handled on the JS side
+    pub fn diagnostics(&self) {
+        for i in 0..self.errors.len() {
+            let v = self.errors.get(i).unwrap();
+            let src = self.get_source(&v.span.src);
+            let start_pos = v.span.start;
+            let end_pos = v.span.end;
+
+            assert!(start_pos < end_pos);
+
+            let (line, col, (sol, eol)) = src.line_col(start_pos);
+            println!(
+                "{}:{}:{}: error: {}\n{}\n{}{}",
+                src.name(),
+                line,
+                col,
+                v,
+                &src.content()[sol..eol],
+                " ".repeat(i - start_pos),
+                "^".repeat(v.span.end - start_pos),
+            )
+        }
     }
 }
