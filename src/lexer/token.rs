@@ -12,13 +12,6 @@ pub enum Token {
     LeftBracket,
     RightBracket,
 
-    I32,
-    I64,
-    U32,
-    U64,
-    F32,
-    F64,
-
     Op { t: Op, is_assignment: bool },
 
     UInteger(u64),

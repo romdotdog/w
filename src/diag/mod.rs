@@ -26,12 +26,9 @@ pub enum Lexeme {
     RightParen,
     LeftBracket,
     RightBracket,
-    I32,
-    I64,
-    U32,
-    U64,
-    F32,
-    F64,
+    LeftAngBracket,
+    RightAngBracket,
+
     Op,
     Integer,
     UInteger,
@@ -43,6 +40,7 @@ pub enum Lexeme {
     // Misc
     Eof,
     PrimaryExpr,
+    Type,
 }
 
 impl From<Token> for Lexeme {
@@ -58,12 +56,6 @@ impl From<Token> for Lexeme {
             Token::RightParen => Lexeme::LeftParen,
             Token::LeftBracket => Lexeme::LeftParen,
             Token::RightBracket => Lexeme::LeftParen,
-            Token::I32 => Lexeme::I32,
-            Token::I64 => Lexeme::I64,
-            Token::U32 => Lexeme::U32,
-            Token::U64 => Lexeme::U64,
-            Token::F32 => Lexeme::F32,
-            Token::F64 => Lexeme::F64,
             Token::Op { .. } => Lexeme::Op,
             Token::UInteger(_) => Lexeme::UInteger,
             Token::Integer(_) => Lexeme::Integer,

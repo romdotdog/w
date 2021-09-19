@@ -5,13 +5,15 @@
 
 use crate::{
     diag::{Diagnostic, Lexeme, Message},
-    lexer::{Lexer, Token},
+    lexer::{Lexer, Op, Token},
     Session,
 };
 
 mod ast;
 pub use ast::Atom;
 use ast::TopLevel;
+
+use self::ast::Type;
 
 pub struct Parser<'a> {
     session: &'a Session,
@@ -79,30 +81,71 @@ impl<'a> Parser<'a> {
         Atom::Block(r, Box::new(last))
     }
 
+    fn recover(&mut self) -> Atom {
+        loop {
+            match self.lex.next() {
+                Some(Token::Semicolon) | None => break Atom::Null,
+                _ => {}
+            }
+        }
+    }
+
+    fn recover_fn(&mut self) -> Atom {
+        loop {
+            match self.lex.next() {
+                Some(Token::Fn) | None => break Atom::Null,
+                _ => {}
+            }
+        }
+    }
+
     fn primaryexpr(&mut self) -> Atom {
         match self.lex.next() {
             Some(Token::LeftParen) => {
                 let e = self.expr();
                 expect_or_error!(self, RightParen);
-                Atom::Paren(Box::new(e))
+
+                match e {
+                    Atom::Ident(s) => Atom::Cast(s.into(), Box::new(self.primaryexpr())),
+                    _ => Atom::Paren(Box::new(e)),
+                }
             }
             Some(Token::Float(f)) => Atom::Float(f),
             Some(Token::Integer(f)) => Atom::Integer(f),
             Some(Token::Ident(s)) => Atom::Ident(s),
             Some(Token::LeftBracket) => self.block(),
-            t => {
-                self.session.error(Diagnostic::new(
-                    self.lex.span(),
-                    Message::ExpectedGot(Lexeme::PrimaryExpr, t.into()),
-                ));
+            Some(Token::Op { t: Op::Lt, .. }) => match self.lex.next() {
+                Some(Token::Ident(s)) => {
+                    expect_or_error!(
+                        self,
+                        |t| { Message::ExpectedGot(Lexeme::RightAngBracket, t.into()) },
+                        Some(Token::Op { t: Op::Gt, .. }) => t
+                    );
 
-                loop {
-                    match self.lex.next() {
-                        Some(Token::Semicolon) | None => break Atom::Null,
-                        _ => {}
-                    }
+                    Atom::Reinterpret(s.into(), Box::new(self.primaryexpr()))
                 }
+                t => {
+                    self.session.error(Diagnostic::new(
+                        self.lex.span(),
+                        Message::ExpectedGot(Lexeme::Type, t.into()),
+                    ));
+
+                    self.recover()
+                }
+            },
+            Some(Token::If) => {
+                let cond = Box::new(self.expr());
+                let body = Box::new(self.expr());
+                let mut else_body = None;
+                match self.lex.next() {
+                    Some(Token::Else) => {
+                        else_body = Some(Box::new(self.expr()));
+                    }
+                    t => self.lex.insert(t),
+                }
+                Atom::If(cond, body, else_body)
             }
+            _ => self.recover(),
         }
     }
 
@@ -191,9 +234,23 @@ impl<'a> Parser<'a> {
 
                     expect_or_error!(self, LeftParen);
                     expect_or_error!(self, RightParen);
+                    expect_or_error!(self, Colon);
+
+                    let t = match self.lex.next() {
+                        Some(Token::Ident(s)) => s.into(),
+                        t => {
+                            self.session.error(Diagnostic::new(
+                                self.lex.span(),
+                                Message::ExpectedGot(Lexeme::Type, t.into()),
+                            ));
+
+                            self.recover_fn();
+                            continue;
+                        }
+                    };
 
                     let e = self.expr();
-                    r.push(TopLevel::Fn(name, e))
+                    r.push(TopLevel::Fn(name, e, t))
                 }
                 _ => todo!(),
             }

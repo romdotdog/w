@@ -15,7 +15,7 @@ fn log10(x: f64): f64 {
 	u = <u64>x;
 	hx = (u32)(u >> 32);
 	k = 0;
-	if hx < 0x00100000 || hx >> 31 {
+	if hx < 0x00100000 | hx >> 31 {
 		if (u << 1 == 0) return -1 / (x * x); // log(+-0) = -inf 
 		if (hx >> 31) return (x - x) / 0.0; // log(-#) = NaN
 
@@ -26,7 +26,7 @@ fn log10(x: f64): f64 {
 		hx = (u32)(u >> 32);
 	} else if hx >= 0x7FF00000 {
 		return x;
-	} else if hx == 0x3FF00000 && u << 32 == 0
+	} else if hx == 0x3FF00000 & u << 32 == 0
 		return 0;
 	
 	// reduce x into [sqrt(2)/2, sqrt(2)]
