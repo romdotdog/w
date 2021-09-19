@@ -93,6 +93,8 @@ impl<'a> Lexer<'a> {
         Some(match c {
             ':' => Token::Colon,
             ';' => Token::Semicolon,
+            ',' => Token::Comma,
+            '!' => Token::Exclamation,
             '{' => Token::LeftBracket,
             '}' => Token::RightBracket,
             '(' => Token::LeftParen,

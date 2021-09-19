@@ -19,13 +19,14 @@ use self::ast::{AtomVariant, TypeVariant};
 pub struct Parser<'a> {
     session: &'a Session,
     lex: Lexer<'a>,
+    token_buffer: Option<Token>,
 }
 
 macro_rules! expect_or_error {
     ($parser: ident, |$t: ident| $error: block, $( $pattern:pat )|+ $( if $guard: expr )? => $r: ident) => {{
 		let mut errored = false;
 		loop {
-			let $t = $parser.lex.next();
+			let $t = $parser.next();
 			match $t {
 				$( $pattern )|+ $( if $guard )? => break $r,
 				None => todo!(),
@@ -52,11 +53,16 @@ impl<'a> Parser<'a> {
         Parser {
             session,
             lex: Lexer::new(session, src),
+            token_buffer: None,
         }
     }
 
+    fn next(&mut self) -> Option<Token> {
+        self.token_buffer.take().or_else(|| self.lex.next())
+    }
+
     pub fn expect(&mut self, t: Option<Token>) {
-        assert_eq!(self.lex.next(), t);
+        assert_eq!(self.next(), t);
     }
 
     pub fn block(&mut self) -> Atom {
@@ -72,8 +78,9 @@ impl<'a> Parser<'a> {
             }
 
             last = Some(self.expr());
-            match self.lex.next() {
+            match self.next() {
                 Some(Token::Semicolon) => continue,
+                Some(Token::RightBracket) => break,
                 _ => {
                     expect_or_error!(self, RightBracket);
                     break;
@@ -91,7 +98,7 @@ impl<'a> Parser<'a> {
     fn recover(&mut self) -> Atom {
         let start = self.lex.span();
         loop {
-            match self.lex.next() {
+            match self.next() {
                 Some(Token::Semicolon) | None => {
                     break Atom::new(
                         AtomVariant::Null,
@@ -107,7 +114,7 @@ impl<'a> Parser<'a> {
     fn parse_type(&mut self) -> Type {
         let mut indir: u8 = 0;
         loop {
-            match self.lex.next() {
+            match self.next() {
                 Some(Token::Op {
                     t: Op::And,
                     is_assignment: false,
@@ -122,10 +129,22 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn ident_type_pair(&mut self) -> (String, Type) {
+        let name = expect_or_error!(
+            self,
+            |t| { Message::ExpectedGot(Lexeme::Ident, t.into()) },
+            Some(Token::Ident(r)) => r
+        );
+
+        expect_or_error!(self, Colon);
+
+        (name, self.parse_type())
+    }
+
     fn recover_fn(&mut self) -> Atom {
         let start = self.lex.span();
         loop {
-            match self.lex.next() {
+            match self.next() {
                 Some(Token::Fn) | None => {
                     break Atom::new(
                         AtomVariant::Null,
@@ -139,7 +158,7 @@ impl<'a> Parser<'a> {
     }
 
     fn primaryexpr(&mut self) -> Atom {
-        match self.lex.next() {
+        match self.next() {
             Some(Token::LeftParen) => {
                 let start = self.lex.span();
                 let e = self.expr();
@@ -167,7 +186,7 @@ impl<'a> Parser<'a> {
                 let t = self.parse_type();
                 let mut op = Op::Cast;
 
-                match self.lex.next() {
+                match self.next() {
                     Some(Token::Op { t: Op::Gt, .. }) => {}
                     t1 => {
                         if t1 == Some(Token::Exclamation) {
@@ -193,11 +212,11 @@ impl<'a> Parser<'a> {
                 let cond = Box::new(self.expr());
                 let body = Box::new(self.expr());
                 let mut else_body = None;
-                match self.lex.next() {
+                match self.next() {
                     Some(Token::Else) => {
                         else_body = Some(Box::new(self.expr()));
                     }
-                    t => self.lex.insert(t),
+                    t => self.token_buffer = t,
                 }
 
                 // TODO: body return checking
@@ -214,7 +233,7 @@ impl<'a> Parser<'a> {
     fn subexpr(&mut self, mut lhs: Atom, min_prec: u8) -> Atom {
         // https://en.wikipedia.org/wiki/Operator-precedence_parser
 
-        let mut l = self.lex.next();
+        let mut l = self.next();
         loop {
             let mut t1_prec = 0;
             match l {
@@ -228,7 +247,7 @@ impl<'a> Parser<'a> {
                 {
                     let mut rhs = self.primaryexpr();
 
-                    l = self.lex.next();
+                    l = self.next();
                     loop {
                         // what's this variable?
                         // Wikipedia's pseudocode is wrong. if t1 is a right associative op
@@ -251,7 +270,7 @@ impl<'a> Parser<'a> {
                                 }
                             } =>
                             {
-                                self.lex.insert(l);
+                                self.token_buffer = l;
                                 rhs = self.subexpr(
                                     rhs,
                                     if right_associative {
@@ -260,7 +279,7 @@ impl<'a> Parser<'a> {
                                         t1_prec + 1
                                     },
                                 );
-                                l = self.lex.next()
+                                l = self.next()
                             }
                             _ => break,
                         }
@@ -274,7 +293,7 @@ impl<'a> Parser<'a> {
                     );
                 }
                 _ => {
-                    self.lex.insert(l);
+                    self.token_buffer = l;
                     break;
                 }
             }
@@ -289,7 +308,7 @@ impl<'a> Parser<'a> {
 
     pub fn parse(mut self) -> Vec<TopLevel> {
         let mut r = Vec::new();
-        while let Some(t) = self.lex.next() {
+        while let Some(t) = self.next() {
             match t {
                 Token::Fn => {
                     let name = expect_or_error!(
@@ -299,10 +318,28 @@ impl<'a> Parser<'a> {
                     );
 
                     expect_or_error!(self, LeftParen);
-                    expect_or_error!(self, RightParen);
+                    let mut params = Vec::new();
+
+                    match self.next() {
+                        Some(Token::RightParen) => {}
+                        t => {
+                            self.token_buffer = t;
+                            // TODO: remove
+
+                            loop {
+                                params.push(self.ident_type_pair());
+                                match self.next() {
+                                    Some(Token::Comma) => {}
+                                    Some(Token::RightParen) => break,
+                                    _ => todo!(),
+                                }
+                            }
+                        }
+                    }
+
                     expect_or_error!(self, Colon);
 
-                    let t = match self.lex.next() {
+                    let t = match self.next() {
                         Some(Token::Ident(s)) => s.into(),
                         t => {
                             self.session.error(Diagnostic::new(
@@ -316,7 +353,7 @@ impl<'a> Parser<'a> {
                     };
 
                     let e = self.expr();
-                    r.push(TopLevel::Fn(name, e, t))
+                    r.push(TopLevel::Fn(name, params, e, t))
                 }
                 _ => todo!(),
             }

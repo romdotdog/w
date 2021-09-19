@@ -7,7 +7,7 @@ use crate::{lexer::Op, span::Span};
 
 #[derive(Debug)]
 pub enum TopLevel {
-    Fn(String, Atom, TypeVariant),
+    Fn(String, Vec<(String, Type)>, Atom, TypeVariant),
 }
 
 type BAtom = Box<Atom>;
@@ -80,7 +80,7 @@ impl From<String> for TypeVariant {
             "u64" => TypeVariant::U64,
             "f32" => TypeVariant::F32,
             "f64" => TypeVariant::F64,
-            _ => todo!(),
+            _ => panic!("{}", s),
         }
     }
 }
