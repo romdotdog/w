@@ -143,7 +143,7 @@ impl<'a> Lexer<'a> {
 
                                 if header_digit.is_digit(radix) {
                                     // go on parsing as normal
-                                    let mut num = String::from(header_digit);
+                                    let mut num = header_digit.to_string();
                                     loop {
                                         match self.nextc() {
                                             Some(t) if t.is_digit(radix) => {
@@ -159,7 +159,7 @@ impl<'a> Lexer<'a> {
                                     let codepoint = u32::from_str_radix(&num, radix);
                                     assert!(codepoint.is_ok(), "max escape value is {}", u32::MAX);
 
-                                    let escaped = char::from_u32(codepoint.unwrap());
+                                    let escaped = std::char::from_u32(codepoint.unwrap());
                                     assert!(
                                         escaped.is_some(),
                                         "invalid codepoint, cannot add \\{}{} as part of escape",
@@ -298,7 +298,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
 
-                let mut num = String::from(c);
+                let mut num = c.to_string();
                 self.skip_digits(&mut num, radix);
 
                 if c != '.'
@@ -397,7 +397,7 @@ impl<'a> Iterator for Lexer<'a> {
         };
 
         self.try_tk_bip(c).or_else(|| {
-            let mut ident = String::from(c);
+            let mut ident = c.to_string();
             self.start = self.p as usize;
 
             while let Some(c2) = self.nextc() {
