@@ -324,11 +324,9 @@ impl<'a> Lexer<'a> {
                     Token::Float(num.parse::<f64>().unwrap())
                 } else {
                     let num = u64::from_str_radix(&num, radix).unwrap();
-                    if num < i64::MAX as u64 {
-                        Token::Integer(num as i64)
-                    } else {
-                        Token::UInteger(num)
-                    }
+					Token::Integer(unsafe {
+						std::mem::transmute::<u64, i64>(num)
+					})
                 }
             }
             _ => return self.try_aip(c),

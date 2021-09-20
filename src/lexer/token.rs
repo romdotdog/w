@@ -15,7 +15,6 @@ pub enum Token {
 
     Op { t: Op, is_assignment: bool },
 
-    UInteger(u64),
     Integer(i64),
     Float(f64),
 

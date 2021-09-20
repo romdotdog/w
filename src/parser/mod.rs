@@ -189,9 +189,6 @@ impl<'a> Parser<'a> {
             Some(Token::Integer(f)) => {
                 Atom::new(AtomVariant::Integer(f), self.lex.span(), Type::auto())
             }
-			Some(Token::UInteger(f)) => {
-                Atom::new(AtomVariant::UInteger(f), self.lex.span(), Type::auto())
-            }
             Some(Token::Ident(s)) => {
                 Atom::new(AtomVariant::Ident(s), self.lex.span(), Type::auto())
             }

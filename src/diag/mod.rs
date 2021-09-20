@@ -41,7 +41,6 @@ pub enum Lexeme {
 
     Op,
     Integer,
-    UInteger,
     Float,
     String,
     Char,
@@ -68,7 +67,6 @@ impl From<Token> for Lexeme {
             Token::LeftBracket => Lexeme::LeftParen,
             Token::RightBracket => Lexeme::LeftParen,
             Token::Op { .. } => Lexeme::Op,
-            Token::UInteger(_) => Lexeme::UInteger,
             Token::Integer(_) => Lexeme::Integer,
             Token::Float(_) => Lexeme::Float,
             Token::String(_) => Lexeme::String,
