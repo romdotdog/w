@@ -63,7 +63,7 @@ impl Session {
 
             let (line, col, (sol, eol)) = src.line_col(start_pos);
             println!(
-                "{}:{}:{}: error: {}\n{}\n{}{}",
+                "\x1b[1m{}:{}:{}: \x1b[91merror:\x1b[0m {}\n{}\n{}\x1b[91m\x1b[1m{}\x1b[0m",
                 src.name(),
                 line,
                 col,
