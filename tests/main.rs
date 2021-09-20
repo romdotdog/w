@@ -24,8 +24,8 @@ fn basic_fn() {
 }
 
 test! {
-	missing_semicolon,
-	r#"
+    missing_semicolon,
+    r#"
 fn main(): u64 {
 	i = 1
 	i = 2

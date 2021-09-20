@@ -85,14 +85,14 @@ impl From<Option<Token>> for Lexeme {
 
 pub enum Message {
     ExpectedGot(Lexeme, Lexeme),
-	MissingSemicolon
+    MissingSemicolon,
 }
 
 impl Display for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Message::ExpectedGot(a, b) => write!(f, "expected {:?}, got {:?}", a, b),
-			Message::MissingSemicolon => write!(f, "missing a semicolon or closing brace")
+            Message::MissingSemicolon => write!(f, "missing a semicolon or closing brace"),
         }
     }
 }

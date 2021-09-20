@@ -324,9 +324,7 @@ impl<'a> Lexer<'a> {
                     Token::Float(num.parse::<f64>().unwrap())
                 } else {
                     let num = u64::from_str_radix(&num, radix).unwrap();
-					Token::Integer(unsafe {
-						std::mem::transmute::<u64, i64>(num)
-					})
+                    Token::Integer(unsafe { std::mem::transmute::<u64, i64>(num) })
                 }
             }
             _ => return self.try_aip(c),

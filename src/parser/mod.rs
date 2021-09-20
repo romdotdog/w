@@ -93,11 +93,11 @@ impl<'a> Parser<'a> {
                 Some(Token::Semicolon) => continue,
                 Some(Token::RightBracket) => break,
                 t => {
-					expect_or_error!(
-						self,
-						|t| { Message::MissingSemicolon },
-						Some(Token::RightBracket) => t
-					);
+                    expect_or_error!(
+                        self,
+                        |t| { Message::MissingSemicolon },
+                        Some(Token::RightBracket) => t
+                    );
                     break;
                 }
             }
@@ -243,28 +243,28 @@ impl<'a> Parser<'a> {
                     Type::new(TypeVariant::Null, 0),
                 )
             }
-			Some(Token::Return) => {
-				let start = self.lex.span();
+            Some(Token::Return) => {
+                let start = self.lex.span();
                 let e = self.expr();
-				let t = e.t;
+                let t = e.t;
 
                 Atom::new(
                     AtomVariant::Return(Box::new(e)),
                     start.to(self.lex.span()),
                     t,
                 )
-			}
-			Some(Token::Op { t: Op::Sub, .. }) => {
-				let start = self.lex.span();
+            }
+            Some(Token::Op { t: Op::Sub, .. }) => {
+                let start = self.lex.span();
                 let e = self.expr();
-				let t = e.t;
+                let t = e.t;
 
                 Atom::new(
                     AtomVariant::UnOp(Op::Sub, Box::new(e)),
                     start.to(self.lex.span()),
                     t,
                 )
-			}
+            }
             t => self.recover(),
         }
     }

@@ -25,7 +25,7 @@ pub enum AtomVariant {
 
     Block(Vec<Atom>, BAtom),
     If(BAtom, BAtom, Option<BAtom>),
-	Return(BAtom)
+    Return(BAtom),
 }
 
 #[derive(Debug)]
