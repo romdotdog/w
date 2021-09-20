@@ -93,8 +93,11 @@ impl<'a> Parser<'a> {
                 Some(Token::Semicolon) => continue,
                 Some(Token::RightBracket) => break,
                 t => {
-					self.token_buffer = t;
-                    expect_or_error!(self, RightBracket);
+					expect_or_error!(
+						self,
+						|t| { Message::MissingSemicolon },
+						Some(Token::RightBracket) => t
+					);
                     break;
                 }
             }
