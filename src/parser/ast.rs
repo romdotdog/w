@@ -15,6 +15,7 @@ type BAtom = Box<Atom>;
 #[derive(Debug)]
 pub enum AtomVariant {
     Integer(i64),
+	UInteger(u64),
     Float(f64),
     Ident(String),
     Null,
@@ -25,6 +26,7 @@ pub enum AtomVariant {
 
     Block(Vec<Atom>, BAtom),
     If(BAtom, BAtom, Option<BAtom>),
+	Return(BAtom)
 }
 
 #[derive(Debug)]

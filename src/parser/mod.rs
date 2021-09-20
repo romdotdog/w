@@ -85,14 +85,15 @@ impl<'a> Parser<'a> {
                 }
                 t => {
                     self.token_buffer = t;
-                    last = Some(self.expr())
+                    last = Some(self.expr());
                 }
             }
 
             match self.next() {
                 Some(Token::Semicolon) => continue,
                 Some(Token::RightBracket) => break,
-                _ => {
+                t => {
+					self.token_buffer = t;
                     expect_or_error!(self, RightBracket);
                     break;
                 }
@@ -188,6 +189,9 @@ impl<'a> Parser<'a> {
             Some(Token::Integer(f)) => {
                 Atom::new(AtomVariant::Integer(f), self.lex.span(), Type::auto())
             }
+			Some(Token::UInteger(f)) => {
+                Atom::new(AtomVariant::UInteger(f), self.lex.span(), Type::auto())
+            }
             Some(Token::Ident(s)) => {
                 Atom::new(AtomVariant::Ident(s), self.lex.span(), Type::auto())
             }
@@ -239,7 +243,29 @@ impl<'a> Parser<'a> {
                     Type::new(TypeVariant::Null, 0),
                 )
             }
-            _ => self.recover(),
+			Some(Token::Return) => {
+				let start = self.lex.span();
+                let e = self.expr();
+				let t = e.t;
+
+                Atom::new(
+                    AtomVariant::Return(Box::new(e)),
+                    start.to(self.lex.span()),
+                    t,
+                )
+			}
+			Some(Token::Op { t: Op::Sub, .. }) => {
+				let start = self.lex.span();
+                let e = self.expr();
+				let t = e.t;
+
+                Atom::new(
+                    AtomVariant::UnOp(Op::Sub, Box::new(e)),
+                    start.to(self.lex.span()),
+                    t,
+                )
+			}
+            t => self.recover(),
         }
     }
 
