@@ -5,9 +5,15 @@ use crate::{lexer::Op, span::Span};
     * Remove Debug derives
 */
 
-#[derive(Debug)]
-pub enum TopLevel {
-    Fn(String, Vec<(String, Type)>, Atom, TypeVariant),
+pub struct Program {
+    pub fns: Vec<WFn>,
+}
+
+pub struct WFn {
+    pub name: String,
+    pub params: Vec<(String, Type)>,
+    pub atom: Atom,
+    pub t: Type,
 }
 
 type BAtom = Box<Atom>;

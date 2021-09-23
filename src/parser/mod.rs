@@ -6,15 +6,14 @@
 use crate::{
     diag::{Diagnostic, Lexeme, Message},
     lexer::{Lexer, Op, Token},
-    parser::ast::Type,
+    parser::ast::{Type, WFn},
     Session, SourceRef,
 };
 
 mod ast;
 pub use ast::Atom;
-use ast::TopLevel;
 
-use self::ast::{AtomVariant, TypeVariant};
+use self::ast::{AtomVariant, Program, TypeVariant};
 
 pub struct Parser<'a> {
     session: &'a Session,
@@ -345,8 +344,8 @@ impl<'a> Parser<'a> {
         self.subexpr(lhs, 0)
     }
 
-    pub fn parse(mut self) -> Vec<TopLevel> {
-        let mut r = Vec::new();
+    pub fn parse(mut self) -> Program {
+        let mut fns = Vec::new();
         while let Some(t) = self.next() {
             match t {
                 Token::Fn => {
@@ -378,25 +377,20 @@ impl<'a> Parser<'a> {
 
                     expect_or_error!(self, Colon);
 
-                    let t = match self.next() {
-                        Some(Token::Ident(s)) => s.into(),
-                        t => {
-                            self.session.error(Diagnostic::new(
-                                self.lex.span(),
-                                Message::ExpectedGot(Lexeme::Type, t.into()),
-                            ));
+                    let t = self.parse_type();
+                    let atom = self.expr();
 
-                            self.recover_fn();
-                            continue;
-                        }
-                    };
-
-                    let e = self.expr();
-                    r.push(TopLevel::Fn(name, params, e, t))
+                    fns.push(WFn {
+                        name,
+                        params,
+                        atom,
+                        t,
+                    })
                 }
                 _ => todo!(),
             }
         }
-        r
+
+        Program { fns }
     }
 }
