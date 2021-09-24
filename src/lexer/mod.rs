@@ -58,6 +58,8 @@ impl<'a> Lexer<'a> {
             "return" => Token::Return,
             "if" => Token::If,
             "else" => Token::Else,
+			"let" => Token::Let,
+			"mut" => Token::Mut,
             _ => Token::Ident(s),
         }
     }

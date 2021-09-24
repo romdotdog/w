@@ -5,10 +5,12 @@ use crate::{lexer::Op, span::Span};
     * Remove Debug derives
 */
 
+#[derive(Debug)]
 pub struct Program {
     pub fns: Vec<WFn>,
 }
 
+#[derive(Debug)]
 pub struct WFn {
     pub name: String,
     pub params: Vec<(String, Type)>,
@@ -30,8 +32,16 @@ pub enum AtomVariant {
     UnOp(Op, BAtom),
 
     Block(Vec<Atom>, BAtom),
+	Let(bool, Vec<Declaration>),
     If(BAtom, BAtom, Option<BAtom>),
     Return(BAtom),
+}
+
+#[derive(Debug)]
+pub struct Declaration {
+	pub lvalue: Atom,
+	pub rvalue: Option<Atom>,
+	pub t: Type,
 }
 
 #[derive(Debug)]

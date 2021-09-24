@@ -13,7 +13,7 @@ use crate::{
 mod ast;
 pub use ast::Atom;
 
-use self::ast::{AtomVariant, Program, TypeVariant};
+use self::ast::{AtomVariant, Program, TypeVariant, Declaration};
 
 pub struct Parser<'a> {
     session: &'a Session,
@@ -194,6 +194,51 @@ impl<'a> Parser<'a> {
             Some(Token::Ident(s)) => {
                 Atom::new(AtomVariant::Ident(s), self.lex.span(), Type::auto())
             }
+			Some(Token::Let) => {
+				let start = self.lex.span();
+				let mut mutable = false;
+				match self.next() {
+					Some(Token::Mut) => mutable = true,
+					t => self.token_buffer = t
+				}
+
+				let mut v = Vec::with_capacity(1);
+				loop {
+					let lvalue = self.primaryexpr();
+					let mut type_ = Type::auto();
+					let mut rvalue = None;
+
+					match self.next() {
+						Some(Token::Colon) => {
+							type_ = self.parse_type();
+						}
+						t => self.token_buffer = t
+					}
+
+					match self.next() {
+						Some(Token::Op { t: Op::Id, .. }) => {
+							rvalue = Some(self.expr());
+						},
+						t => self.token_buffer = t
+					}
+
+					v.push(Declaration {
+						lvalue,
+						rvalue,
+						t: type_
+					});
+
+					match self.next() {
+						Some(Token::Comma) => {}
+						t => {
+							self.token_buffer = t;
+							break;
+						}
+					}
+				}
+
+				Atom::new(AtomVariant::Let(mutable, v), start.to(self.lex.span()), Type::new(TypeVariant::Null, 0))
+			}
             Some(Token::LeftBracket) => self.block(),
             Some(Token::Op { t: Op::Lt, .. }) => {
                 let start = self.lex.span();

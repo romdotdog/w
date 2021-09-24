@@ -4,6 +4,8 @@ pub enum Token {
     Return,
     If,
     Else,
+	Let,
+	Mut,
 
     Semicolon,
     Colon,
