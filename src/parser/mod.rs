@@ -10,6 +10,8 @@ use crate::{
     Session, SourceRef,
 };
 
+pub mod indir;
+use indir::Indir;
 mod ast;
 pub use ast::Atom;
 
@@ -104,7 +106,7 @@ impl<'a> Parser<'a> {
 
         let span = start.to(self.lex.span());
         let last = last
-            .unwrap_or_else(|| Atom::new(AtomVariant::Null, span, Type::new(TypeVariant::Null, 0)));
+            .unwrap_or_else(|| Atom::new(AtomVariant::Null, span, Type::new(TypeVariant::Null)));
         let t = last.t;
         Atom::new(AtomVariant::Block(r, Box::new(last)), span, t)
     }
@@ -117,7 +119,7 @@ impl<'a> Parser<'a> {
                     break Atom::new(
                         AtomVariant::Null,
                         start.to(self.lex.span()),
-                        Type::new(TypeVariant::Null, 0),
+                        Type::new(TypeVariant::Null),
                     )
                 }
                 _ => {}
@@ -126,17 +128,24 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_type(&mut self) -> Type {
-        let mut indir: u8 = 0;
+        let mut indir = Indir::none();
+		let count = 0;
         loop {
             match self.next() {
                 Some(Token::Op {
-                    t: Op::And,
+                    t: Op::Mul,
                     is_assignment: false,
                 }) => {
-                    indir = indir.checked_add(1).unwrap_or_else(|| todo!());
+                    indir.add(match self.next() {
+						Some(Token::Mut) => true,
+						t => {
+							self.token_buffer = t;
+							false
+						}
+					})
                 }
                 Some(Token::Ident(s)) => {
-                    return Type::new(s.into(), indir);
+                    return Type::with_indir(s.into(), indir);
                 }
                 _ => todo!(),
             }
@@ -163,7 +172,7 @@ impl<'a> Parser<'a> {
                     break Atom::new(
                         AtomVariant::Null,
                         start.to(self.lex.span()),
-                        Type::new(TypeVariant::Null, 0),
+                        Type::new(TypeVariant::Null),
                     )
                 }
                 _ => {}
@@ -237,7 +246,7 @@ impl<'a> Parser<'a> {
 					}
 				}
 
-				Atom::new(AtomVariant::Let(mutable, v), start.to(self.lex.span()), Type::new(TypeVariant::Null, 0))
+				Atom::new(AtomVariant::Let(mutable, v), start.to(self.lex.span()), Type::new(TypeVariant::Null))
 			}
             Some(Token::LeftBracket) => self.block(),
             Some(Token::Op { t: Op::Lt, .. }) => {
@@ -248,7 +257,7 @@ impl<'a> Parser<'a> {
                 match self.next() {
                     Some(Token::Op { t: Op::Gt, .. }) => {}
                     t1 => {
-                        // !
+                        // !x
                         match t1 {
                             Some(Token::Op { t: Op::LNot, .. }) => op = Op::Reinterpret,
                             _ => {}
@@ -284,7 +293,7 @@ impl<'a> Parser<'a> {
                 Atom::new(
                     AtomVariant::If(cond, body, else_body),
                     start.to(self.lex.span()),
-                    Type::new(TypeVariant::Null, 0),
+                    Type::new(TypeVariant::Null),
                 )
             }
             Some(Token::Return) => {

@@ -1,4 +1,5 @@
 use crate::{lexer::Op, span::Span};
+use super::indir::Indir;
 
 /*
     TODO:
@@ -60,21 +61,23 @@ impl Atom {
 #[derive(Debug, Clone, Copy)]
 pub struct Type {
     v: TypeVariant,
-    indir: u8,
+    indir: Indir,
 }
 
 impl Type {
-    pub fn new(v: TypeVariant, indir: u8) -> Self {
-        Type { v, indir }
+    pub fn new(v: TypeVariant) -> Self {
+        Type { v, indir: Indir::none() }
     }
 
+	pub fn with_indir(v: TypeVariant, indir: Indir) -> Self {
+		Type { v, indir }
+	}
+
     pub fn auto() -> Self {
-        Type {
-            v: TypeVariant::Auto,
-            indir: 0,
-        }
+		Self::new(TypeVariant::Auto)
     }
 }
+
 
 #[derive(Debug, Clone, Copy)]
 pub enum TypeVariant {
