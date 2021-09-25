@@ -1,6 +1,7 @@
 /*
     TODO:
-    * Refactor right associativity
+    * Diagnostics
+    * Fill all `todo!()`s
 */
 
 use crate::{
