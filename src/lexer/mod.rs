@@ -197,8 +197,16 @@ impl<'a> Lexer<'a> {
                                     res.push(header_char);
                                 }
                             } else {
-                                // is not an escape
-                                res.push(header_char);
+                                // TODO: Figure out the semantics of this
+                                res.push(match header_char {
+                                    't' => '\t',
+                                    'r' => '\r',
+                                    'n' => '\n',
+                                    _ => {
+                                        // is not an escape
+                                        header_char
+                                    }
+                                })
                             }
                         }
                         Some('"') => {
