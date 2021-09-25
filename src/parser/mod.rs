@@ -324,71 +324,90 @@ impl<'a> Parser<'a> {
 
     fn subexpr(&mut self, mut lhs: Atom, min_prec: u8) -> Atom {
         // https://en.wikipedia.org/wiki/Operator-precedence_parser
-
         let mut l = self.next();
         loop {
-            let mut t1_prec = 0;
-            match l {
-                Some(Token::Op { t, is_assignment })
-                    if t.is_binary() && {
-                        // from the article:
-                        // binary operator whose precedence is >= min_precedence
-                        t1_prec = t.prec(is_assignment);
-                        t1_prec >= min_prec
-                    } =>
-                {
-                    let mut rhs = self.primaryexpr();
-
-                    l = self.next();
-                    loop {
-                        // what's this variable?
-                        // Wikipedia's pseudocode is wrong. if t1 is a right associative op
-                        // with equal precedence, then trying to match t2 with a higher
-                        // min_prec is impossible
-                        let mut right_associative = false;
-                        match l {
-                            Some(Token::Op {
-                                ref t,
-                                is_assignment,
-                            }) if t.is_binary() && {
-                                // from the article:
-                                // binary operator whose precedence is greater than op's
-                                // or a right-associative operator whose precedence
-                                // is equal to op's
-                                let prec = t.prec(is_assignment);
-                                prec > t1_prec || {
-                                    right_associative = is_assignment && prec == t1_prec;
-                                    right_associative
-                                }
-                            } =>
-                            {
-                                self.token_buffer = l;
-                                rhs = self.subexpr(
-                                    rhs,
-                                    if right_associative {
-                                        t1_prec
-                                    } else {
-                                        t1_prec + 1
-                                    },
-                                );
-                                l = self.next()
-                            }
-                            _ => break,
-                        }
-                    }
-
-                    let span = lhs.span.to(rhs.span);
-                    lhs = Atom::new(
-                        AtomVariant::BinOp(Box::new(lhs), t, Box::new(rhs)),
-                        span,
-                        Type::auto(),
-                    );
-                }
-                _ => {
-                    self.token_buffer = l;
+			let t = match l {
+				Some(Token::Op(Op::Binary(Op::Compound(t)))) | 
+				Some(Token::Op(Op::Binary(Op::Regular(t)))) => t,
+				Some(Token::Op(Op::Ambiguous(t))) => t.to_binary(),
+				_ => {
+					self.token_buffer = l;
                     break;
-                }
-            }
+				}
+			};
+
+			// from the article:
+			// binary operator whose precedence is >= min_precedence
+			let mut t_prec = t.prec();
+			if t.prec() >= min_prec {
+				let mut rhs = self.primaryexpr();
+
+				l = self.next();
+				loop {
+					// Wikipedia's pseudocode is wrong. if t1 is a right associative op
+					// with equal precedence, then trying to match t2 with a higher
+					// min_prec is impossible
+					let (v, cond, next_prec) = match l {
+						Some(Token::Op(Op::Binary(BinOp::Compound(v)))) => {
+							let t2_prec = v.prec();
+							(v, t1_prec == t2_prec, t2_prec + 1)
+						}
+
+						_ => {
+							let t2 = match l {
+								Some(Token::Op(Op::Binary(t))) => t,
+								Some(Token::Op(Op::Ambiguous(t))) => t.to_binary(),
+								_ => todo!()
+							};
+
+							(t, )
+						}
+					}
+
+					if t.prec() > t1_prec || 
+
+					let mut right_associative = false;
+					match l {
+						Some(Token::Op {
+							ref t,
+							is_assignment,
+						}) if t.is_binary() && {
+							// from the article:
+							// binary operator whose precedence is greater than op's
+							// or a right-associative operator whose precedence
+							// is equal to op's
+							let prec = t.prec(is_assignment);
+							prec > t1_prec || {
+								right_associative = is_assignment && prec == t1_prec;
+								right_associative
+							}
+						} =>
+						{
+							self.token_buffer = l;
+							rhs = self.subexpr(
+								rhs,
+								if right_associative {
+									t1_prec
+								} else {
+									t1_prec + 1
+								},
+							);
+							l = self.next()
+						}
+						_ => break,
+					}
+				}
+
+				let span = lhs.span.to(rhs.span);
+				lhs = Atom::new(
+					AtomVariant::BinOp(Box::new(lhs), t, Box::new(rhs)),
+					span,
+					Type::auto(),
+				);
+			} else {
+				self.token_buffer = l;
+				break;
+			}
         }
         lhs
     }

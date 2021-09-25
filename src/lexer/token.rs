@@ -15,7 +15,7 @@ pub enum Token {
     LeftBracket,
     RightBracket,
 
-    Op { t: Op, is_assignment: bool },
+    Op(Op),
 
     Integer(i64),
     Float(f64),
@@ -27,10 +27,24 @@ pub enum Token {
 
 #[derive(Debug, PartialEq)]
 pub enum Op {
-    /// Identity: used for the vanilla equals assignment
+	Binary(BinOp),
+	Unary(UnOp),
+	Ambiguous(AmbiguousOp)
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BinOp {
+	Compound(BinOpVariant),
+	Regular(BinOpVariant),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BinOpVariant {
+	/// Identity: used for the vanilla equals assignment
     ///
     /// `a = 1`
     Id,
+
     /// .
     Acs,
 
@@ -38,89 +52,114 @@ pub enum Op {
     Le,
     Gt,
     Ge,
+
     /// ==
     EqC,
     Neq,
 
     Add,
     Sub,
-
-    /// can be used as unary as deref
     Mul,
-
     Div,
     Mod,
 
     Xor,
-
-    /// can be used as unary as adrof
     And,
     Or,
     Rsh,
     Lsh,
+}
 
-    // -- UnOp --
-    Inc,
-    Dec,
+impl BinOpVariant {
+	pub fn prec(&self) -> u8 {
+		match self {
+			Acs => 9,
+            Mul | Div | Mod => 10,
+            Add | Sub => 11,
+            Lsh | Rsh => 12,
+            Gt | Ge | Lt | Le => 13,
+            EqC | Neq => 14,
+            And => 15,
+            Xor => 16,
+            Or => 17,
+		}
+	}
+}
 
-    Reinterpret,
-    Cast,
+#[derive(Debug)]
+pub enum UnOp {
+	Deref,
+	AddrOf,
+	Minus,
+	Plus,
 
-    /// shorthand for -1 - x
+	Inc,
+	Dec,
+	Reinterpret,
+	Cast,
+	
+	/// shorthand for -1 - x
     BNot,
 
     /// shorthand for x ^ 1
     LNot,
 }
 
+macro_rules! ambiguous {
+	{$($n: ident => ($b: ident, $u: ident)), *} => {
+		#[derive(Debug)]
+		pub enum AmbiguousOp {
+			$($n), *
+		}
+
+		impl AmbiguousOp {
+			pub fn to_binary(&self) -> BinOpVariant {
+				match self {
+					$(
+						$n => BinOpVariant::$b
+					), *
+				}
+			}
+
+			pub fn to_unary(&self) -> UnOp {
+				match self {
+					$(
+						$n => UnOp::$u
+					), *
+				}
+			}
+		}
+	}
+}
+
+ambiguous! {
+	Minus => (Sub, Minus),
+	Plus => (Add, Plus),
+	Ampersand => (And, AddrOf),
+	Asterisk => (Mul, Deref)
+}
+
 impl Op {
     pub fn is_unary(&self) -> bool {
         match self {
-            Op::LNot
-            | Op::BNot
-            | Op::And
-            | Op::Mul
-            | Op::Sub
-            | Op::Add
-            | Op::Reinterpret
-            | Op::Cast => true,
-            _ => false,
+            Op::Binary(_) => false,
+            _ => true,
         }
     }
 
     pub fn is_binary(&self) -> bool {
         match self {
-            Op::LNot | Op::BNot | Op::Reinterpret | Op::Cast => false,
+            Op::Unary(_) => false,
             _ => true,
         }
     }
 
     pub fn prec(&self, is_assignment: bool) -> u8 {
-        if is_assignment {
-            return 20;
-        }
-
-        match self {
-            Op::Acs => 9,
-            Op::Mul | Op::Div | Op::Mod => 10,
-            Op::Add | Op::Sub => 11,
-            Op::Lsh | Op::Rsh => 12,
-            Op::Gt | Op::Ge | Op::Lt | Op::Le => 13,
-            Op::EqC | Op::Neq => 14,
-            Op::And => 15,
-            Op::Xor => 16,
-            Op::Or => 17,
-
-            // is_assignment is always on
-            Op::Id => unreachable!(),
-
-            // complete if this will ever be hit
-            Op::Inc => todo!(),
-            Op::Dec => todo!(),
-            Op::BNot => todo!(),
-            Op::LNot => todo!(),
-            Op::Reinterpret => todo!(),
-            Op::Cast => todo!(),
-        }
+		match self {
+			Op::Unary(_) => panic!("attempt to get precedence of a unary operator"),
+			Op::Binary(BinOp::Compound(_)) => return 20;
+			Op::Binary(BinOp::Regular(t)) => t,
+			Op::Ambiguous(t) => t.to_binary()
+		}.prec()
     }
 }

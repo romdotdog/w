@@ -89,13 +89,34 @@ impl<'a> Lexer<'a> {
     }
 
     fn try_aip(&mut self, c: char) -> Option<Token> {
+		// TODO: Refactor for code size
         macro_rules! op {
-            ($t: ident) => {
-                Token::Op {
-                    t: Op::$t,
-                    is_assignment: self.try_take_equals(),
-                }
+			(@ambiguous $t: ident) => {
+				let amb = AmbiguousOp::$t;
+				match self.try_take_equals() {
+					true => Op::Binary(BinOp::Compound(amb.to_binary())),
+					false => Op::Ambiguous(amb)
+				}
+			};
+
+            (@binary $t: ident) => {
+				Op::Binary(match self.try_take_equals() {
+					true => BinOp::Compound(BinOpVariant::$t),
+					false => BinOp::Regular(BinOpVariant::$t)
+				})
             };
+
+			(@compound $t: ident) => {
+				Op::Binary(BinOp::Compound(BinOpVariant::$t))
+			};
+
+			(@simple $t: ident) => {
+				Op::Binary(BinOp::Regular(BinOpVariant::$t))
+			};
+			
+			(@unary $t: ident) => {
+				Op::Unary(UnOp::$t)
+			};
         }
 
         Some(match c {
@@ -107,13 +128,13 @@ impl<'a> Lexer<'a> {
             '(' => Token::LeftParen,
             ')' => Token::RightParen,
 
-            '*' => op!(Mul),
-            '/' => op!(Div),
+            '*' => op!(@ambiguous Asterisk),
+            '/' => op!(@binary Div),
 
-            '%' => op!(Mod),
-            '^' => op!(Xor),
-            '&' => op!(And),
-            '|' => op!(Or),
+            '%' => op!(@binary Mod),
+            '^' => op!(@binary Xor),
+            '&' => op!(@ambiguous Ampersand),
+            '|' => op!(@binary Or),
 
             '\'' => {
                 let c2 = self.nextc();
@@ -192,65 +213,53 @@ impl<'a> Lexer<'a> {
             }
 
             '>' | '<' | '=' | '!' | '+' | '-' => {
-                enum Assignment {
-                    Unset,
-                    True,
-                    False,
-                }
-
                 // two char ops
                 let mut is_assignment = Assignment::Unset;
                 let c2 = self.nextc();
 
                 let t = match (c, c2) {
-                    ('>', Some('=')) => Op::Ge,
-                    ('<', Some('=')) => Op::Le,
-                    ('<', Some('<')) => Op::Lsh,
-                    ('>', Some('>')) => Op::Rsh,
+                    ('>', Some('=')) => op!(@binary Ge),
+                    ('<', Some('=')) => op!(@binary Ge),
+                    ('<', Some('<')) => op!(@binary Lsh),
+                    ('>', Some('>')) => op!(@binary Rsh),
                     ('<', _) => {
                         self.buffer = c2;
-                        is_assignment = Assignment::False;
-                        Op::Lt
+                        op!(@simple Lt)
                     }
                     ('>', _) => {
                         self.buffer = c2;
-                        is_assignment = Assignment::False;
-                        Op::Gt
+                        op!(@simple Gt)
                     }
 
                     ('=', Some('=')) => Op::EqC,
                     ('=', _) => {
                         self.buffer = c2;
-                        is_assignment = Assignment::True;
-                        Op::Id
+                        op!(@compound Id)
                     }
 
-                    ('!', Some('=')) => Op::Neq,
+                    ('!', Some('=')) => op!(@binary Ne),
                     ('!', _) => {
                         self.buffer = c2;
-                        is_assignment = Assignment::False;
-                        Op::LNot
+                        op!(@unary LNot)
                     }
 
                     ('+', Some('+')) => {
                         // Please don't
-                        is_assignment = Assignment::False;
-                        Op::Inc
+                        op!(@unary Inc)
                     }
 
                     ('-', Some('-')) => {
-                        is_assignment = Assignment::False;
-                        Op::Dec
+                        op!(@unary Dec)
                     }
 
                     ('+', _) => {
                         self.buffer = c2;
-                        Op::Add
+                        op!(@ambiguous Plus)
                     }
 
                     ('-', _) => {
                         self.buffer = c2;
-                        Op::Sub
+                        op!(@ambiguous Minus)
                     }
 
                     (_, _) => {
