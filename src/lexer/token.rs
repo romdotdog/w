@@ -151,20 +151,6 @@ ambiguous! {
 }
 
 impl Op {
-    pub fn is_unary(&self) -> bool {
-        match self {
-            Op::Binary(_) => false,
-            _ => true,
-        }
-    }
-
-    pub fn is_binary(&self) -> bool {
-        match self {
-            Op::Unary(_) => false,
-            _ => true,
-        }
-    }
-
     pub fn prec(&self) -> u8 {
         match self {
             Op::Unary(_) => panic!("attempt to get precedence of a unary operator"),
