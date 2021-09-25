@@ -6,7 +6,7 @@
 
 use crate::{
     diag::{Diagnostic, Lexeme, Message},
-    lexer::{AmbiguousOp, BinOp, BinOpVariant, Lexer, Op, Token, UnOp},
+    lexer::{AmbiguousOp, BinOp, BinOpVariant, Lexer, Token, UnOp},
     parser::ast::{Type, WFn},
     Session, SourceRef,
 };
@@ -132,15 +132,13 @@ impl<'a> Parser<'a> {
         let mut indir = Indir::none();
         loop {
             match self.next() {
-                Some(Token::Op(Op::Ambiguous(AmbiguousOp::Asterisk))) => {
-                    indir.add(match self.next() {
-                        Some(Token::Mut) => true,
-                        t => {
-                            self.token_buffer = t;
-                            false
-                        }
-                    })
-                }
+                Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => indir.add(match self.next() {
+                    Some(Token::Mut) => true,
+                    t => {
+                        self.token_buffer = t;
+                        false
+                    }
+                }),
                 Some(Token::Ident(s)) => {
                     return Type::with_indir(s.into(), indir);
                 }
@@ -222,7 +220,7 @@ impl<'a> Parser<'a> {
                     }
 
                     match self.next() {
-                        Some(Token::Op(Op::Binary(BinOp::Compound(BinOpVariant::Id)))) => {
+                        Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
                             rvalue = Some(self.expr());
                         }
                         t => self.token_buffer = t,
@@ -250,24 +248,24 @@ impl<'a> Parser<'a> {
                 )
             }
             Some(Token::LeftBracket) => self.block(),
-            Some(Token::Op(Op::Binary(BinOp::Regular(BinOpVariant::Lt)))) => {
+            Some(Token::BinOp(BinOp::Regular(BinOpVariant::Lt))) => {
                 let start = self.lex.span();
                 let t = self.parse_type();
                 let mut op = UnOp::Cast;
 
                 match self.next() {
-                    Some(Token::Op(Op::Binary(BinOp::Regular(BinOpVariant::Gt)))) => {}
+                    Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => {}
                     t1 => {
                         // !x
                         match t1 {
-                            Some(Token::Op(Op::Unary(UnOp::LNot))) => op = UnOp::Reinterpret,
+                            Some(Token::UnOp(UnOp::LNot)) => op = UnOp::Reinterpret,
                             _ => {}
                         }
 
                         expect_or_error!(
                             self,
                             |t| { Message::ExpectedGot(Lexeme::RightAngBracket, t.into()) },
-                            Some(Token::Op(Op::Binary(BinOp::Regular(BinOpVariant::Gt)))) => t
+                            Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => t
                         );
                     }
                 }
@@ -308,7 +306,7 @@ impl<'a> Parser<'a> {
                     t,
                 )
             }
-            Some(Token::Op(Op::Ambiguous(AmbiguousOp::Minus))) => {
+            Some(Token::AmbiguousOp(AmbiguousOp::Minus)) => {
                 let start = self.lex.span();
                 let e = self.expr();
                 let t = e.t;
@@ -328,8 +326,8 @@ impl<'a> Parser<'a> {
         let mut l = self.next();
         loop {
             let t = match l {
-                Some(Token::Op(Op::Binary(t))) => t,
-                Some(Token::Op(Op::Ambiguous(ref t))) => BinOp::Regular(t.to_binary()),
+                Some(Token::BinOp(t)) => t,
+                Some(Token::AmbiguousOp(ref t)) => BinOp::Regular(t.to_binary()),
                 _ => {
                     self.token_buffer = l;
                     break;
@@ -348,15 +346,15 @@ impl<'a> Parser<'a> {
                     // with equal precedence, then trying to match t2 with a higher
                     // min_prec is impossible
                     let (cond, next_prec) = match l {
-                        Some(Token::Op(Op::Binary(BinOp::Compound(v)))) => {
+                        Some(Token::BinOp(BinOp::Compound(v))) => {
                             let t2_prec = v.prec();
                             (t_prec == t2_prec, t_prec + 1)
                         }
 
                         _ => {
                             let t2_prec = match l {
-                                Some(Token::Op(Op::Binary(t))) => t.prec(),
-                                Some(Token::Op(Op::Ambiguous(t))) => t.to_binary().prec(),
+                                Some(Token::BinOp(t)) => t.prec(),
+                                Some(Token::AmbiguousOp(t)) => t.to_binary().prec(),
                                 _ => break,
                             };
 

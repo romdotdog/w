@@ -1,6 +1,6 @@
 use super::indir::Indir;
 use crate::{
-    lexer::{BinOp, Op, UnOp},
+    lexer::{BinOp, UnOp},
     span::Span,
 };
 

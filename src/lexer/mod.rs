@@ -10,7 +10,7 @@
 use crate::{span::Span, Session, SourceRef};
 
 mod token;
-pub use token::{AmbiguousOp, BinOp, BinOpVariant, Op, Token, UnOp};
+pub use token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
 
 use std::str::Chars;
 
@@ -93,29 +93,29 @@ impl<'a> Lexer<'a> {
         macro_rules! op {
             (@ambiguous $t: ident) => {{
                 let amb = AmbiguousOp::$t;
-                Token::Op(match self.try_take_equals() {
-                    true => Op::Binary(BinOp::Compound(amb.to_binary())),
-                    false => Op::Ambiguous(amb),
-                })
+                match self.try_take_equals() {
+                    true => Token::BinOp(BinOp::Compound(amb.to_binary())),
+                    false => Token::AmbiguousOp(amb),
+                }
             }};
 
             (@binary $t: ident) => {
-                Token::Op(Op::Binary(match self.try_take_equals() {
+                Token::BinOp(match self.try_take_equals() {
                     true => BinOp::Compound(BinOpVariant::$t),
                     false => BinOp::Regular(BinOpVariant::$t),
-                }))
+                })
             };
 
             (@compound $t: ident) => {
-                Token::Op(Op::Binary(BinOp::Compound(BinOpVariant::$t)))
+                Token::BinOp(BinOp::Compound(BinOpVariant::$t))
             };
 
             (@simple $t: ident) => {
-                Token::Op(Op::Binary(BinOp::Regular(BinOpVariant::$t)))
+                Token::BinOp(BinOp::Regular(BinOpVariant::$t))
             };
 
             (@unary $t: ident) => {
-                Token::Op(Op::Unary(UnOp::$t))
+                Token::UnOp(UnOp::$t)
             };
         }
 

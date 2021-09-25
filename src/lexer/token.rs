@@ -15,7 +15,9 @@ pub enum Token {
     LeftBracket,
     RightBracket,
 
-    Op(Op),
+    BinOp(BinOp),
+    UnOp(UnOp),
+    AmbiguousOp(AmbiguousOp),
 
     Integer(i64),
     Float(f64),
@@ -23,13 +25,6 @@ pub enum Token {
     String(String),
     Char(char),
     Ident(String),
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Op {
-    Binary(BinOp),
-    Unary(UnOp),
-    Ambiguous(AmbiguousOp),
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -148,14 +143,4 @@ ambiguous! {
     Plus => (Add, Plus),
     Ampersand => (And, AddrOf),
     Asterisk => (Mul, Deref)
-}
-
-impl Op {
-    pub fn prec(&self) -> u8 {
-        match self {
-            Op::Unary(_) => panic!("attempt to get precedence of a unary operator"),
-            Op::Binary(t) => t.prec(),
-            Op::Ambiguous(t) => t.to_binary().prec(),
-        }
-    }
 }
