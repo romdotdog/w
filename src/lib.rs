@@ -20,8 +20,8 @@ pub struct Session {
 pub struct SourceRef(usize);
 
 /*
-	TODO:
-	* Create fork of AppendList
+    TODO:
+    * Create fork of AppendList
 */
 
 impl Session {
@@ -68,7 +68,7 @@ impl Session {
 
             let (line, col, (sol, eol)) = src.line_col(start_pos);
             println!(
-                "\x1b[1m{}:{}:{}: \x1b[91merror:\x1b[0m {}\n{}\n{}\x1bZ[91m\x1b[1m{}\x1b[0m",
+                "\x1b[1m{}:{}:{}: \x1b[91merror:\x1b[0m {}\n{}\n{}\x1b[91m\x1b[1m{}\x1b[0m",
                 src.name(),
                 line,
                 col,
