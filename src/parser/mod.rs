@@ -129,7 +129,6 @@ impl<'a> Parser<'a> {
 
     fn parse_type(&mut self) -> Type {
         let mut indir = Indir::none();
-        let count = 0;
         loop {
             match self.next() {
                 Some(Token::Op(Op::Ambiguous(AmbiguousOp::Asterisk))) => {
@@ -308,7 +307,7 @@ impl<'a> Parser<'a> {
                     t,
                 )
             }
-            Some(Token::Op(Op::Binary(BinOp::Regular(BinOpVariant::Sub)))) => {
+            Some(Token::Op(Op::Ambiguous(AmbiguousOp::Minus))) => {
                 let start = self.lex.span();
                 let e = self.expr();
                 let t = e.t;
@@ -319,7 +318,7 @@ impl<'a> Parser<'a> {
                     t,
                 )
             }
-            t => self.recover(),
+            t => panic!("{:?}", t),
         }
     }
 
