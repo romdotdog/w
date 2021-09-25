@@ -11,6 +11,7 @@ use crate::{
     Session, SourceRef,
 };
 
+pub mod codegen;
 pub mod indir;
 use indir::Indir;
 mod ast;
@@ -210,7 +211,6 @@ impl<'a> Parser<'a> {
                 loop {
                     let lvalue = self.primaryexpr();
                     let mut type_ = Type::auto();
-                    let mut rvalue = None;
 
                     match self.next() {
                         Some(Token::Colon) => {
@@ -219,12 +219,10 @@ impl<'a> Parser<'a> {
                         t => self.token_buffer = t,
                     }
 
-                    match self.next() {
-                        Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
-                            rvalue = Some(self.expr());
-                        }
-                        t => self.token_buffer = t,
-                    }
+                    let mut rvalue = match self.next() {
+                        Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => self.expr(),
+                        t => todo!(),
+                    };
 
                     v.push(Declaration {
                         lvalue,

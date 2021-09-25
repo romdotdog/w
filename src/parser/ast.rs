@@ -44,7 +44,7 @@ pub enum AtomVariant {
 #[derive(Debug)]
 pub struct Declaration {
     pub lvalue: Atom,
-    pub rvalue: Option<Atom>,
+    pub rvalue: Atom,
     pub t: Type,
 }
 
@@ -63,8 +63,8 @@ impl Atom {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Type {
-    v: TypeVariant,
-    indir: Indir,
+    pub v: TypeVariant,
+    pub indir: Indir,
 }
 
 impl Type {
