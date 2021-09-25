@@ -5,7 +5,7 @@
 
 use crate::{
     diag::{Diagnostic, Lexeme, Message},
-    lexer::{Lexer, Op, Token},
+    lexer::{AmbiguousOp, BinOp, BinOpVariant, Lexer, Op, Token, UnOp},
     parser::ast::{Type, WFn},
     Session, SourceRef,
 };
@@ -15,7 +15,7 @@ use indir::Indir;
 mod ast;
 pub use ast::Atom;
 
-use self::ast::{AtomVariant, Program, TypeVariant, Declaration};
+use self::ast::{AtomVariant, Declaration, Program, TypeVariant};
 
 pub struct Parser<'a> {
     session: &'a Session,
@@ -129,20 +129,17 @@ impl<'a> Parser<'a> {
 
     fn parse_type(&mut self) -> Type {
         let mut indir = Indir::none();
-		let count = 0;
+        let count = 0;
         loop {
             match self.next() {
-                Some(Token::Op {
-                    t: Op::Mul,
-                    is_assignment: false,
-                }) => {
+                Some(Token::Op(Op::Ambiguous(AmbiguousOp::Asterisk))) => {
                     indir.add(match self.next() {
-						Some(Token::Mut) => true,
-						t => {
-							self.token_buffer = t;
-							false
-						}
-					})
+                        Some(Token::Mut) => true,
+                        t => {
+                            self.token_buffer = t;
+                            false
+                        }
+                    })
                 }
                 Some(Token::Ident(s)) => {
                     return Type::with_indir(s.into(), indir);
@@ -203,70 +200,74 @@ impl<'a> Parser<'a> {
             Some(Token::Ident(s)) => {
                 Atom::new(AtomVariant::Ident(s), self.lex.span(), Type::auto())
             }
-			Some(Token::Let) => {
-				let start = self.lex.span();
-				let mut mutable = false;
-				match self.next() {
-					Some(Token::Mut) => mutable = true,
-					t => self.token_buffer = t
-				}
+            Some(Token::Let) => {
+                let start = self.lex.span();
+                let mut mutable = false;
+                match self.next() {
+                    Some(Token::Mut) => mutable = true,
+                    t => self.token_buffer = t,
+                }
 
-				let mut v = Vec::with_capacity(1);
-				loop {
-					let lvalue = self.primaryexpr();
-					let mut type_ = Type::auto();
-					let mut rvalue = None;
+                let mut v = Vec::with_capacity(1);
+                loop {
+                    let lvalue = self.primaryexpr();
+                    let mut type_ = Type::auto();
+                    let mut rvalue = None;
 
-					match self.next() {
-						Some(Token::Colon) => {
-							type_ = self.parse_type();
-						}
-						t => self.token_buffer = t
-					}
+                    match self.next() {
+                        Some(Token::Colon) => {
+                            type_ = self.parse_type();
+                        }
+                        t => self.token_buffer = t,
+                    }
 
-					match self.next() {
-						Some(Token::Op { t: Op::Id, .. }) => {
-							rvalue = Some(self.expr());
-						},
-						t => self.token_buffer = t
-					}
+                    match self.next() {
+                        Some(Token::Op(Op::Binary(BinOp::Compound(BinOpVariant::Id)))) => {
+                            rvalue = Some(self.expr());
+                        }
+                        t => self.token_buffer = t,
+                    }
 
-					v.push(Declaration {
-						lvalue,
-						rvalue,
-						t: type_
-					});
+                    v.push(Declaration {
+                        lvalue,
+                        rvalue,
+                        t: type_,
+                    });
 
-					match self.next() {
-						Some(Token::Comma) => {}
-						t => {
-							self.token_buffer = t;
-							break;
-						}
-					}
-				}
+                    match self.next() {
+                        Some(Token::Comma) => {}
+                        t => {
+                            self.token_buffer = t;
+                            break;
+                        }
+                    }
+                }
 
-				Atom::new(AtomVariant::Let(mutable, v), start.to(self.lex.span()), Type::new(TypeVariant::Null))
-			}
+                Atom::new(
+                    AtomVariant::Let(mutable, v),
+                    start.to(self.lex.span()),
+                    Type::new(TypeVariant::Null),
+                )
+            }
             Some(Token::LeftBracket) => self.block(),
-            Some(Token::Op { t: Op::Lt, .. }) => {
+            Some(Token::Op(Op::Binary(BinOp::Regular(BinOpVariant::Lt)))) => {
                 let start = self.lex.span();
                 let t = self.parse_type();
-                let mut op = Op::Cast;
+                let mut op = UnOp::Cast;
 
                 match self.next() {
-                    Some(Token::Op { t: Op::Gt, .. }) => {}
+                    Some(Token::Op(Op::Binary(BinOp::Regular(BinOpVariant::Gt)))) => {}
                     t1 => {
                         // !x
                         match t1 {
-                            Some(Token::Op { t: Op::LNot, .. }) => op = Op::Reinterpret,
+                            Some(Token::Op(Op::Unary(UnOp::LNot))) => op = UnOp::Reinterpret,
                             _ => {}
                         }
 
                         expect_or_error!(
                             self,
                             |t| { Message::ExpectedGot(Lexeme::RightAngBracket, t.into()) },
-                            Some(Token::Op { t: Op::Gt, .. }) => t
+                            Some(Token::Op(Op::Binary(BinOp::Regular(BinOpVariant::Gt)))) => t
                         );
                     }
                 }
@@ -307,13 +308,13 @@ impl<'a> Parser<'a> {
                     t,
                 )
             }
-            Some(Token::Op { t: Op::Sub, .. }) => {
+            Some(Token::Op(Op::Binary(BinOp::Regular(BinOpVariant::Sub)))) => {
                 let start = self.lex.span();
                 let e = self.expr();
                 let t = e.t;
 
                 Atom::new(
-                    AtomVariant::UnOp(Op::Sub, Box::new(e)),
+                    AtomVariant::UnOp(UnOp::Minus, Box::new(e)),
                     start.to(self.lex.span()),
                     t,
                 )
@@ -326,88 +327,62 @@ impl<'a> Parser<'a> {
         // https://en.wikipedia.org/wiki/Operator-precedence_parser
         let mut l = self.next();
         loop {
-			let t = match l {
-				Some(Token::Op(Op::Binary(Op::Compound(t)))) | 
-				Some(Token::Op(Op::Binary(Op::Regular(t)))) => t,
-				Some(Token::Op(Op::Ambiguous(t))) => t.to_binary(),
-				_ => {
-					self.token_buffer = l;
+            let t = match l {
+                Some(Token::Op(Op::Binary(t))) => t,
+                Some(Token::Op(Op::Ambiguous(ref t))) => BinOp::Regular(t.to_binary()),
+                _ => {
+                    self.token_buffer = l;
                     break;
-				}
-			};
+                }
+            };
 
-			// from the article:
-			// binary operator whose precedence is >= min_precedence
-			let mut t_prec = t.prec();
-			if t.prec() >= min_prec {
-				let mut rhs = self.primaryexpr();
+            // from the article:
+            // binary operator whose precedence is >= min_precedence
+            let t_prec = t.prec();
+            if t.prec() >= min_prec {
+                let mut rhs = self.primaryexpr();
 
-				l = self.next();
-				loop {
-					// Wikipedia's pseudocode is wrong. if t1 is a right associative op
-					// with equal precedence, then trying to match t2 with a higher
-					// min_prec is impossible
-					let (v, cond, next_prec) = match l {
-						Some(Token::Op(Op::Binary(BinOp::Compound(v)))) => {
-							let t2_prec = v.prec();
-							(v, t1_prec == t2_prec, t2_prec + 1)
-						}
+                l = self.next();
+                loop {
+                    // Wikipedia's pseudocode is wrong. if t1 is a right associative op
+                    // with equal precedence, then trying to match t2 with a higher
+                    // min_prec is impossible
+                    let (cond, next_prec) = match l {
+                        Some(Token::Op(Op::Binary(BinOp::Compound(v)))) => {
+                            let t2_prec = v.prec();
+                            (t_prec == t2_prec, t_prec + 1)
+                        }
 
-						_ => {
-							let t2 = match l {
-								Some(Token::Op(Op::Binary(t))) => t,
-								Some(Token::Op(Op::Ambiguous(t))) => t.to_binary(),
-								_ => todo!()
-							};
+                        _ => {
+                            let t2_prec = match l {
+                                Some(Token::Op(Op::Binary(t))) => t.prec(),
+                                Some(Token::Op(Op::Ambiguous(t))) => t.to_binary().prec(),
+                                _ => break,
+                            };
 
-							(t, )
-						}
-					}
+                            (t2_prec > t_prec, t_prec)
+                        }
+                    };
 
-					if t.prec() > t1_prec || 
+                    if cond {
+                        self.token_buffer = l;
+                        rhs = self.subexpr(rhs, next_prec);
+                        l = self.next()
+                    } else {
+                        break;
+                    }
+                }
 
-					let mut right_associative = false;
-					match l {
-						Some(Token::Op {
-							ref t,
-							is_assignment,
-						}) if t.is_binary() && {
-							// from the article:
-							// binary operator whose precedence is greater than op's
-							// or a right-associative operator whose precedence
-							// is equal to op's
-							let prec = t.prec(is_assignment);
-							prec > t1_prec || {
-								right_associative = is_assignment && prec == t1_prec;
-								right_associative
-							}
-						} =>
-						{
-							self.token_buffer = l;
-							rhs = self.subexpr(
-								rhs,
-								if right_associative {
-									t1_prec
-								} else {
-									t1_prec + 1
-								},
-							);
-							l = self.next()
-						}
-						_ => break,
-					}
-				}
-
-				let span = lhs.span.to(rhs.span);
-				lhs = Atom::new(
-					AtomVariant::BinOp(Box::new(lhs), t, Box::new(rhs)),
-					span,
-					Type::auto(),
-				);
-			} else {
-				self.token_buffer = l;
-				break;
-			}
+                let span = lhs.span.to(rhs.span);
+                lhs = Atom::new(
+                    AtomVariant::BinOp(Box::new(lhs), t, Box::new(rhs)),
+                    span,
+                    Type::auto(),
+                );
+            } else {
+                self.token_buffer = l;
+                break;
+            }
         }
         lhs
     }

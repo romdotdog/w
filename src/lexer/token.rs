@@ -4,8 +4,8 @@ pub enum Token {
     Return,
     If,
     Else,
-	Let,
-	Mut,
+    Let,
+    Mut,
 
     Semicolon,
     Colon,
@@ -25,22 +25,32 @@ pub enum Token {
     Ident(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Op {
-	Binary(BinOp),
-	Unary(UnOp),
-	Ambiguous(AmbiguousOp)
+    Binary(BinOp),
+    Unary(UnOp),
+    Ambiguous(AmbiguousOp),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum BinOp {
-	Compound(BinOpVariant),
-	Regular(BinOpVariant),
+    Compound(BinOpVariant),
+    Regular(BinOpVariant),
 }
 
-#[derive(Debug, PartialEq)]
+impl BinOp {
+    pub fn prec(&self) -> u8 {
+        match self {
+            BinOp::Compound(_) => return 20,
+            BinOp::Regular(t) => t,
+        }
+        .prec()
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum BinOpVariant {
-	/// Identity: used for the vanilla equals assignment
+    /// Identity: used for the vanilla equals assignment
     ///
     /// `a = 1`
     Id,
@@ -71,34 +81,35 @@ pub enum BinOpVariant {
 }
 
 impl BinOpVariant {
-	pub fn prec(&self) -> u8 {
-		match self {
-			Acs => 9,
-            Mul | Div | Mod => 10,
-            Add | Sub => 11,
-            Lsh | Rsh => 12,
-            Gt | Ge | Lt | Le => 13,
-            EqC | Neq => 14,
-            And => 15,
-            Xor => 16,
-            Or => 17,
-		}
-	}
+    pub fn prec(&self) -> u8 {
+        match self {
+            BinOpVariant::Acs => 9,
+            BinOpVariant::Mul | BinOpVariant::Div | BinOpVariant::Mod => 10,
+            BinOpVariant::Add | BinOpVariant::Sub => 11,
+            BinOpVariant::Lsh | BinOpVariant::Rsh => 12,
+            BinOpVariant::Gt | BinOpVariant::Ge | BinOpVariant::Lt | BinOpVariant::Le => 13,
+            BinOpVariant::EqC | BinOpVariant::Neq => 14,
+            BinOpVariant::And => 15,
+            BinOpVariant::Xor => 16,
+            BinOpVariant::Or => 17,
+            BinOpVariant::Id => unreachable!(), // always compound
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum UnOp {
-	Deref,
-	AddrOf,
-	Minus,
-	Plus,
+    Deref,
+    AddrOf,
+    Minus,
+    Plus,
 
-	Inc,
-	Dec,
-	Reinterpret,
-	Cast,
-	
-	/// shorthand for -1 - x
+    Inc,
+    Dec,
+    Reinterpret,
+    Cast,
+
+    /// shorthand for -1 - x
     BNot,
 
     /// shorthand for x ^ 1
@@ -107,7 +118,7 @@ pub enum UnOp {
 
 macro_rules! ambiguous {
 	{$($n: ident => ($b: ident, $u: ident)), *} => {
-		#[derive(Debug)]
+		#[derive(Debug, PartialEq, Clone, Copy)]
 		pub enum AmbiguousOp {
 			$($n), *
 		}
@@ -116,7 +127,7 @@ macro_rules! ambiguous {
 			pub fn to_binary(&self) -> BinOpVariant {
 				match self {
 					$(
-						$n => BinOpVariant::$b
+						AmbiguousOp::$n => BinOpVariant::$b
 					), *
 				}
 			}
@@ -124,7 +135,7 @@ macro_rules! ambiguous {
 			pub fn to_unary(&self) -> UnOp {
 				match self {
 					$(
-						$n => UnOp::$u
+						AmbiguousOp::$n => UnOp::$u
 					), *
 				}
 			}
@@ -133,10 +144,10 @@ macro_rules! ambiguous {
 }
 
 ambiguous! {
-	Minus => (Sub, Minus),
-	Plus => (Add, Plus),
-	Ampersand => (And, AddrOf),
-	Asterisk => (Mul, Deref)
+    Minus => (Sub, Minus),
+    Plus => (Add, Plus),
+    Ampersand => (And, AddrOf),
+    Asterisk => (Mul, Deref)
 }
 
 impl Op {
@@ -154,12 +165,11 @@ impl Op {
         }
     }
 
-    pub fn prec(&self, is_assignment: bool) -> u8 {
-		match self {
-			Op::Unary(_) => panic!("attempt to get precedence of a unary operator"),
-			Op::Binary(BinOp::Compound(_)) => return 20;
-			Op::Binary(BinOp::Regular(t)) => t,
-			Op::Ambiguous(t) => t.to_binary()
-		}.prec()
+    pub fn prec(&self) -> u8 {
+        match self {
+            Op::Unary(_) => panic!("attempt to get precedence of a unary operator"),
+            Op::Binary(t) => t.prec(),
+            Op::Ambiguous(t) => t.to_binary().prec(),
+        }
     }
 }

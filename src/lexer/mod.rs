@@ -10,7 +10,7 @@
 use crate::{span::Span, Session, SourceRef};
 
 mod token;
-pub use token::{Op, Token};
+pub use token::{AmbiguousOp, BinOp, BinOpVariant, Op, Token, UnOp};
 
 use std::str::Chars;
 
@@ -58,8 +58,8 @@ impl<'a> Lexer<'a> {
             "return" => Token::Return,
             "if" => Token::If,
             "else" => Token::Else,
-			"let" => Token::Let,
-			"mut" => Token::Mut,
+            "let" => Token::Let,
+            "mut" => Token::Mut,
             _ => Token::Ident(s),
         }
     }
@@ -89,34 +89,34 @@ impl<'a> Lexer<'a> {
     }
 
     fn try_aip(&mut self, c: char) -> Option<Token> {
-		// TODO: Refactor for code size
+        // TODO: Refactor for code size
         macro_rules! op {
-			(@ambiguous $t: ident) => {
-				let amb = AmbiguousOp::$t;
-				match self.try_take_equals() {
-					true => Op::Binary(BinOp::Compound(amb.to_binary())),
-					false => Op::Ambiguous(amb)
-				}
-			};
+            (@ambiguous $t: ident) => {{
+                let amb = AmbiguousOp::$t;
+                Token::Op(match self.try_take_equals() {
+                    true => Op::Binary(BinOp::Compound(amb.to_binary())),
+                    false => Op::Ambiguous(amb),
+                })
+            }};
 
             (@binary $t: ident) => {
-				Op::Binary(match self.try_take_equals() {
-					true => BinOp::Compound(BinOpVariant::$t),
-					false => BinOp::Regular(BinOpVariant::$t)
-				})
+                Token::Op(Op::Binary(match self.try_take_equals() {
+                    true => BinOp::Compound(BinOpVariant::$t),
+                    false => BinOp::Regular(BinOpVariant::$t),
+                }))
             };
 
-			(@compound $t: ident) => {
-				Op::Binary(BinOp::Compound(BinOpVariant::$t))
-			};
+            (@compound $t: ident) => {
+                Token::Op(Op::Binary(BinOp::Compound(BinOpVariant::$t)))
+            };
 
-			(@simple $t: ident) => {
-				Op::Binary(BinOp::Regular(BinOpVariant::$t))
-			};
-			
-			(@unary $t: ident) => {
-				Op::Unary(UnOp::$t)
-			};
+            (@simple $t: ident) => {
+                Token::Op(Op::Binary(BinOp::Regular(BinOpVariant::$t)))
+            };
+
+            (@unary $t: ident) => {
+                Token::Op(Op::Unary(UnOp::$t))
+            };
         }
 
         Some(match c {
@@ -214,10 +214,8 @@ impl<'a> Lexer<'a> {
 
             '>' | '<' | '=' | '!' | '+' | '-' => {
                 // two char ops
-                let mut is_assignment = Assignment::Unset;
                 let c2 = self.nextc();
-
-                let t = match (c, c2) {
+                match (c, c2) {
                     ('>', Some('=')) => op!(@binary Ge),
                     ('<', Some('=')) => op!(@binary Ge),
                     ('<', Some('<')) => op!(@binary Lsh),
@@ -231,13 +229,13 @@ impl<'a> Lexer<'a> {
                         op!(@simple Gt)
                     }
 
-                    ('=', Some('=')) => Op::EqC,
+                    ('=', Some('=')) => op!(@binary EqC),
                     ('=', _) => {
                         self.buffer = c2;
                         op!(@compound Id)
                     }
 
-                    ('!', Some('=')) => op!(@binary Ne),
+                    ('!', Some('=')) => op!(@binary Neq),
                     ('!', _) => {
                         self.buffer = c2;
                         op!(@unary LNot)
@@ -266,15 +264,6 @@ impl<'a> Lexer<'a> {
                         self.buffer = c2;
                         return None;
                     }
-                };
-
-                Token::Op {
-                    t,
-                    is_assignment: match is_assignment {
-                        Assignment::Unset => self.try_take_equals(),
-                        Assignment::True => true,
-                        Assignment::False => false,
-                    },
                 }
             }
             _ => return None,

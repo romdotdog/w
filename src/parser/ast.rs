@@ -1,5 +1,8 @@
-use crate::{lexer::Op, span::Span};
 use super::indir::Indir;
+use crate::{
+    lexer::{BinOp, Op, UnOp},
+    span::Span,
+};
 
 /*
     TODO:
@@ -29,20 +32,20 @@ pub enum AtomVariant {
     Null,
 
     Paren(BAtom),
-    BinOp(BAtom, Op, BAtom),
-    UnOp(Op, BAtom),
+    BinOp(BAtom, BinOp, BAtom),
+    UnOp(UnOp, BAtom),
 
     Block(Vec<Atom>, BAtom),
-	Let(bool, Vec<Declaration>),
+    Let(bool, Vec<Declaration>),
     If(BAtom, BAtom, Option<BAtom>),
     Return(BAtom),
 }
 
 #[derive(Debug)]
 pub struct Declaration {
-	pub lvalue: Atom,
-	pub rvalue: Option<Atom>,
-	pub t: Type,
+    pub lvalue: Atom,
+    pub rvalue: Option<Atom>,
+    pub t: Type,
 }
 
 #[derive(Debug)]
@@ -66,18 +69,20 @@ pub struct Type {
 
 impl Type {
     pub fn new(v: TypeVariant) -> Self {
-        Type { v, indir: Indir::none() }
+        Type {
+            v,
+            indir: Indir::none(),
+        }
     }
 
-	pub fn with_indir(v: TypeVariant, indir: Indir) -> Self {
-		Type { v, indir }
-	}
+    pub fn with_indir(v: TypeVariant, indir: Indir) -> Self {
+        Type { v, indir }
+    }
 
     pub fn auto() -> Self {
-		Self::new(TypeVariant::Auto)
+        Self::new(TypeVariant::Auto)
     }
 }
-
 
 #[derive(Debug, Clone, Copy)]
 pub enum TypeVariant {
