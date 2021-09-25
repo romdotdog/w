@@ -199,6 +199,10 @@ impl<'a> Parser<'a> {
             Some(Token::Ident(s)) => {
                 Atom::new(AtomVariant::Ident(s), self.lex.span(), Type::auto())
             }
+            Some(Token::String(s)) => {
+                Atom::new(AtomVariant::String(s), self.lex.span(), Type::auto())
+            }
+            Some(Token::Char(s)) => Atom::new(AtomVariant::Char(s), self.lex.span(), Type::auto()),
             Some(Token::Let) => {
                 let start = self.lex.span();
                 let mut mutable = false;
@@ -219,9 +223,9 @@ impl<'a> Parser<'a> {
                         t => self.token_buffer = t,
                     }
 
-                    let mut rvalue = match self.next() {
+                    let rvalue = match self.next() {
                         Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => self.expr(),
-                        t => todo!(),
+                        _ => todo!(),
                     };
 
                     v.push(Declaration {

@@ -26,6 +26,8 @@ type BAtom = Box<Atom>;
 
 #[derive(Debug)]
 pub enum AtomVariant {
+    String(String),
+    Char(char),
     Integer(i64),
     Float(f64),
     Ident(String),

@@ -16,3 +16,6 @@ harness = false
 [dependencies]
 unicode-segmentation = "1.8"
 appendlist = "1.4"
+
+[dev-dependencies]
+similar = "2.0.0"

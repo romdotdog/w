@@ -59,6 +59,8 @@ impl Display for Atom {
             AtomVariant::Integer(i) => write!(f, "{}", i),
             AtomVariant::Float(n) => write!(f, "{}", n),
             AtomVariant::Ident(t) => write!(f, "{}", t),
+            AtomVariant::String(s) => write!(f, "\"{}\"", s.replace("\"", "\\\"")),
+            AtomVariant::Char(c) => write!(f, "'{}'", c),
             AtomVariant::Null => write!(f, "null"),
             AtomVariant::Paren(a) => write!(f, "({})", a),
             AtomVariant::BinOp(lhs, op, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
