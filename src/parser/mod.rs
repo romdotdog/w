@@ -299,13 +299,24 @@ impl<'a> Parser<'a> {
                     t,
                 )
             }
-            Some(Token::AmbiguousOp(AmbiguousOp::Minus)) => {
+            Some(Token::AmbiguousOp(o)) => {
                 let start = self.lex.span();
                 let e = self.expr();
                 let t = e.t;
 
                 Atom::new(
-                    AtomVariant::UnOp(UnOp::Minus, Box::new(e)),
+                    AtomVariant::UnOp(o.to_unary(), Box::new(e)),
+                    start.to(self.lex.span()),
+                    t,
+                )
+            }
+            Some(Token::UnOp(u)) => {
+                let start = self.lex.span();
+                let e = self.expr();
+                let t = e.t;
+
+                Atom::new(
+                    AtomVariant::UnOp(u, Box::new(e)),
                     start.to(self.lex.span()),
                     t,
                 )
