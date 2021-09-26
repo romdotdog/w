@@ -65,10 +65,6 @@ impl<'a> Parser<'a> {
         self.token_buffer.take().or_else(|| self.lex.next())
     }
 
-    pub fn expect(&mut self, t: Option<Token>) {
-        assert_eq!(self.next(), t);
-    }
-
     pub fn block(&mut self) -> Atom {
         let mut r = Vec::new();
         let start = self.lex.span();
