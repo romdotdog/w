@@ -107,21 +107,8 @@ impl<'a> Parser<'a> {
         }
 
         let span = start.to(self.lex.span());
-        let last = last.unwrap_or_else(|| Atom::new(AtomVariant::Null, span, Type::void()));
-        let t = last.t;
-        Atom::new(AtomVariant::Block(r, Box::new(last)), span, t)
-    }
-
-    fn recover(&mut self) -> Atom {
-        let start = self.lex.span();
-        loop {
-            match self.next() {
-                Some(Token::Semicolon) | None => {
-                    break Atom::new(AtomVariant::Null, start.to(self.lex.span()), Type::void())
-                }
-                _ => {}
-            }
-        }
+        let t = last.as_ref().map_or_else(|| Type::void(), |a| a.t);
+        Atom::new(AtomVariant::Block(r, last.map(|a| Box::new(a))), span, t)
     }
 
     fn parse_type(&mut self) -> Type {
@@ -153,18 +140,6 @@ impl<'a> Parser<'a> {
         expect_or_error!(self, Colon);
 
         (name, self.parse_type())
-    }
-
-    fn recover_fn(&mut self) -> Atom {
-        let start = self.lex.span();
-        loop {
-            match self.next() {
-                Some(Token::Fn) | None => {
-                    break Atom::new(AtomVariant::Null, start.to(self.lex.span()), Type::void())
-                }
-                _ => {}
-            }
-        }
     }
 
     fn primaryexpr(&mut self) -> Atom {

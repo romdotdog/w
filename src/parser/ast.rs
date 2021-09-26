@@ -31,13 +31,12 @@ pub enum AtomVariant {
     Integer(i64),
     Float(f64),
     Ident(String),
-    Null,
 
     Paren(BAtom),
     BinOp(BAtom, BinOp, BAtom),
     UnOp(UnOp, BAtom),
 
-    Block(Vec<Atom>, BAtom),
+    Block(Vec<Atom>, Option<BAtom>),
     Let(bool, Vec<Declaration>),
     If(BAtom, BAtom, Option<BAtom>),
     Return(BAtom),

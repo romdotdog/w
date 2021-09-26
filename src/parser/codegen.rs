@@ -61,7 +61,6 @@ impl Display for Atom {
             AtomVariant::Ident(t) => write!(f, "{}", t),
             AtomVariant::String(s) => write!(f, "\"{}\"", s.replace("\"", "\\\"")),
             AtomVariant::Char(c) => write!(f, "'{}'", c),
-            AtomVariant::Null => write!(f, "null"),
             AtomVariant::Paren(a) => write!(f, "({})", a),
             AtomVariant::BinOp(lhs, op, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
             AtomVariant::UnOp(o, rhs) => match o {
@@ -81,9 +80,9 @@ impl Display for Atom {
                 for atom in a {
                     writeln!(f, "\t{};", format!("{}", atom).replace("\n", "\n\t"))?
                 }
-                match l.v {
-                    AtomVariant::Null => write!(f, "}}"),
-                    _ => write!(f, "\t{}\n}}", format!("{}", l).replace("\n", "\n\t")),
+                match l {
+                    None => write!(f, "}}"),
+                    Some(l) => write!(f, "\t{}\n}}", format!("{}", l).replace("\n", "\n\t")),
                 }
             }
             AtomVariant::Let(mutable, v) => {
