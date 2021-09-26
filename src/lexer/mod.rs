@@ -162,42 +162,44 @@ impl<'a> Lexer<'a> {
 
                             if let Some(radix) = char_to_radix(header_char) {
                                 let radix = radix as u32;
+
                                 //  ^ \x6e, \d71
                                 // if there is no applicable digit after, then treat as normal escape
-                                let header_digit =
-                                    self.nextc().expect("expected integer escape, got <eof>");
-
-                                if header_digit.is_digit(radix) {
-                                    // go on parsing as normal
-                                    let mut num = header_digit.to_string();
-                                    loop {
-                                        match self.nextc() {
-                                            Some(t) if t.is_digit(radix) => {
-                                                num.push(t);
-                                            }
-                                            c1 => {
-                                                self.buffer = c1;
-                                                break;
+                                match self.nextc() {
+                                    Some(header_digit) if header_digit.is_digit(radix) => {
+                                        // go on parsing as normal
+                                        let mut num = header_digit.to_string();
+                                        loop {
+                                            match self.nextc() {
+                                                Some(t) if t.is_digit(radix) => {
+                                                    num.push(t);
+                                                }
+                                                c1 => {
+                                                    self.buffer = c1;
+                                                    break;
+                                                }
                                             }
                                         }
+
+                                        let codepoint = u32::from_str_radix(&num, radix);
+                                        assert!(
+                                            codepoint.is_ok(),
+                                            "max escape value is {}",
+                                            u32::MAX
+                                        );
+
+                                        let escaped = std::char::from_u32(codepoint.unwrap());
+                                        assert!(
+											escaped.is_some(),
+											"invalid codepoint, cannot add \\{}{} as part of escape",
+											header_char,
+											num
+										);
+
+                                        // push the codepoint
+                                        res.push(escaped.unwrap());
                                     }
-
-                                    let codepoint = u32::from_str_radix(&num, radix);
-                                    assert!(codepoint.is_ok(), "max escape value is {}", u32::MAX);
-
-                                    let escaped = std::char::from_u32(codepoint.unwrap());
-                                    assert!(
-                                        escaped.is_some(),
-                                        "invalid codepoint, cannot add \\{}{} as part of escape",
-                                        header_char,
-                                        num
-                                    );
-
-                                    // push the codepoint
-                                    res.push(escaped.unwrap());
-                                } else {
-                                    // treat header character as escaped
-                                    res.push(header_char);
+                                    t => self.buffer = t,
                                 }
                             } else {
                                 // TODO: Figure out the semantics of this
@@ -291,7 +293,11 @@ impl<'a> Lexer<'a> {
                     False,
                 }
 
-                let mut float = Floatable::Maybe;
+                let mut float = if c == '.' {
+                    Floatable::True
+                } else {
+                    Floatable::Maybe
+                };
 
                 let mut radix: u32 = 10;
                 if c == '0' {
@@ -312,23 +318,21 @@ impl<'a> Lexer<'a> {
                 let mut num = c.to_string();
                 self.skip_digits(&mut num, radix);
 
-                if c != '.'
-                    && match self.nextc() {
-                        Some('.') => true,
-                        t => {
-                            self.buffer = t;
-                            false
+                match self.nextc() {
+                    Some('.') if c != '.' => {
+                        if float == Floatable::False {
+                            panic!("floats in different radix are not supported")
                         }
-                    }
-                {
-                    if float == Floatable::False {
-                        panic!("floats in different radix are not supported")
-                    }
 
-                    float = Floatable::True;
+                        float = Floatable::True;
 
-                    num.push('.');
-                    self.skip_digits(&mut num, 10);
+                        num.push('.');
+                        self.skip_digits(&mut num, 10);
+                    }
+                    t => {
+                        println!("{:?}", t);
+                        self.buffer = t;
+                    }
                 }
 
                 if float == Floatable::True {
