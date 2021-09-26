@@ -20,10 +20,10 @@ impl Display for WFn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "fn {}(", self.name)?;
 
-        let l = self.params.len() - 1;
+        let l = self.params.len();
         for (i, (s, t)) in self.params.iter().enumerate() {
             write!(f, "{}: {}", s, t)?;
-            if i < l {
+            if i + 1 < l {
                 write!(f, ", ")?;
             }
         }
@@ -92,14 +92,14 @@ impl Display for Atom {
                     false => write!(f, "let ")?,
                 }
 
-                let l = v.len() - 1;
+                let l = v.len();
                 for (i, v) in v.iter().enumerate() {
                     match &v.t.v {
                         TypeVariant::Auto => write!(f, "{} = {}", v.lvalue, v.rvalue),
                         _ => write!(f, "{}: {} = {}", v.lvalue, v.t, v.rvalue),
                     }?;
 
-                    if i < l {
+                    if i + 1 < l {
                         write!(f, ",\n\t")?
                     }
                 }
