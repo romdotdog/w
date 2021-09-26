@@ -4,7 +4,7 @@
 
 ### what's this?
 
-This a compiler for a language that
+this a compiler for a language that
 
 - compiles to and is idiomatic to WebAssembly
 - has Rust-like syntax but C-like semantics
