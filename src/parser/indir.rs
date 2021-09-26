@@ -68,9 +68,9 @@ impl Display for Indir {
         let mut n = 0b00001000u8 << l;
         while n != 0b00001000u8 {
             if self.0 & n == 0 {
-                write!(f, "*");
+                write!(f, "*")?;
             } else {
-                write!(f, "*mut ");
+                write!(f, "*mut ")?;
             }
             n >>= 1u8;
         }
