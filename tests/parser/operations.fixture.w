@@ -7,5 +7,7 @@ fn main(): void {
 	a > b >= c < d >= e == f != g;
 	a + b - c * d / e % f;
 	a ^ b & c | d >> e << f;
+	a * (b + c);
+	a = b === c >>= d;
 	!~<f64!><f64>--+++-&*a;
 }
