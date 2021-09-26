@@ -64,15 +64,16 @@ impl Indir {
 
 impl Display for Indir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        println!("{:8b}", self.0);
         let l = self.len();
-        let mut n = 0b00001000u8 << l;
-        while n != 0b00001000u8 {
+        let mut n = 0b00001000u8;
+        for _ in 0..l {
             if self.0 & n == 0 {
                 write!(f, "*")?;
             } else {
                 write!(f, "*mut ")?;
             }
-            n >>= 1u8;
+            n <<= 1u8;
         }
         Ok(())
     }
