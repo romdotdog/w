@@ -44,3 +44,4 @@ macro_rules! test {
 
 test!(literals);
 test!(operations);
+test!(types);
