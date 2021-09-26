@@ -5,7 +5,7 @@
 */
 
 use crate::{
-    diag::{Lexeme, Message},
+    diag::Message,
     lexer::{AmbiguousOp, BinOp, BinOpVariant, Lexer, Token, UnOp},
     parser::ast::{Type, WFn},
     Session, SourceRef,
@@ -38,14 +38,14 @@ impl<'a> Parser<'a> {
         self.token_buffer.take().or_else(|| self.lex.next())
     }
 
-    pub fn block(&mut self) -> Atom {
+    pub fn block(&mut self) -> Option<Atom> {
         let mut r = Vec::new();
         let start = self.lex.span();
 
         let mut last = None;
 
         loop {
-            match last {
+            match last.take() {
                 Some(t) => r.push(t),
                 None => {}
             }
@@ -57,26 +57,53 @@ impl<'a> Parser<'a> {
                 }
                 t => {
                     self.token_buffer = t;
-                    last = Some(self.expr());
+
+                    let a = self.expr();
+                    match a {
+                        Some(_) => last = a,
+                        None => {
+                            // panic!!
+                            loop {
+                                let t = self.next();
+                                match t {
+                                    Some(Token::RightBracket) | Some(Token::Semicolon) => {
+                                        self.token_buffer = t;
+                                        break;
+                                    }
+                                    None => {
+                                        self.session
+                                            .error(Message::ParserPanicFailed, self.lex.span());
+                                        break;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
             match self.next() {
-                Some(Token::Semicolon) => continue,
                 Some(Token::RightBracket) => break,
+                Some(Token::Semicolon) => {}
                 t => {
-                    todo!();
-                    break;
+                    // try to continue
+                    self.session
+                        .error(Message::MissingSemicolon, self.lex.span());
+                    self.token_buffer = t;
                 }
             }
         }
 
         let span = start.to(self.lex.span());
-        let t = last.as_ref().map_or_else(|| Type::void(), |a| a.t);
-        Atom::new(AtomVariant::Block(r, last.map(|a| Box::new(a))), span, t)
+        Some(Atom {
+            t: last.as_ref().map_or_else(|| Type::void(), |a| a.t),
+            v: AtomVariant::Block(r, last.map(|a| Box::new(a))),
+            span,
+        })
     }
 
-    fn parse_type(&mut self) -> Type {
+    fn parse_type(&mut self) -> Option<Type> {
         let mut indir = Indir::none();
         loop {
             match self.next() {
@@ -88,37 +115,57 @@ impl<'a> Parser<'a> {
                     }
                 }),
                 Some(Token::Ident(s)) => {
-                    return Type::with_indir(s.into(), indir);
+                    return Some(Type::with_indir(s.into(), indir));
                 }
-                _ => todo!(),
+                _ => {
+                    self.session.error(Message::MalformedType, self.lex.span());
+                }
             }
         }
     }
 
-    fn ident_type_pair(&mut self) -> (String, Type) {
-        let name = match self.next() {
+    fn ident_type_pair(&mut self) -> Option<(String, Type)> {
+        let t = self.next();
+        let name = match t {
             Some(Token::Ident(s)) => s,
-            _ => todo!(),
+            Some(Token::Colon) => {
+                self.session
+                    .error(Message::MissingIdentifier, self.lex.span());
+                self.token_buffer = t;
+                "unknown".to_owned()
+            }
+            _ => {
+                self.session
+                    .error(Message::MalformedIdentifier, self.lex.span());
+                "unknown".to_owned()
+            }
         };
 
         match self.next() {
             Some(Token::Colon) => {}
-            _ => todo!(),
+            t => {
+                self.session.error(Message::MissingType, self.lex.span());
+                self.token_buffer = t;
+            }
         }
 
-        (name, self.parse_type())
+        Some((name, self.parse_type()?))
     }
 
-    fn primaryexpr(&mut self) -> Atom {
-        match self.next() {
+    fn primaryexpr(&mut self) -> Option<Atom> {
+        Some(match self.next() {
             Some(Token::LeftParen) => {
                 let start = self.lex.span();
-                let e = self.expr();
+                let e = self.expr()?;
                 let t = e.t;
 
                 match self.next() {
                     Some(Token::RightParen) => {}
-                    _ => todo!(),
+                    t => {
+                        self.session
+                            .error(Message::MissingClosingParen, self.lex.span());
+                        return None;
+                    }
                 }
 
                 Atom::new(
@@ -150,19 +197,23 @@ impl<'a> Parser<'a> {
 
                 let mut v = Vec::with_capacity(1);
                 loop {
-                    let lvalue = self.primaryexpr();
+                    let lvalue = self.primaryexpr()?;
                     let mut type_ = Type::auto();
 
                     match self.next() {
                         Some(Token::Colon) => {
-                            type_ = self.parse_type();
+                            type_ = self.parse_type()?;
                         }
                         t => self.token_buffer = t,
                     }
 
                     let rvalue = match self.next() {
-                        Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => self.expr(),
-                        _ => todo!(),
+                        Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => self.expr()?,
+                        _ => {
+                            self.session
+                                .error(Message::InitializerRequired, self.lex.span());
+                            return None;
+                        }
                     };
 
                     v.push(Declaration {
@@ -186,10 +237,10 @@ impl<'a> Parser<'a> {
                     Type::void(),
                 )
             }
-            Some(Token::LeftBracket) => self.block(),
+            Some(Token::LeftBracket) => self.block()?,
             Some(Token::BinOp(BinOp::Regular(BinOpVariant::Lt))) => {
                 let start = self.lex.span();
-                let t = self.parse_type();
+                let t = self.parse_type()?;
                 let mut op = UnOp::Cast;
 
                 match self.next() {
@@ -203,25 +254,29 @@ impl<'a> Parser<'a> {
 
                         match self.next() {
                             Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => {}
-                            _ => todo!(),
+                            _ => {
+                                self.session
+                                    .error(Message::MissingClosingAngleBracket, self.lex.span());
+                                return None;
+                            }
                         }
                     }
                 }
 
-                Atom::new(
-                    AtomVariant::UnOp(op, Box::new(self.primaryexpr())),
-                    start.to(self.lex.span()),
+                Atom {
+                    v: AtomVariant::UnOp(op, Box::new(self.primaryexpr()?)),
+                    span: start.to(self.lex.span()),
                     t,
-                )
+                }
             }
             Some(Token::If) => {
                 let start = self.lex.span();
-                let cond = Box::new(self.expr());
-                let body = Box::new(self.expr());
+                let cond = Box::new(self.expr()?);
+                let body = Box::new(self.expr()?);
                 let mut else_body = None;
                 match self.next() {
                     Some(Token::Else) => {
-                        else_body = Some(Box::new(self.expr()));
+                        else_body = Some(Box::new(self.expr()?));
                     }
                     t => self.token_buffer = t,
                 }
@@ -235,7 +290,7 @@ impl<'a> Parser<'a> {
             }
             Some(Token::Return) => {
                 let start = self.lex.span();
-                let e = self.expr();
+                let e = self.expr()?;
                 let t = e.t;
 
                 Atom::new(
@@ -246,18 +301,17 @@ impl<'a> Parser<'a> {
             }
             Some(Token::AmbiguousOp(o)) => {
                 let start = self.lex.span();
-                let e = self.primaryexpr();
-                let t = e.t;
+                let e = self.primaryexpr()?;
 
-                Atom::new(
-                    AtomVariant::UnOp(o.to_unary(), Box::new(e)),
-                    start.to(self.lex.span()),
-                    t,
-                )
+                Atom {
+                    t: e.t,
+                    v: AtomVariant::UnOp(o.to_unary(), Box::new(e)),
+                    span: start.to(self.lex.span()),
+                }
             }
             Some(Token::UnOp(u)) => {
                 let start = self.lex.span();
-                let e = self.primaryexpr();
+                let e = self.primaryexpr()?;
                 let t = e.t;
 
                 Atom::new(
@@ -266,11 +320,14 @@ impl<'a> Parser<'a> {
                     t,
                 )
             }
-            t => panic!("{:?}", t),
-        }
+            t => {
+                self.session.error(Message::CompilerError, self.lex.span());
+                return None;
+            }
+        })
     }
 
-    fn subexpr(&mut self, mut lhs: Atom, min_prec: u8) -> Atom {
+    fn subexpr(&mut self, mut lhs: Atom, min_prec: u8) -> Option<Atom> {
         // https://en.wikipedia.org/wiki/Operator-precedence_parser
         let mut l = self.next();
         loop {
@@ -287,7 +344,7 @@ impl<'a> Parser<'a> {
             // binary operator whose precedence is >= min_precedence
             let t_prec = t.prec();
             if t.prec() >= min_prec {
-                let mut rhs = self.primaryexpr();
+                let mut rhs = self.primaryexpr()?;
 
                 l = self.next();
                 loop {
@@ -313,7 +370,7 @@ impl<'a> Parser<'a> {
 
                     if cond {
                         self.token_buffer = l;
-                        rhs = self.subexpr(rhs, next_prec);
+                        rhs = self.subexpr(rhs, next_prec)?;
                         l = self.next()
                     } else {
                         break;
@@ -331,69 +388,90 @@ impl<'a> Parser<'a> {
                 break;
             }
         }
-        lhs
+        Some(lhs)
     }
 
-    pub fn expr(&mut self) -> Atom {
-        let lhs = self.primaryexpr();
+    pub fn expr(&mut self) -> Option<Atom> {
+        let lhs = self.primaryexpr()?;
         self.subexpr(lhs, 0)
     }
 
-    pub fn parse(mut self) -> Program {
+    pub fn function(&mut self) -> Option<WFn> {
+        let name = match self.next() {
+            Some(Token::Ident(s)) => s,
+            t => {
+                self.token_buffer = t;
+                return None;
+            }
+        };
+
+        match self.next() {
+            Some(Token::LeftParen) => {}
+            t => {
+                self.token_buffer = t;
+                return None;
+            }
+        }
+
+        let mut params = Vec::new();
+
+        match self.next() {
+            Some(Token::RightParen) => {}
+            t => {
+                self.token_buffer = t;
+                // TODO: remove
+
+                loop {
+                    params.push(self.ident_type_pair()?);
+                    match self.next() {
+                        Some(Token::Comma) => {}
+                        Some(Token::RightParen) => break,
+                        _ => todo!(),
+                    }
+                }
+            }
+        }
+
+        let t = match self.next() {
+            Some(Token::Colon) => self.parse_type()?,
+            t => {
+                self.token_buffer = t;
+                Type::void()
+            }
+        };
+
+        let atom = self.expr()?;
+
+        Some(WFn {
+            name,
+            params,
+            atom,
+            t,
+        })
+    }
+
+    pub fn parse(mut self) -> Option<Program> {
         let mut fns = Vec::new();
         while let Some(t) = self.next() {
             match t {
                 Token::Fn => {
-                    let name = match self.next() {
-                        Some(Token::Ident(s)) => s,
-                        _ => todo!(),
-                    };
-
-                    match self.next() {
-                        Some(Token::LeftParen) => {}
-                        _ => todo!(),
-                    }
-
-                    let mut params = Vec::new();
-
-                    match self.next() {
-                        Some(Token::RightParen) => {}
-                        t => {
-                            self.token_buffer = t;
-                            // TODO: remove
-
+                    match self.function() {
+                        Some(f) => fns.push(f),
+                        None => {
+                            // panic
                             loop {
-                                params.push(self.ident_type_pair());
                                 match self.next() {
-                                    Some(Token::Comma) => {}
-                                    Some(Token::RightParen) => break,
-                                    _ => todo!(),
+                                    None | Some(Token::Fn) => break,
+                                    _ => {}
                                 }
                             }
                         }
                     }
-
-                    let t = match self.next() {
-                        Some(Token::Colon) => self.parse_type(),
-                        t => {
-                            self.token_buffer = t;
-                            Type::void()
-                        }
-                    };
-
-                    let atom = self.expr();
-
-                    fns.push(WFn {
-                        name,
-                        params,
-                        atom,
-                        t,
-                    })
                 }
                 _ => todo!(),
             }
         }
 
-        Program { fns }
+        Some(Program { fns })
     }
 }

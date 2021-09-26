@@ -12,7 +12,7 @@ macro_rules! test {
             let fixture = concat!("tests/parser/", stringify!($f), ".fixture.w");
             let entry =
                 sess.register_source(filename.to_owned(), fs::read_to_string(filename).unwrap());
-            let t = format!("{}", sess.parse(entry).parse());
+            let t = format!("{}", sess.parse(entry).parse().unwrap());
 
             if let Ok(fixture_src) = fs::read_to_string(fixture) {
                 let mut failed = false;
