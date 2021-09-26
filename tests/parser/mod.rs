@@ -45,3 +45,6 @@ macro_rules! test {
 test!(literals);
 test!(operations);
 test!(types);
+test!(ifs);
+
+test!(returns);
