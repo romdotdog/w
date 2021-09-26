@@ -21,7 +21,7 @@ pub struct Lexer<'a> {
     src: SourceRef,
 
     buffer: Option<char>,
-    token_buffer: Option<Token>,
+    token_buffer: Option<(Token, Span)>,
 
     p: isize,
 
@@ -68,7 +68,7 @@ impl<'a> Lexer<'a> {
         match self.nextc() {
             Some('=') => true,
             t => {
-                self.buffer = t;
+                self.backtrack(t);
                 false
             }
         }
@@ -81,7 +81,7 @@ impl<'a> Lexer<'a> {
                     buf.push(t);
                 }
                 c1 => {
-                    self.buffer = c1;
+                    self.backtrack(c1);
                     break;
                 }
             }
@@ -175,7 +175,7 @@ impl<'a> Lexer<'a> {
                                                     num.push(t);
                                                 }
                                                 c1 => {
-                                                    self.buffer = c1;
+                                                    self.backtrack(c1);
                                                     break;
                                                 }
                                             }
@@ -199,7 +199,7 @@ impl<'a> Lexer<'a> {
                                         // push the codepoint
                                         res.push(escaped.unwrap());
                                     }
-                                    t => self.buffer = t,
+                                    t => self.backtrack(t),
                                 }
                             } else {
                                 // TODO: Figure out the semantics of this
@@ -234,23 +234,23 @@ impl<'a> Lexer<'a> {
                     ('<', Some('<')) => op!(@binary Lsh),
                     ('>', Some('>')) => op!(@binary Rsh),
                     ('<', _) => {
-                        self.buffer = c2;
+                        self.backtrack(c2);
                         op!(@simple Lt)
                     }
                     ('>', _) => {
-                        self.buffer = c2;
+                        self.backtrack(c2);
                         op!(@simple Gt)
                     }
 
                     ('=', Some('=')) => op!(@binary EqC),
                     ('=', _) => {
-                        self.buffer = c2;
+                        self.backtrack(c2);
                         op!(@compound Id)
                     }
 
                     ('!', Some('=')) => op!(@binary Neq),
                     ('!', _) => {
-                        self.buffer = c2;
+                        self.backtrack(c2);
                         op!(@unary LNot)
                     }
 
@@ -264,17 +264,17 @@ impl<'a> Lexer<'a> {
                     }
 
                     ('+', _) => {
-                        self.buffer = c2;
+                        self.backtrack(c2);
                         op!(@ambiguous Plus)
                     }
 
                     ('-', _) => {
-                        self.buffer = c2;
+                        self.backtrack(c2);
                         op!(@ambiguous Minus)
                     }
 
                     (_, _) => {
-                        self.buffer = c2;
+                        self.backtrack(c2);
                         return None;
                     }
                 }
@@ -308,10 +308,10 @@ impl<'a> Lexer<'a> {
                                 float = Floatable::False;
                                 radix = radix_ as u32;
                             } else {
-                                self.buffer = t;
+                                self.backtrack(t);
                             }
                         }
-                        _ => self.buffer = t,
+                        _ => self.backtrack(t),
                     }
                 }
 
@@ -331,7 +331,7 @@ impl<'a> Lexer<'a> {
                     }
                     t => {
                         println!("{:?}", t);
-                        self.buffer = t;
+                        self.backtrack(t);
                     }
                 }
 
@@ -346,17 +346,17 @@ impl<'a> Lexer<'a> {
         })
     }
 
-    fn try_tk_aip(&mut self, c: char) -> Option<Token> {
-        self.start = self.p as usize;
+    fn try_tk_aip(&mut self, c: char) -> Option<(Token, Span)> {
+        let start = self.p as usize;
         let r = self.try_aip(c);
-        self.end = self.p as usize;
-        r
+        let end = self.p as usize + 1;
+        r.map(|t| (t, Span::new(self.src, start, end)))
     }
 
     fn try_tk_bip(&mut self, c: char) -> Option<Token> {
         self.start = self.p as usize;
         let r = self.try_bip(c);
-        self.end = self.p as usize;
+        self.end = self.p as usize + 1;
         r
     }
 
@@ -364,13 +364,21 @@ impl<'a> Lexer<'a> {
         self.p += 1;
         self.buffer.take().or_else(|| self.stream.next())
     }
+
+    fn backtrack(&mut self, t: Option<char>) {
+        self.buffer = t;
+        self.p -= 1;
+    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Token> {
-        if let Some(token) = self.token_buffer.take() {
+        if let Some((token, span)) = self.token_buffer.take() {
+            self.start = span.start;
+            self.end = span.end;
+
             return Some(token);
         }
 
@@ -404,13 +412,15 @@ impl<'a> Iterator for Lexer<'a> {
 
         self.try_tk_bip(c).or_else(|| {
             let mut ident = c.to_string();
-            self.start = self.p as usize;
+            let start = self.p as usize;
+            let mut end = start + 1;
 
             while let Some(c2) = self.nextc() {
                 if c2.is_whitespace() {
                     break;
                 }
 
+                end = self.p as usize;
                 if let Some(t) = self.try_tk_aip(c2) {
                     self.token_buffer = Some(t);
                     break;
@@ -419,7 +429,8 @@ impl<'a> Iterator for Lexer<'a> {
                 ident.push(c2);
             }
 
-            self.end = self.p as usize;
+            self.start = start;
+            self.end = end;
             Some(Lexer::keyword(ident))
         })
     }

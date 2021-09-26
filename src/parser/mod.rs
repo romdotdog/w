@@ -55,6 +55,7 @@ impl<'a> Parser<'a> {
                     last = None;
                     break;
                 }
+                None => {}
                 t => {
                     self.token_buffer = t;
 
@@ -70,11 +71,7 @@ impl<'a> Parser<'a> {
                                         self.token_buffer = t;
                                         break;
                                     }
-                                    None => {
-                                        self.session
-                                            .error(Message::ParserPanicFailed, self.lex.span());
-                                        break;
-                                    }
+                                    None => break,
                                     _ => {}
                                 }
                             }
@@ -86,6 +83,11 @@ impl<'a> Parser<'a> {
             match self.next() {
                 Some(Token::RightBracket) => break,
                 Some(Token::Semicolon) => {}
+                None => {
+                    self.session
+                        .error(Message::MissingClosingBracket, self.lex.span());
+                    break;
+                }
                 t => {
                     // try to continue
                     self.session
@@ -161,7 +163,7 @@ impl<'a> Parser<'a> {
 
                 match self.next() {
                     Some(Token::RightParen) => {}
-                    t => {
+                    _ => {
                         self.session
                             .error(Message::MissingClosingParen, self.lex.span());
                         return None;
@@ -320,8 +322,9 @@ impl<'a> Parser<'a> {
                     t,
                 )
             }
-            t => {
-                self.session.error(Message::CompilerError, self.lex.span());
+            _ => {
+                self.session
+                    .error(Message::UnexpectedToken, self.lex.span());
                 return None;
             }
         })
@@ -450,28 +453,35 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub fn parse(mut self) -> Option<Program> {
+    pub fn panic_top_level(&mut self) {
+        loop {
+            let t = self.next();
+            match t {
+                None | Some(Token::Fn) => {
+                    self.token_buffer = t;
+                    break;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub fn parse(mut self) -> Program {
         let mut fns = Vec::new();
         while let Some(t) = self.next() {
             match t {
-                Token::Fn => {
-                    match self.function() {
-                        Some(f) => fns.push(f),
-                        None => {
-                            // panic
-                            loop {
-                                match self.next() {
-                                    None | Some(Token::Fn) => break,
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
+                Token::Fn => match self.function() {
+                    Some(f) => fns.push(f),
+                    None => self.panic_top_level(),
+                },
+                _ => {
+                    self.session
+                        .error(Message::InvalidTopLevel, self.lex.span());
+                    self.panic_top_level()
                 }
-                _ => todo!(),
             }
         }
 
-        Some(Program { fns })
+        Program { fns }
     }
 }

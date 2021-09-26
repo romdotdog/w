@@ -1,9 +1,10 @@
 use similar::{ChangeTag, TextDiff};
 use std::fs;
+use w::diag::Message;
 use w::Session;
 
 macro_rules! test {
-    ($f: ident) => {
+    ($f: ident $(, $e: ident)*) => {
         #[test]
         fn $f() {
             let sess = Session::new();
@@ -12,7 +13,28 @@ macro_rules! test {
             let fixture = concat!("tests/parser/", stringify!($f), ".fixture.w");
             let entry =
                 sess.register_source(filename.to_owned(), fs::read_to_string(filename).unwrap());
-            let t = format!("{}", sess.parse(entry).parse().unwrap());
+            let t = format!("{}", sess.parse(entry).parse());
+
+			// check errors
+			#[allow(unused_mut)]
+			let mut n = 0;
+
+			$({
+				match sess.errors.get(n) {
+					Some((Message::$e, _)) => {}
+					Some(t) => panic!("expected '{}', got '{}'", Message::$e, t.0),
+					None => panic!("expected '{}', got no error", Message::$e)
+				};
+				n += 1;
+			})*
+
+			match sess.errors.get(n) {
+				Some(_) => {
+					sess.diagnostics();
+					panic!("found additional errors");
+				}
+				None => {},
+			}
 
             if let Ok(fixture_src) = fs::read_to_string(fixture) {
                 let mut failed = false;
@@ -46,5 +68,5 @@ test!(literals);
 test!(operations);
 test!(types);
 test!(ifs);
-
 test!(returns);
+test!(panic, MissingClosingParen, MissingClosingBracket);

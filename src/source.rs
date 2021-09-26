@@ -57,6 +57,13 @@ impl Source {
 
         // must use this crate since identifiers are catch-all
         let col = UnicodeSegmentation::graphemes(&self.src[self.line_pos[lo]..i], true).count();
-        (hi, col + 1, (self.line_pos[lo], self.line_pos[hi]))
+        (
+            hi,
+            col + 1,
+            (
+                self.line_pos[lo],
+                *self.line_pos.get(hi).unwrap_or(&self.src_size),
+            ),
+        )
     }
 }

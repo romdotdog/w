@@ -14,7 +14,7 @@ use span::Span;
 pub struct Session {
     sources: AppendList<Source>,
     warnings: AppendList<(Message, Span)>,
-    errors: AppendList<(Message, Span)>,
+    pub errors: AppendList<(Message, Span)>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -65,17 +65,24 @@ impl Session {
             let start_pos = s.start;
             let end_pos = s.end;
 
-            assert!(start_pos < end_pos);
+            assert!(start_pos < end_pos, "{} - {} / {}", start_pos, end_pos, m);
 
             let (line, col, (sol, eol)) = src.line_col(start_pos);
+            let spaces = src.content()[sol..start_pos]
+                .chars()
+                .fold(0, |i, c| match c {
+                    '\t' => i + 8,
+                    _ => i + 1,
+                });
+
             println!(
                 "\x1b[1m{}:{}:{}: \x1b[91merror:\x1b[0m {}\n{}\n{}\x1b[91m\x1b[1m{}\x1b[0m",
                 src.name(),
                 line,
                 col,
                 m,
-                &src.content()[sol..eol].trim_end(),
-                " ".repeat(start_pos - sol),
+                src.content()[sol..eol].trim_end(),
+                " ".repeat(spaces),
                 "^".repeat(s.end - start_pos),
             )
         }
