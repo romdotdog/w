@@ -19,7 +19,7 @@ impl Display for Message {
             Message::UnexpectedToken => write!(f, "unexpected token"),
             Message::MissingSemicolon => write!(f, "missing a semicolon or closing brace"),
             Message::MissingIdentifier => write!(f, "missing identifier here"),
-            Message::MalformedIdentifier => write!(f, "expected identifier here"),
+            Message::MalformedIdentifier => write!(f, "invalid identifier here"),
             Message::MissingType => write!(f, "missing type here"),
             Message::MalformedType => write!(f, "found malformed type"),
             Message::MissingClosingParen => write!(f, "')' expected here"),

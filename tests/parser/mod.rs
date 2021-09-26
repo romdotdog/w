@@ -15,6 +15,8 @@ macro_rules! test {
                 sess.register_source(filename.to_owned(), fs::read_to_string(filename).unwrap());
             let t = format!("{}", sess.parse(entry).parse());
 
+			sess.diagnostics();
+
 			// check errors
 			#[allow(unused_mut)]
 			let mut n = 0;
@@ -29,10 +31,7 @@ macro_rules! test {
 			})*
 
 			match sess.errors.get(n) {
-				Some(_) => {
-					sess.diagnostics();
-					panic!("found additional errors");
-				}
+				Some(_) => panic!("found additional errors"),
 				None => {},
 			}
 
@@ -69,4 +68,15 @@ test!(operations);
 test!(types);
 test!(ifs);
 test!(returns);
-test!(panic, MissingClosingParen, MissingClosingBracket);
+test!(
+    errors,
+    MissingClosingParen,
+    MissingType,
+    InitializerRequired,
+    MissingClosingAngleBracket,
+    InvalidTopLevel,
+    MalformedIdentifier,
+    MalformedType,
+    MissingIdentifier,
+    MissingClosingBracket
+);

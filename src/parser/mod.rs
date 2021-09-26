@@ -121,6 +121,7 @@ impl<'a> Parser<'a> {
                 }
                 _ => {
                     self.session.error(Message::MalformedType, self.lex.span());
+                    return None;
                 }
             }
         }
@@ -148,6 +149,7 @@ impl<'a> Parser<'a> {
             t => {
                 self.session.error(Message::MissingType, self.lex.span());
                 self.token_buffer = t;
+                return None;
             }
         }
 
@@ -251,14 +253,15 @@ impl<'a> Parser<'a> {
                         // !x
                         match t1 {
                             Some(Token::UnOp(UnOp::LNot)) => op = UnOp::Reinterpret,
-                            _ => {}
+                            t => self.token_buffer = t,
                         }
 
                         match self.next() {
                             Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => {}
-                            _ => {
+                            t => {
                                 self.session
                                     .error(Message::MissingClosingAngleBracket, self.lex.span());
+                                self.token_buffer = t;
                                 return None;
                             }
                         }
