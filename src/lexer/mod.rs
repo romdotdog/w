@@ -128,6 +128,8 @@ impl<'a> Lexer<'a> {
             '(' => Token::LeftParen,
             ')' => Token::RightParen,
 
+            '.' => op!(@binary Acs),
+
             '*' => op!(@ambiguous Asterisk),
             '/' => op!(@binary Div),
 
