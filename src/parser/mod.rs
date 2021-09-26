@@ -5,7 +5,7 @@
 */
 
 use crate::{
-    diag::{Diagnostic, Lexeme, Message},
+    diag::{Lexeme, Message},
     lexer::{AmbiguousOp, BinOp, BinOpVariant, Lexer, Token, UnOp},
     parser::ast::{Type, WFn},
     Session, SourceRef,
@@ -23,33 +23,6 @@ pub struct Parser<'a> {
     session: &'a Session,
     lex: Lexer<'a>,
     token_buffer: Option<Token>,
-}
-
-macro_rules! expect_or_error {
-    ($parser: ident, |$t: ident| $error: block, $( $pattern:pat )|+ $( if $guard: expr )? => $r: ident) => {{
-		let mut errored = false;
-		let start = $parser.lex.span();
-		loop {
-			let $t = $parser.next();
-			match $t {
-				$( $pattern )|+ $( if $guard )? => break $r,
-				None => todo!(),
-				_ if errored => {}
-				$t => {
-					$parser.session.error(Diagnostic::new(start.to($parser.lex.span()), $error));
-					errored = true;
-				}
-			}
-		}
-    }};
-
-	($parser: ident, $t: ident) => {
-		expect_or_error!(
-			$parser,
-			|t| { Message::ExpectedGot(Lexeme::$t, t.into()) },
-			Some(Token::$t) => t
-		);
-	}
 }
 
 impl<'a> Parser<'a> {
@@ -92,11 +65,7 @@ impl<'a> Parser<'a> {
                 Some(Token::Semicolon) => continue,
                 Some(Token::RightBracket) => break,
                 t => {
-                    expect_or_error!(
-                        self,
-                        |t| { Message::MissingSemicolon },
-                        Some(Token::RightBracket) => t
-                    );
+                    todo!();
                     break;
                 }
             }
@@ -127,13 +96,15 @@ impl<'a> Parser<'a> {
     }
 
     fn ident_type_pair(&mut self) -> (String, Type) {
-        let name = expect_or_error!(
-            self,
-            |t| { Message::ExpectedGot(Lexeme::Ident, t.into()) },
-            Some(Token::Ident(r)) => r
-        );
+        let name = match self.next() {
+            Some(Token::Ident(s)) => s,
+            _ => todo!(),
+        };
 
-        expect_or_error!(self, Colon);
+        match self.next() {
+            Some(Token::Colon) => {}
+            _ => todo!(),
+        }
 
         (name, self.parse_type())
     }
@@ -144,7 +115,11 @@ impl<'a> Parser<'a> {
                 let start = self.lex.span();
                 let e = self.expr();
                 let t = e.t;
-                expect_or_error!(self, RightParen);
+
+                match self.next() {
+                    Some(Token::RightParen) => {}
+                    _ => todo!(),
+                }
 
                 Atom::new(
                     AtomVariant::Paren(Box::new(e)),
@@ -226,11 +201,10 @@ impl<'a> Parser<'a> {
                             _ => {}
                         }
 
-                        expect_or_error!(
-                            self,
-                            |t| { Message::ExpectedGot(Lexeme::RightAngBracket, t.into()) },
-                            Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => t
-                        );
+                        match self.next() {
+                            Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => {}
+                            _ => todo!(),
+                        }
                     }
                 }
 
@@ -370,13 +344,16 @@ impl<'a> Parser<'a> {
         while let Some(t) = self.next() {
             match t {
                 Token::Fn => {
-                    let name = expect_or_error!(
-                        self,
-                        |t| { Message::ExpectedGot(Lexeme::Ident, t.into()) },
-                        Some(Token::Ident(r)) => r
-                    );
+                    let name = match self.next() {
+                        Some(Token::Ident(s)) => s,
+                        _ => todo!(),
+                    };
 
-                    expect_or_error!(self, LeftParen);
+                    match self.next() {
+                        Some(Token::LeftParen) => {}
+                        _ => todo!(),
+                    }
+
                     let mut params = Vec::new();
 
                     match self.next() {

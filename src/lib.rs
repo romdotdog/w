@@ -5,15 +5,16 @@ pub mod source;
 pub mod span;
 
 use appendlist::AppendList;
-use diag::Diagnostic;
+use diag::Message;
 use lexer::Lexer;
 use parser::Parser;
 use source::Source;
+use span::Span;
 
 pub struct Session {
     sources: AppendList<Source>,
-    warnings: AppendList<Diagnostic>,
-    errors: AppendList<Diagnostic>,
+    warnings: AppendList<(Message, Span)>,
+    errors: AppendList<(Message, Span)>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -51,18 +52,18 @@ impl Session {
         &self.sources[i.0]
     }
 
-    pub fn error(&self, diag: Diagnostic) {
-        self.errors.push(diag);
+    pub fn error(&self, msg: Message, span: Span) {
+        self.errors.push((msg, span));
     }
 
     // TODO: Limit to non-wasm targets
     // Diagnostics will be handled on the JS side
     pub fn diagnostics(&self) {
         for i in 0..self.errors.len() {
-            let v = self.errors.get(i).unwrap();
-            let src = self.get_source(&v.span.src);
-            let start_pos = v.span.start;
-            let end_pos = v.span.end;
+            let (m, s) = self.errors.get(i).unwrap();
+            let src = self.get_source(&s.src);
+            let start_pos = s.start;
+            let end_pos = s.end;
 
             assert!(start_pos < end_pos);
 
@@ -72,10 +73,10 @@ impl Session {
                 src.name(),
                 line,
                 col,
-                v,
+                m,
                 &src.content()[sol..eol].trim_end(),
                 " ".repeat(start_pos - sol),
-                "^".repeat(v.span.end - start_pos),
+                "^".repeat(s.end - start_pos),
             )
         }
     }

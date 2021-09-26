@@ -1,23 +1,5 @@
-use crate::{lexer::Token, span::Span};
+use crate::lexer::Token;
 use std::fmt::Display;
-
-pub struct Diagnostic {
-    pub span: Span,
-    pub message: Message,
-}
-
-impl Diagnostic {
-    pub fn new(span: Span, message: Message) -> Self {
-        Diagnostic { span, message }
-    }
-}
-
-// TODO: Refactor
-impl Display for Diagnostic {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
 
 // TODO: Remove
 #[derive(Debug)]
