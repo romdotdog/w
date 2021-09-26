@@ -364,11 +364,6 @@ impl<'a> Lexer<'a> {
         self.p += 1;
         self.buffer.take().or_else(|| self.stream.next())
     }
-
-    pub fn insert(&mut self, t: Option<Token>) {
-        assert!(self.token_buffer.is_none());
-        self.token_buffer = t;
-    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
