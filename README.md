@@ -13,3 +13,7 @@ This a compiler for a language that
   - e.g. `let mut`, `*mut x`
 - global namespacing
   - without headers!
+
+---
+
+_this project is a part of the [Homebrew Compiler Club](https://discord.gg/wzkJN89wV3)_
