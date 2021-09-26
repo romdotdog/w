@@ -80,3 +80,21 @@ impl Session {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::lexer::Token;
+    use super::Session;
+
+    #[test]
+    fn lexer() {
+        let sess = Session::new();
+        let src = sess.register_source("lexer_test".to_owned(), "a 1.2 b //".to_owned());
+        let mut lex = sess.lexer(src);
+
+        assert_eq!(lex.next(), Some(Token::Ident("a".to_owned())));
+        assert_eq!(lex.next(), Some(Token::Float(1.2)));
+        assert_eq!(lex.next(), Some(Token::Ident("b".to_owned())));
+        assert_eq!(lex.next(), None);
+    }
+}
