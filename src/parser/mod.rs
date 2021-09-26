@@ -276,7 +276,7 @@ impl<'a> Parser<'a> {
             }
             Some(Token::AmbiguousOp(o)) => {
                 let start = self.lex.span();
-                let e = self.expr();
+                let e = self.primaryexpr();
                 let t = e.t;
 
                 Atom::new(
@@ -287,7 +287,7 @@ impl<'a> Parser<'a> {
             }
             Some(Token::UnOp(u)) => {
                 let start = self.lex.span();
-                let e = self.expr();
+                let e = self.primaryexpr();
                 let t = e.t;
 
                 Atom::new(

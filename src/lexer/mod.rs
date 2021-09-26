@@ -135,6 +135,7 @@ impl<'a> Lexer<'a> {
             '^' => op!(@binary Xor),
             '&' => op!(@ambiguous Ampersand),
             '|' => op!(@binary Or),
+            '~' => op!(@unary BNot),
 
             '\'' => {
                 let c2 = self.nextc();
