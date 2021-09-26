@@ -81,9 +81,8 @@ impl Type {
         Type { v, indir }
     }
 
-    /// void pointer
     pub fn void() -> Self {
-        Self::with_indir(TypeVariant::Void, Indir::pointers(1, 1))
+        Self::new(TypeVariant::Void)
     }
 
     pub fn auto() -> Self {

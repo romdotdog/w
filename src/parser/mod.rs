@@ -414,9 +414,14 @@ impl<'a> Parser<'a> {
                         }
                     }
 
-                    expect_or_error!(self, Colon);
+                    let t = match self.next() {
+                        Some(Token::Colon) => self.parse_type(),
+                        t => {
+                            self.token_buffer = t;
+                            Type::void()
+                        }
+                    };
 
-                    let t = self.parse_type();
                     let atom = self.expr();
 
                     fns.push(WFn {
