@@ -4,17 +4,10 @@ use crate::{
     span::Span,
 };
 
-/*
-    TODO:
-    * Remove Debug derives
-*/
-
-#[derive(Debug)]
 pub struct Program {
     pub fns: Vec<WFn>,
 }
 
-#[derive(Debug)]
 pub struct WFn {
     pub name: String,
     pub params: Vec<(String, Type)>,
@@ -24,7 +17,6 @@ pub struct WFn {
 
 type BAtom = Box<Atom>;
 
-#[derive(Debug)]
 pub enum AtomVariant {
     String(String),
     Char(char),
@@ -42,14 +34,12 @@ pub enum AtomVariant {
     Return(BAtom),
 }
 
-#[derive(Debug)]
 pub struct Declaration {
     pub lvalue: Atom,
     pub rvalue: Atom,
     pub t: Type,
 }
 
-#[derive(Debug)]
 pub struct Atom {
     pub v: AtomVariant,
     pub span: Span,
@@ -62,7 +52,7 @@ impl Atom {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct Type {
     pub v: TypeVariant,
     pub indir: Indir,
@@ -89,7 +79,7 @@ impl Type {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub enum TypeVariant {
     Auto,
     Void,
