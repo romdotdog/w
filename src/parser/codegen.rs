@@ -42,7 +42,7 @@ impl Display for TypeVariant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TypeVariant::Auto => write!(f, "<inferred>"),
-            TypeVariant::Null => write!(f, "null"),
+            TypeVariant::Void => write!(f, "void"),
             TypeVariant::I32 => write!(f, "i32"),
             TypeVariant::I64 => write!(f, "i64"),
             TypeVariant::U32 => write!(f, "u32"),

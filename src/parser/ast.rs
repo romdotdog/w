@@ -81,6 +81,11 @@ impl Type {
         Type { v, indir }
     }
 
+    /// void pointer
+    pub fn void() -> Self {
+        Self::with_indir(TypeVariant::Void, Indir::pointers(1, 1))
+    }
+
     pub fn auto() -> Self {
         Self::new(TypeVariant::Auto)
     }
@@ -89,7 +94,7 @@ impl Type {
 #[derive(Debug, Clone, Copy)]
 pub enum TypeVariant {
     Auto,
-    Null,
+    Void,
     I32,
     I64,
     U32,
@@ -107,6 +112,7 @@ impl From<String> for TypeVariant {
             "u64" => TypeVariant::U64,
             "f32" => TypeVariant::F32,
             "f64" => TypeVariant::F64,
+            "void" => TypeVariant::Void,
             _ => todo!(),
         }
     }

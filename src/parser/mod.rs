@@ -17,7 +17,7 @@ use indir::Indir;
 mod ast;
 pub use ast::Atom;
 
-use self::ast::{AtomVariant, Declaration, Program, TypeVariant};
+use self::ast::{AtomVariant, Declaration, Program};
 
 pub struct Parser<'a> {
     session: &'a Session,
@@ -107,8 +107,7 @@ impl<'a> Parser<'a> {
         }
 
         let span = start.to(self.lex.span());
-        let last = last
-            .unwrap_or_else(|| Atom::new(AtomVariant::Null, span, Type::new(TypeVariant::Null)));
+        let last = last.unwrap_or_else(|| Atom::new(AtomVariant::Null, span, Type::void()));
         let t = last.t;
         Atom::new(AtomVariant::Block(r, Box::new(last)), span, t)
     }
@@ -118,11 +117,7 @@ impl<'a> Parser<'a> {
         loop {
             match self.next() {
                 Some(Token::Semicolon) | None => {
-                    break Atom::new(
-                        AtomVariant::Null,
-                        start.to(self.lex.span()),
-                        Type::new(TypeVariant::Null),
-                    )
+                    break Atom::new(AtomVariant::Null, start.to(self.lex.span()), Type::void())
                 }
                 _ => {}
             }
@@ -165,11 +160,7 @@ impl<'a> Parser<'a> {
         loop {
             match self.next() {
                 Some(Token::Fn) | None => {
-                    break Atom::new(
-                        AtomVariant::Null,
-                        start.to(self.lex.span()),
-                        Type::new(TypeVariant::Null),
-                    )
+                    break Atom::new(AtomVariant::Null, start.to(self.lex.span()), Type::void())
                 }
                 _ => {}
             }
@@ -246,7 +237,7 @@ impl<'a> Parser<'a> {
                 Atom::new(
                     AtomVariant::Let(mutable, v),
                     start.to(self.lex.span()),
-                    Type::new(TypeVariant::Null),
+                    Type::void(),
                 )
             }
             Some(Token::LeftBracket) => self.block(),
@@ -294,7 +285,7 @@ impl<'a> Parser<'a> {
                 Atom::new(
                     AtomVariant::If(cond, body, else_body),
                     start.to(self.lex.span()),
-                    Type::new(TypeVariant::Null),
+                    Type::void(),
                 )
             }
             Some(Token::Return) => {
