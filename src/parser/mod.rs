@@ -173,7 +173,8 @@ impl<'a> Parser<'a> {
 								match self.next() {
 									Some(Token::Comma) => {}
 									Some(Token::RightParen) => break,
-									_ => {
+									t => {
+										self.token_buffer = t;
 										self.session
 											.error(Message::MissingClosingParen, self.lex.span());
 										return None;	
@@ -208,7 +209,8 @@ impl<'a> Parser<'a> {
 
                 match self.next() {
                     Some(Token::RightParen) => {}
-                    _ => {
+                    t => {
+						self.token_buffer = t;
                         self.session
                             .error(Message::MissingClosingParen, self.lex.span());
                         return None;
@@ -491,7 +493,8 @@ impl<'a> Parser<'a> {
                     match self.next() {
                         Some(Token::Comma) => {}
                         Some(Token::RightParen) => break,
-                        _ => {
+                        t => {
+							self.token_buffer = t;
 							self.session
 								.error(Message::MissingClosingParen, self.lex.span());
 							return None;
