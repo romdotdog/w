@@ -46,12 +46,6 @@ pub struct Atom {
     pub t: Type,
 }
 
-impl Atom {
-    pub fn new(v: AtomVariant, span: Span, t: Type) -> Self {
-        Atom { v, span, t }
-    }
-}
-
 #[derive(Clone, Copy)]
 pub struct Type {
     pub v: TypeVariant,
