@@ -156,8 +156,8 @@ impl<'a> Parser<'a> {
         Some((name, self.parse_type()?))
     }
 
-    fn simpleexpr(&mut self) -> Option<Atom> {
-        Some(match self.next() {
+    fn simpleexpr(&mut self, t: Option<Token>) -> Option<Atom> {
+        Some(match t {
             Some(Token::LeftParen) => {
                 let start = self.lex.span();
                 let e = self.expr()?;
@@ -295,6 +295,7 @@ impl<'a> Parser<'a> {
                 }
             }
             Some(Token::If) => {
+                println!("hi");
                 let start = self.lex.span();
                 let cond = Box::new(self.expr()?);
                 let body = Box::new(self.expr()?);
@@ -342,7 +343,7 @@ impl<'a> Parser<'a> {
                     span: start.to(self.lex.span()),
                 }
             }
-            _ => self.simpleexpr()?,
+            t => self.simpleexpr(t)?,
         })
     }
 
