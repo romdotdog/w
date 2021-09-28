@@ -64,7 +64,6 @@ impl Indir {
 
 impl Display for Indir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        println!("{:8b}", self.0);
         let l = self.len();
         let mut n = 0b00001000u8;
         for _ in 0..l {

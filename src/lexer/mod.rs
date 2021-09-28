@@ -330,7 +330,6 @@ impl<'a> Lexer<'a> {
                         self.skip_digits(&mut num, 10);
                     }
                     t => {
-                        println!("{:?}", t);
                         self.backtrack(t);
                     }
                 }

@@ -343,7 +343,6 @@ impl<'a> Parser<'a> {
                 }
             }
             Some(Token::If) => {
-                println!("hi");
                 let start = self.lex.span();
                 let cond = Box::new(self.expr()?);
                 let body = Box::new(self.expr()?);
