@@ -2,6 +2,11 @@ fn +() {
 
 }
 
+fn foo() {
+	bar
+	baz
+}
+
 fn a() {
 	2 + (d;
 }

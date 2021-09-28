@@ -70,6 +70,7 @@ test!(ifs);
 test!(returns);
 test!(
     errors,
+	MissingSemicolon,
     MissingClosingParen,
     MissingType,
     InitializerRequired,
