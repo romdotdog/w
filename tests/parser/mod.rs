@@ -80,3 +80,4 @@ test!(
     MissingIdentifier,
     MissingClosingBracket
 );
+test!(postfix);

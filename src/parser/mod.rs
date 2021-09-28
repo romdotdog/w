@@ -156,8 +156,52 @@ impl<'a> Parser<'a> {
         Some((name, self.parse_type()?))
     }
 
+	fn postfixexpr(&mut self, mut lhs: Atom) -> Option<Atom> {
+		loop {
+			match self.next() {
+				Some(Token::LeftParen) => {
+					let mut args = Vec::new();
+
+					match self.next() {
+						Some(Token::RightParen) => {}
+						t => {
+							self.token_buffer = t;
+							// TODO: remove
+
+							loop {
+								args.push(self.expr()?);
+								match self.next() {
+									Some(Token::Comma) => {}
+									Some(Token::RightParen) => break,
+									_ => {
+										self.session
+											.error(Message::MissingClosingParen, self.lex.span());
+										return None;	
+									},
+								}
+							}
+						}
+					}
+					
+					lhs = Atom {
+						span: lhs.span.to(self.lex.span()),
+						v: AtomVariant::Call(Box::new(lhs), args),
+						t: Type::auto()
+					}
+				},
+
+				t => {
+					self.token_buffer = t;
+					break;
+				}
+			}
+		}
+
+		Some(lhs)
+	}
+
     fn simpleexpr(&mut self, t: Option<Token>) -> Option<Atom> {
-        Some(match t {
+        let lhs = match t {
             Some(Token::LeftParen) => {
                 let start = self.lex.span();
                 let e = self.expr()?;
@@ -208,7 +252,9 @@ impl<'a> Parser<'a> {
                     .error(Message::UnexpectedToken, self.lex.span());
                 return None;
             }
-        })
+        };
+
+		self.postfixexpr(lhs)
     }
 
     fn primaryexpr(&mut self) -> Option<Atom> {
@@ -445,7 +491,11 @@ impl<'a> Parser<'a> {
                     match self.next() {
                         Some(Token::Comma) => {}
                         Some(Token::RightParen) => break,
-                        _ => todo!(),
+                        _ => {
+							self.session
+								.error(Message::MissingClosingParen, self.lex.span());
+							return None;
+						},
                     }
                 }
             }

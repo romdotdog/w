@@ -85,6 +85,19 @@ impl Display for Atom {
                     Some(l) => write!(f, "\t{}\n}}", format!("{}", l).replace("\n", "\n\t")),
                 }
             }
+			AtomVariant::Call(lhs, args) => {
+				write!(f, "{}(", lhs)?;
+				let l = args.len();
+				for (i, arg) in args.iter().enumerate() {
+					write!(f, "{}", arg)?;
+
+					if i + 1 < l {
+						write!(f, ", ")?;
+					}
+				}
+
+				write!(f, ")")
+			}
             AtomVariant::Let(mutable, v) => {
                 match mutable {
                     true => write!(f, "let mut ")?,
