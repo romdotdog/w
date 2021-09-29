@@ -80,18 +80,20 @@ impl<'a> Parser<'a> {
                 }
             }
 
+			let err_span = self.lex.span();
+
             match self.next() {
                 Some(Token::RightBracket) => break,
                 Some(Token::Semicolon) => {}
                 None => {
                     self.session
-                        .error(Message::MissingClosingBracket, self.lex.span());
+                        .error(Message::MissingClosingBracket, err_span);
                     break;
                 }
                 t => {
                     // try to continue
                     self.session
-                        .error(Message::MissingSemicolon, self.lex.span());
+                        .error(Message::MissingSemicolon, err_span);
                     self.token_buffer = t;
                 }
             }
