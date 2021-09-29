@@ -17,7 +17,7 @@ use indir::Indir;
 mod ast;
 pub use ast::Atom;
 
-use self::ast::{AtomVariant, Declaration, Program};
+use self::ast::{AtomVariant, Declaration, Program, IncDec};
 
 pub struct Parser<'a> {
     session: &'a Session,
@@ -159,6 +159,22 @@ impl<'a> Parser<'a> {
 	fn postfixexpr(&mut self, mut lhs: Atom) -> Option<Atom> {
 		loop {
 			match self.next() {
+				Some(Token::UnOp(UnOp::Dec)) => {
+					lhs = Atom {
+						span: lhs.span.to(self.lex.span()),
+						v: AtomVariant::PostIncDec(Box::new(lhs), IncDec::Dec),
+						t: Type::auto()
+					}
+				}
+
+				Some(Token::UnOp(UnOp::Inc)) => {
+					lhs = Atom {
+						span: lhs.span.to(self.lex.span()),
+						v: AtomVariant::PostIncDec(Box::new(lhs), IncDec::Inc),
+						t: Type::auto()
+					}
+				}
+				
 				Some(Token::Period) => {
 					let period_span = self.lex.span();
 					match self.next() {

@@ -17,6 +17,11 @@ pub struct WFn {
 
 type BAtom = Box<Atom>;
 
+pub enum IncDec {
+	Inc,
+	Dec
+}
+
 pub enum AtomVariant {
     String(String),
     Char(char),
@@ -27,6 +32,7 @@ pub enum AtomVariant {
     Paren(BAtom),
     BinOp(BAtom, BinOp, BAtom),
     UnOp(UnOp, BAtom),
+	PostIncDec(BAtom, IncDec),
 
 	Call(BAtom, Vec<Atom>),
 	Access(BAtom, String),

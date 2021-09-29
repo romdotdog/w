@@ -1,7 +1,7 @@
 use crate::lexer::{BinOp, BinOpVariant, UnOp};
 
 use super::{
-    ast::{AtomVariant, Program, Type, TypeVariant, WFn},
+    ast::{AtomVariant, Program, Type, TypeVariant, WFn, IncDec},
     Atom,
 };
 
@@ -65,6 +65,10 @@ impl Display for Atom {
             AtomVariant::BinOp(lhs, op, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
 			AtomVariant::Access(lhs, ident) => write!(f, "{}.{}", lhs, ident),
 			AtomVariant::Index(lhs, rhs) => write!(f, "{}[{}]", lhs, rhs),
+			AtomVariant::PostIncDec(lhs, incdec) => match incdec {
+				IncDec::Inc => write!(f, "{}++", lhs),
+				IncDec::Dec => write!(f, "{}--", lhs)
+			}
             AtomVariant::UnOp(o, rhs) => match o {
                 UnOp::Deref => write!(f, "*{}", rhs),
                 UnOp::AddrOf => write!(f, "&{}", rhs),
