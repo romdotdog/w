@@ -27,7 +27,9 @@ pub enum AtomVariant {
     Paren(BAtom),
     BinOp(BAtom, BinOp, BAtom),
     UnOp(UnOp, BAtom),
+
 	Call(BAtom, Vec<Atom>),
+	Access(BAtom, String),
 
     Block(Vec<Atom>, Option<BAtom>),
     Let(bool, Vec<Declaration>),

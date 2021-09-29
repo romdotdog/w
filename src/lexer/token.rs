@@ -10,6 +10,8 @@ pub enum Token {
     Semicolon,
     Colon,
     Comma,
+	Period,
+	
     LeftParen,
     RightParen,
     LeftBracket,
@@ -50,9 +52,6 @@ pub enum BinOpVariant {
     /// `a = 1`
     Id,
 
-    /// .
-    Acs,
-
     Lt,
     Le,
     Gt,
@@ -78,7 +77,6 @@ pub enum BinOpVariant {
 impl BinOpVariant {
     pub fn prec(&self) -> u8 {
         match self {
-            BinOpVariant::Acs => 9,
             BinOpVariant::Mul | BinOpVariant::Div | BinOpVariant::Mod => 10,
             BinOpVariant::Add | BinOpVariant::Sub => 11,
             BinOpVariant::Lsh | BinOpVariant::Rsh => 12,

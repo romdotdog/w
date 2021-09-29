@@ -159,6 +159,23 @@ impl<'a> Parser<'a> {
 	fn postfixexpr(&mut self, mut lhs: Atom) -> Option<Atom> {
 		loop {
 			match self.next() {
+				Some(Token::Period) => {
+					match self.next() {
+						Some(Token::Ident(s)) => {
+							lhs = Atom {
+								span: lhs.span.to(self.lex.span()),
+								v: AtomVariant::Access(Box::new(lhs), s),
+								t: Type::auto(),
+							}
+						}
+						t => {
+							self.token_buffer = t;
+							self.session.error(Message::MissingIdentifier, self.lex.span());
+							return None;
+						}
+					}
+				}
+
 				Some(Token::LeftParen) => {
 					let mut args = Vec::new();
 

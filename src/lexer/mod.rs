@@ -123,12 +123,11 @@ impl<'a> Lexer<'a> {
             ':' => Token::Colon,
             ';' => Token::Semicolon,
             ',' => Token::Comma,
+			'.' => Token::Period,
             '{' => Token::LeftBracket,
             '}' => Token::RightBracket,
             '(' => Token::LeftParen,
             ')' => Token::RightParen,
-
-            '.' => op!(@binary Acs),
 
             '*' => op!(@ambiguous Asterisk),
             '/' => op!(@binary Div),

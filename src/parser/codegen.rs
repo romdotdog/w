@@ -63,6 +63,7 @@ impl Display for Atom {
             AtomVariant::Char(c) => write!(f, "'{}'", c),
             AtomVariant::Paren(a) => write!(f, "({})", a),
             AtomVariant::BinOp(lhs, op, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
+			AtomVariant::Access(lhs, ident) => write!(f, "{}.{}", lhs, ident),
             AtomVariant::UnOp(o, rhs) => match o {
                 UnOp::Deref => write!(f, "*{}", rhs),
                 UnOp::AddrOf => write!(f, "&{}", rhs),
@@ -140,7 +141,6 @@ impl Display for BinOpVariant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BinOpVariant::Id => panic!(),
-            BinOpVariant::Acs => write!(f, "."),
             BinOpVariant::Lt => write!(f, "<"),
             BinOpVariant::Le => write!(f, "<="),
             BinOpVariant::Gt => write!(f, ">"),
