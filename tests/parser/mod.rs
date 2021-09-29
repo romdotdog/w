@@ -82,6 +82,7 @@ test!(
     MissingClosingBracket
 );
 test!(postfix,
+	MissingIdentifier,
 	UnexpectedToken,
 	MissingClosingParen
 );

@@ -160,6 +160,7 @@ impl<'a> Parser<'a> {
 		loop {
 			match self.next() {
 				Some(Token::Period) => {
+					let periodSpan = self.lex.span();
 					match self.next() {
 						Some(Token::Ident(s)) => {
 							lhs = Atom {
@@ -170,7 +171,7 @@ impl<'a> Parser<'a> {
 						}
 						t => {
 							self.token_buffer = t;
-							self.session.error(Message::MissingIdentifier, self.lex.span());
+							self.session.error(Message::MissingIdentifier, periodSpan);
 							return None;
 						}
 					}
