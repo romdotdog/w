@@ -18,4 +18,10 @@ impl Span {
         assert!(self.start <= self.end, "{} .. {}", self.start, self.end);
         self
     }
+
+	pub fn move(mut self, n: usize) -> Self {
+		self.start += n;
+		self.end += n;
+		self
+	}
 }

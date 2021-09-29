@@ -70,10 +70,11 @@ impl Session {
             let (line, col, (sol, eol)) = src.line_col(start_pos);
             let spaces = src.content()[sol..start_pos]
                 .chars()
-                .fold(0, |i, c| match c {
-                    '\t' => i + 8,
-                    _ => i + 1,
-                });
+				.map(|c| match c.is_whitespace() {
+					true => c,
+					false => ' '
+				})
+                .collect::<String>();
 
             println!(
                 "\x1b[1m{}:{}:{}: \x1b[91merror:\x1b[0m {}\n{}\n{}\x1b[91m\x1b[1m{}\x1b[0m",
@@ -82,7 +83,7 @@ impl Session {
                 col,
                 m,
                 src.content()[sol..eol].trim_end(),
-                " ".repeat(spaces),
+                spaces,
                 "^".repeat(s.end - start_pos),
             )
         }
