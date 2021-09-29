@@ -59,7 +59,7 @@ impl<'a> Parser<'a> {
                 t => {
                     self.token_buffer = t;
 
-                    let a = self.expr();
+                    let a = self.atom();
                     match a {
                         Some(_) => last = a,
                         None => {
@@ -156,7 +156,7 @@ impl<'a> Parser<'a> {
         Some((name, self.parse_type()?))
     }
 
-	fn postfixexpr(&mut self, mut lhs: Atom) -> Option<Atom> {
+	fn postfixatom(&mut self, mut lhs: Atom) -> Option<Atom> {
 		loop {
 			match self.next() {
 				Some(Token::UnOp(UnOp::Dec)) => {
@@ -194,7 +194,7 @@ impl<'a> Parser<'a> {
 				}
 
 				Some(Token::LeftSqBracket) => {
-					let atom = self.expr()?;
+					let atom = self.atom()?;
 
 					match self.next() {
 						Some(Token::RightSqBracket) => {
@@ -223,7 +223,7 @@ impl<'a> Parser<'a> {
 							// TODO: remove
 
 							loop {
-								args.push(self.expr()?);
+								args.push(self.atom()?);
 
 								match self.next() {
 									Some(Token::Comma) => {}
@@ -256,11 +256,11 @@ impl<'a> Parser<'a> {
 		Some(lhs)
 	}
 
-    fn simpleexpr(&mut self, t: Option<Token>) -> Option<Atom> {
+    fn simpleatom(&mut self, t: Option<Token>) -> Option<Atom> {
         let lhs = match t {
             Some(Token::LeftParen) => {
                 let start = self.lex.span();
-                let e = self.expr()?;
+                let e = self.atom()?;
 
                 match self.next() {
                     Some(Token::RightParen) => {}
@@ -311,10 +311,10 @@ impl<'a> Parser<'a> {
             }
         };
 
-		self.postfixexpr(lhs)
+		self.postfixatom(lhs)
     }
 
-    fn primaryexpr(&mut self) -> Option<Atom> {
+    fn primaryatom(&mut self) -> Option<Atom> {
         Some(match self.next() {
             Some(Token::Let) => {
                 let start = self.lex.span();
@@ -326,7 +326,7 @@ impl<'a> Parser<'a> {
 
                 let mut v = Vec::with_capacity(1);
                 loop {
-                    let lvalue = self.primaryexpr()?;
+                    let lvalue = self.primaryatom()?;
                     let mut type_ = Type::auto();
 
                     match self.next() {
@@ -337,7 +337,7 @@ impl<'a> Parser<'a> {
                     }
 
                     let rvalue = match self.next() {
-                        Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => self.expr()?,
+                        Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => self.atom()?,
                         _ => {
                             self.session
                                 .error(Message::InitializerRequired, self.lex.span());
@@ -392,19 +392,19 @@ impl<'a> Parser<'a> {
                 }
 
                 Atom {
-                    v: AtomVariant::UnOp(op, Box::new(self.primaryexpr()?)),
+                    v: AtomVariant::UnOp(op, Box::new(self.primaryatom()?)),
                     span: start.to(self.lex.span()),
                     t,
                 }
             }
             Some(Token::If) => {
                 let start = self.lex.span();
-                let cond = Box::new(self.expr()?);
-                let body = Box::new(self.expr()?);
+                let cond = Box::new(self.atom()?);
+                let body = Box::new(self.atom()?);
                 let mut else_body = None;
                 match self.next() {
                     Some(Token::Else) => {
-                        else_body = Some(Box::new(self.expr()?));
+                        else_body = Some(Box::new(self.atom()?));
                     }
                     t => self.token_buffer = t,
                 }
@@ -417,8 +417,8 @@ impl<'a> Parser<'a> {
             }
 			Some(Token::Loop) => {
 				let start = self.lex.span();
-				let initial = Box::new(self.expr()?);
-				let loop_body = Box::new(self.expr()?);
+				let initial = Box::new(self.atom()?);
+				let loop_body = Box::new(self.atom()?);
 
 				Atom {
 					t: Type::auto(),
@@ -433,7 +433,7 @@ impl<'a> Parser<'a> {
 					t: Type::auto(),
 					v: AtomVariant::Br(match self.next() {
 						Some(Token::If) => {
-							Some(Box::new(self.expr()?))
+							Some(Box::new(self.atom()?))
 						}
 						t => {
 							self.token_buffer = t;
@@ -445,7 +445,7 @@ impl<'a> Parser<'a> {
 			}
             Some(Token::Return) => {
                 let start = self.lex.span();
-                let e = self.expr()?;
+                let e = self.atom()?;
 
                 Atom {
                     t: e.t,
@@ -455,7 +455,7 @@ impl<'a> Parser<'a> {
             }
             Some(Token::AmbiguousOp(o)) => {
                 let start = self.lex.span();
-                let e = self.primaryexpr()?;
+                let e = self.primaryatom()?;
 
                 Atom {
                     t: e.t,
@@ -465,7 +465,7 @@ impl<'a> Parser<'a> {
             }
             Some(Token::UnOp(u)) => {
                 let start = self.lex.span();
-                let e = self.primaryexpr()?;
+                let e = self.primaryatom()?;
 
                 Atom {
                     t: e.t,
@@ -473,11 +473,11 @@ impl<'a> Parser<'a> {
                     span: start.to(self.lex.span()),
                 }
             }
-            t => self.simpleexpr(t)?,
+            t => self.simpleatom(t)?,
         })
     }
 
-    fn subexpr(&mut self, mut lhs: Atom, min_prec: u8) -> Option<Atom> {
+    fn subatom(&mut self, mut lhs: Atom, min_prec: u8) -> Option<Atom> {
         // https://en.wikipedia.org/wiki/Operator-precedence_parser
         let mut l = self.next();
         loop {
@@ -494,7 +494,7 @@ impl<'a> Parser<'a> {
             // binary operator whose precedence is >= min_precedence
             let t_prec = t.prec();
             if t.prec() >= min_prec {
-                let mut rhs = self.primaryexpr()?;
+                let mut rhs = self.primaryatom()?;
 
                 l = self.next();
                 loop {
@@ -520,7 +520,7 @@ impl<'a> Parser<'a> {
 
                     if cond {
                         self.token_buffer = l;
-                        rhs = self.subexpr(rhs, next_prec)?;
+                        rhs = self.subatom(rhs, next_prec)?;
                         l = self.next()
                     } else {
                         break;
@@ -540,9 +540,9 @@ impl<'a> Parser<'a> {
         Some(lhs)
     }
 
-    pub fn expr(&mut self) -> Option<Atom> {
-        let lhs = self.primaryexpr()?;
-        self.subexpr(lhs, 0)
+    pub fn atom(&mut self) -> Option<Atom> {
+        let lhs = self.primaryatom()?;
+        self.subatom(lhs, 0)
     }
 
     pub fn function(&mut self) -> Option<WFn> {
@@ -594,7 +594,7 @@ impl<'a> Parser<'a> {
             }
         };
 
-        let atom = self.expr()?;
+        let atom = self.atom()?;
 
         Some(WFn {
             name,
