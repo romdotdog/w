@@ -83,6 +83,7 @@ test!(
 );
 test!(postfix,
 	MissingIdentifier,
+	MissingClosingSqBracket,
 	UnexpectedToken,
 	MissingClosingParen
 );

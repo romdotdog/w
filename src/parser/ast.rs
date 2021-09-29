@@ -30,6 +30,7 @@ pub enum AtomVariant {
 
 	Call(BAtom, Vec<Atom>),
 	Access(BAtom, String),
+	Index(BAtom, BAtom),
 
     Block(Vec<Atom>, Option<BAtom>),
     Let(bool, Vec<Declaration>),

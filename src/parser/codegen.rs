@@ -64,6 +64,7 @@ impl Display for Atom {
             AtomVariant::Paren(a) => write!(f, "({})", a),
             AtomVariant::BinOp(lhs, op, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
 			AtomVariant::Access(lhs, ident) => write!(f, "{}.{}", lhs, ident),
+			AtomVariant::Index(lhs, rhs) => write!(f, "{}[{}]", lhs, rhs),
             AtomVariant::UnOp(o, rhs) => match o {
                 UnOp::Deref => write!(f, "*{}", rhs),
                 UnOp::AddrOf => write!(f, "&{}", rhs),

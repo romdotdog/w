@@ -16,6 +16,8 @@ pub enum Token {
     RightParen,
     LeftBracket,
     RightBracket,
+	LeftSqBracket,
+	RightSqBracket,
 
     BinOp(BinOp),
     UnOp(UnOp),

@@ -160,7 +160,7 @@ impl<'a> Parser<'a> {
 		loop {
 			match self.next() {
 				Some(Token::Period) => {
-					let periodSpan = self.lex.span();
+					let period_span = self.lex.span();
 					match self.next() {
 						Some(Token::Ident(s)) => {
 							lhs = Atom {
@@ -171,7 +171,27 @@ impl<'a> Parser<'a> {
 						}
 						t => {
 							self.token_buffer = t;
-							self.session.error(Message::MissingIdentifier, periodSpan);
+							self.session.error(Message::MissingIdentifier, period_span.move_by(1));
+							return None;
+						}
+					}
+				}
+
+				Some(Token::LeftSqBracket) => {
+					let atom = self.expr()?;
+
+					match self.next() {
+						Some(Token::RightSqBracket) => {
+							lhs = Atom {
+								span: lhs.span.to(self.lex.span()),
+								v: AtomVariant::Index(Box::new(lhs), Box::new(atom)),
+								t: Type::auto()
+							}
+						},
+						t => {
+							self.token_buffer = t;
+							self.session
+								.error(Message::MissingClosingSqBracket, self.lex.span());
 							return None;
 						}
 					}
@@ -188,6 +208,7 @@ impl<'a> Parser<'a> {
 
 							loop {
 								args.push(self.expr()?);
+
 								match self.next() {
 									Some(Token::Comma) => {}
 									Some(Token::RightParen) => break,

@@ -19,7 +19,7 @@ impl Span {
         self
     }
 
-	pub fn move(mut self, n: usize) -> Self {
+	pub fn move_by(mut self, n: usize) -> Self {
 		self.start += n;
 		self.end += n;
 		self

@@ -128,6 +128,8 @@ impl<'a> Lexer<'a> {
             '}' => Token::RightBracket,
             '(' => Token::LeftParen,
             ')' => Token::RightParen,
+			'[' => Token::LeftSqBracket,
+            ']' => Token::RightSqBracket,
 
             '*' => op!(@ambiguous Asterisk),
             '/' => op!(@binary Div),

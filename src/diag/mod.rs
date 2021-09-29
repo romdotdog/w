@@ -10,6 +10,7 @@ pub enum Message {
     MissingClosingParen,
     MissingClosingBracket,
     MissingClosingAngleBracket,
+	MissingClosingSqBracket,
     InitializerRequired,
 }
 
@@ -25,6 +26,7 @@ impl Display for Message {
             Message::MissingClosingParen => write!(f, "')' expected here"),
             Message::MissingClosingBracket => write!(f, "missing '}}'"),
             Message::MissingClosingAngleBracket => write!(f, "'>' expected here"),
+			Message::MissingClosingSqBracket => write!(f, "']' expected here"),
             Message::InitializerRequired => write!(f, "declaration must have an initializer"),
             Message::InvalidTopLevel => {
                 write!(f, "only functions, globals and directives are allowed here")
