@@ -415,6 +415,34 @@ impl<'a> Parser<'a> {
                     span: start.to(self.lex.span()),
                 }
             }
+			Some(Token::Loop) => {
+				let start = self.lex.span();
+				let initial = Box::new(self.expr()?);
+				let loop_body = Box::new(self.expr()?);
+
+				Atom {
+					t: Type::auto(),
+					v: AtomVariant::Loop(initial, loop_body),
+					span: start.to(self.lex.span()),
+				}
+			}
+			Some(Token::Br) => {
+				let start = self.lex.span();
+
+				Atom {
+					t: Type::auto(),
+					v: AtomVariant::Br(match self.next() {
+						Some(Token::If) => {
+							Some(Box::new(self.expr()?))
+						}
+						t => {
+							self.token_buffer = t;
+							None
+						}
+					}),
+					span: start.to(self.lex.span()),
+				}
+			}
             Some(Token::Return) => {
                 let start = self.lex.span();
                 let e = self.expr()?;

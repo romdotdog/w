@@ -3,9 +3,12 @@ pub enum Token {
     Fn,
     Return,
     If,
+	Loop,
+	Let,
+
     Else,
-    Let,
     Mut,
+	Br,
 
     Semicolon,
     Colon,

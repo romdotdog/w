@@ -60,6 +60,8 @@ impl<'a> Lexer<'a> {
             "else" => Token::Else,
             "let" => Token::Let,
             "mut" => Token::Mut,
+			"loop" => Token::Loop,
+			"br" => Token::Br,
             _ => Token::Ident(s),
         }
     }

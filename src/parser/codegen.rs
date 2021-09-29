@@ -127,6 +127,11 @@ impl Display for Atom {
                 Some(e) => write!(f, "if {} {} else {}", cond, body, e),
                 None => write!(f, "if {} {}", cond, body),
             },
+			AtomVariant::Loop(init, body) => write!(f, "loop {} {}", init, body),
+			AtomVariant::Br(cond) => match cond {
+				Some(cond) => write!(f, "br if {}", cond),
+				None => write!(f, "br"),
+			}
             AtomVariant::Return(r) => write!(f, "return {}", r),
         }
     }

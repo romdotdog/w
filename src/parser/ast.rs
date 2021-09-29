@@ -41,7 +41,9 @@ pub enum AtomVariant {
     Block(Vec<Atom>, Option<BAtom>),
     Let(bool, Vec<Declaration>),
     If(BAtom, BAtom, Option<BAtom>),
+	Loop(BAtom, BAtom),
     Return(BAtom),
+	Br(Option<BAtom>),
 }
 
 pub struct Declaration {
