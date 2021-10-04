@@ -4,6 +4,8 @@
     * Fill all `todo!()`s
 */
 
+use std::cmp::Ordering;
+
 use crate::{
     diag::Message,
     lexer::{AmbiguousOp, BinOp, BinOpVariant, Lexer, Token, UnOp},
@@ -17,7 +19,7 @@ use indir::Indir;
 mod ast;
 pub use ast::Atom;
 
-use self::ast::{AtomVariant, Declaration, Program, IncDec};
+use self::ast::{AtomVariant, Declaration, IncDec, Program};
 
 pub struct Parser<'a> {
     session: &'a Session,
@@ -80,20 +82,18 @@ impl<'a> Parser<'a> {
                 }
             }
 
-			let err_span = self.lex.span();
+            let err_span = self.lex.span();
 
             match self.next() {
                 Some(Token::RightBracket) => break,
                 Some(Token::Semicolon) => {}
                 None => {
-                    self.session
-                        .error(Message::MissingClosingBracket, err_span);
+                    self.session.error(Message::MissingClosingBracket, err_span);
                     break;
                 }
                 t => {
                     // try to continue
-                    self.session
-                        .error(Message::MissingSemicolon, err_span);
+                    self.session.error(Message::MissingSemicolon, err_span);
                     self.token_buffer = t;
                 }
             }
@@ -109,15 +109,25 @@ impl<'a> Parser<'a> {
 
     fn parse_type(&mut self) -> Option<Type> {
         let mut indir = Indir::none();
+        let mut len = 0;
         loop {
             match self.next() {
-                Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => indir.add(match self.next() {
-                    Some(Token::Mut) => true,
-                    t => {
-                        self.token_buffer = t;
-                        false
+                Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => {
+                    match len.partial_cmp(&5).unwrap() {
+                        Ordering::Less => indir.add(match self.next() {
+                            Some(Token::Mut) => true,
+                            t => {
+                                self.token_buffer = t;
+                                false
+                            }
+                        }),
+                        Ordering::Equal => self
+                            .session
+                            .error(Message::TooMuchIndirection, self.lex.span()),
+                        Ordering::Greater => {}
                     }
-                }),
+                    len += 1;
+                }
                 Some(Token::Ident(s)) => {
                     return Some(Type::with_indir(s.into(), indir));
                 }
@@ -158,105 +168,106 @@ impl<'a> Parser<'a> {
         Some((name, self.parse_type()?))
     }
 
-	fn postfixatom(&mut self, mut lhs: Atom) -> Option<Atom> {
-		loop {
-			match self.next() {
-				Some(Token::UnOp(UnOp::Dec)) => {
-					lhs = Atom {
-						span: lhs.span.to(self.lex.span()),
-						v: AtomVariant::PostIncDec(Box::new(lhs), IncDec::Dec),
-						t: Type::auto()
-					}
-				}
+    fn postfixatom(&mut self, mut lhs: Atom) -> Option<Atom> {
+        loop {
+            match self.next() {
+                Some(Token::UnOp(UnOp::Dec)) => {
+                    lhs = Atom {
+                        span: lhs.span.to(self.lex.span()),
+                        v: AtomVariant::PostIncDec(Box::new(lhs), IncDec::Dec),
+                        t: Type::auto(),
+                    }
+                }
 
-				Some(Token::UnOp(UnOp::Inc)) => {
-					lhs = Atom {
-						span: lhs.span.to(self.lex.span()),
-						v: AtomVariant::PostIncDec(Box::new(lhs), IncDec::Inc),
-						t: Type::auto()
-					}
-				}
-				
-				Some(Token::Period) => {
-					let period_span = self.lex.span();
-					match self.next() {
-						Some(Token::Ident(s)) => {
-							lhs = Atom {
-								span: lhs.span.to(self.lex.span()),
-								v: AtomVariant::Access(Box::new(lhs), s),
-								t: Type::auto(),
-							}
-						}
-						t => {
-							self.token_buffer = t;
-							self.session.error(Message::MissingIdentifier, period_span.move_by(1));
-							return None;
-						}
-					}
-				}
+                Some(Token::UnOp(UnOp::Inc)) => {
+                    lhs = Atom {
+                        span: lhs.span.to(self.lex.span()),
+                        v: AtomVariant::PostIncDec(Box::new(lhs), IncDec::Inc),
+                        t: Type::auto(),
+                    }
+                }
 
-				Some(Token::LeftSqBracket) => {
-					let atom = self.atom()?;
+                Some(Token::Period) => {
+                    let period_span = self.lex.span();
+                    match self.next() {
+                        Some(Token::Ident(s)) => {
+                            lhs = Atom {
+                                span: lhs.span.to(self.lex.span()),
+                                v: AtomVariant::Access(Box::new(lhs), s),
+                                t: Type::auto(),
+                            }
+                        }
+                        t => {
+                            self.token_buffer = t;
+                            self.session
+                                .error(Message::MissingIdentifier, period_span.move_by(1));
+                            return None;
+                        }
+                    }
+                }
 
-					match self.next() {
-						Some(Token::RightSqBracket) => {
-							lhs = Atom {
-								span: lhs.span.to(self.lex.span()),
-								v: AtomVariant::Index(Box::new(lhs), Box::new(atom)),
-								t: Type::auto()
-							}
-						},
-						t => {
-							self.token_buffer = t;
-							self.session
-								.error(Message::MissingClosingSqBracket, self.lex.span());
-							return None;
-						}
-					}
-				}
+                Some(Token::LeftSqBracket) => {
+                    let atom = self.atom()?;
 
-				Some(Token::LeftParen) => {
-					let mut args = Vec::new();
+                    match self.next() {
+                        Some(Token::RightSqBracket) => {
+                            lhs = Atom {
+                                span: lhs.span.to(self.lex.span()),
+                                v: AtomVariant::Index(Box::new(lhs), Box::new(atom)),
+                                t: Type::auto(),
+                            }
+                        }
+                        t => {
+                            self.token_buffer = t;
+                            self.session
+                                .error(Message::MissingClosingSqBracket, self.lex.span());
+                            return None;
+                        }
+                    }
+                }
 
-					match self.next() {
-						Some(Token::RightParen) => {}
-						t => {
-							self.token_buffer = t;
-							// TODO: remove
+                Some(Token::LeftParen) => {
+                    let mut args = Vec::new();
 
-							loop {
-								args.push(self.atom()?);
+                    match self.next() {
+                        Some(Token::RightParen) => {}
+                        t => {
+                            self.token_buffer = t;
+                            // TODO: remove
 
-								match self.next() {
-									Some(Token::Comma) => {}
-									Some(Token::RightParen) => break,
-									t => {
-										self.token_buffer = t;
-										self.session
-											.error(Message::MissingClosingParen, self.lex.span());
-										return None;	
-									},
-								}
-							}
-						}
-					}
-					
-					lhs = Atom {
-						span: lhs.span.to(self.lex.span()),
-						v: AtomVariant::Call(Box::new(lhs), args),
-						t: Type::auto()
-					}
-				},
+                            loop {
+                                args.push(self.atom()?);
 
-				t => {
-					self.token_buffer = t;
-					break;
-				}
-			}
-		}
+                                match self.next() {
+                                    Some(Token::Comma) => {}
+                                    Some(Token::RightParen) => break,
+                                    t => {
+                                        self.token_buffer = t;
+                                        self.session
+                                            .error(Message::MissingClosingParen, self.lex.span());
+                                        return None;
+                                    }
+                                }
+                            }
+                        }
+                    }
 
-		Some(lhs)
-	}
+                    lhs = Atom {
+                        span: lhs.span.to(self.lex.span()),
+                        v: AtomVariant::Call(Box::new(lhs), args),
+                        t: Type::auto(),
+                    }
+                }
+
+                t => {
+                    self.token_buffer = t;
+                    break;
+                }
+            }
+        }
+
+        Some(lhs)
+    }
 
     fn simpleatom(&mut self, t: Option<Token>) -> Option<Atom> {
         let lhs = match t {
@@ -267,7 +278,7 @@ impl<'a> Parser<'a> {
                 match self.next() {
                     Some(Token::RightParen) => {}
                     t => {
-						self.token_buffer = t;
+                        self.token_buffer = t;
                         self.session
                             .error(Message::MissingClosingParen, self.lex.span());
                         return None;
@@ -313,7 +324,7 @@ impl<'a> Parser<'a> {
             }
         };
 
-		self.postfixatom(lhs)
+        self.postfixatom(lhs)
     }
 
     fn primaryatom(&mut self) -> Option<Atom> {
@@ -417,34 +428,32 @@ impl<'a> Parser<'a> {
                     span: start.to(self.lex.span()),
                 }
             }
-			Some(Token::Loop) => {
-				let start = self.lex.span();
-				let initial = Box::new(self.atom()?);
-				let loop_body = Box::new(self.atom()?);
+            Some(Token::Loop) => {
+                let start = self.lex.span();
+                let initial = Box::new(self.atom()?);
+                let loop_body = Box::new(self.atom()?);
 
-				Atom {
-					t: Type::auto(),
-					v: AtomVariant::Loop(initial, loop_body),
-					span: start.to(self.lex.span()),
-				}
-			}
-			Some(Token::Br) => {
-				let start = self.lex.span();
+                Atom {
+                    t: Type::auto(),
+                    v: AtomVariant::Loop(initial, loop_body),
+                    span: start.to(self.lex.span()),
+                }
+            }
+            Some(Token::Br) => {
+                let start = self.lex.span();
 
-				Atom {
-					t: Type::auto(),
-					v: AtomVariant::Br(match self.next() {
-						Some(Token::If) => {
-							Some(Box::new(self.atom()?))
-						}
-						t => {
-							self.token_buffer = t;
-							None
-						}
-					}),
-					span: start.to(self.lex.span()),
-				}
-			}
+                Atom {
+                    t: Type::auto(),
+                    v: AtomVariant::Br(match self.next() {
+                        Some(Token::If) => Some(Box::new(self.atom()?)),
+                        t => {
+                            self.token_buffer = t;
+                            None
+                        }
+                    }),
+                    span: start.to(self.lex.span()),
+                }
+            }
             Some(Token::Return) => {
                 let start = self.lex.span();
                 let e = self.atom()?;
@@ -578,11 +587,11 @@ impl<'a> Parser<'a> {
                         Some(Token::Comma) => {}
                         Some(Token::RightParen) => break,
                         t => {
-							self.token_buffer = t;
-							self.session
-								.error(Message::MissingClosingParen, self.lex.span());
-							return None;
-						},
+                            self.token_buffer = t;
+                            self.session
+                                .error(Message::MissingClosingParen, self.lex.span());
+                            return None;
+                        }
                     }
                 }
             }

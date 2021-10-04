@@ -65,11 +65,11 @@ macro_rules! test {
 
 test!(literals);
 test!(operations);
-test!(types);
+test!(types, TooMuchIndirection);
 test!(controlflow);
 test!(
     errors,
-	MissingSemicolon,
+    MissingSemicolon,
     MissingClosingParen,
     MissingType,
     InitializerRequired,
@@ -80,9 +80,10 @@ test!(
     MissingIdentifier,
     MissingClosingBracket
 );
-test!(postfix,
-	MissingIdentifier,
-	MissingClosingSqBracket,
-	UnexpectedToken,
-	MissingClosingParen
+test!(
+    postfix,
+    MissingIdentifier,
+    MissingClosingSqBracket,
+    UnexpectedToken,
+    MissingClosingParen
 );
