@@ -11,11 +11,7 @@ fn a() {
 	2 + (d;
 }
 
-fn b(hi) {}
-
-fn c() {
-	let hi;
-}
+fn b(c) {}
 
 fn d() {
 	<f32

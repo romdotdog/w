@@ -1,7 +1,7 @@
 use crate::lexer::{BinOp, BinOpVariant, UnOp};
 
 use super::{
-    ast::{AtomVariant, IncDec, Program, Type, TypeVariant, WFn},
+    ast::{AtomVariant, IdentPair, IncDec, Program, Type, TypeVariant, WFn},
     Atom,
 };
 
@@ -21,8 +21,8 @@ impl Display for WFn {
         write!(f, "fn {}(", self.name)?;
 
         let l = self.params.len();
-        for (i, (s, t)) in self.params.iter().enumerate() {
-            write!(f, "{}: {}", s, t)?;
+        for (i, pair) in self.params.iter().enumerate() {
+            write!(f, "{}", pair)?;
             if i + 1 < l {
                 write!(f, ", ")?;
             }
@@ -104,22 +104,10 @@ impl Display for Atom {
 
                 write!(f, ")")
             }
-            AtomVariant::Let(mutable, v) => {
-                match mutable {
-                    true => write!(f, "let mut ")?,
-                    false => write!(f, "let ")?,
-                }
-
-                let l = v.len();
-                for (i, v) in v.iter().enumerate() {
-                    match &v.t.v {
-                        TypeVariant::Auto => write!(f, "{} = {}", v.lvalue, v.rvalue),
-                        _ => write!(f, "{}: {} = {}", v.lvalue, v.t, v.rvalue),
-                    }?;
-
-                    if i + 1 < l {
-                        write!(f, ",\n\t")?
-                    }
+            AtomVariant::Let(pair, rhs) => {
+                write!(f, "let {}", pair)?;
+                if let Some(rhs) = rhs {
+                    write!(f, " = {}", rhs)?;
                 }
                 Ok(())
             }
@@ -168,5 +156,22 @@ impl Display for BinOpVariant {
             BinOpVariant::Rsh => write!(f, ">>"),
             BinOpVariant::Lsh => write!(f, "<<"),
         }
+    }
+}
+
+impl Display for IdentPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.mutable {
+            write!(f, "mut ")?;
+        }
+
+        write!(f, "{}", self.ident)?;
+
+        match self.t.v {
+            TypeVariant::Auto => {}
+            _ => write!(f, ": {}", self.t)?,
+        }
+
+        Ok(())
     }
 }

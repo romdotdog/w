@@ -2,8 +2,10 @@ fn main() {
 	/*
 		ooo fancy block comment
 	*/
-	let a = 1, b = 2;
-	let mut c = 3, d = 4;
+	let a = 1;
+	let b = 2;
+	let mut c = 3;
+	let mut d = 4;
 
 	a > b >= c < d <= e == f != g;
 	a + b - c * d / e % f;

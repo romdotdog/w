@@ -72,7 +72,6 @@ test!(
     MissingSemicolon,
     MissingClosingParen,
     MissingType,
-    InitializerRequired,
     MissingClosingAngleBracket,
     InvalidTopLevel,
     MalformedIdentifier,

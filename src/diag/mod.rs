@@ -11,7 +11,6 @@ pub enum Message {
     MissingClosingBracket,
     MissingClosingAngleBracket,
     MissingClosingSqBracket,
-    InitializerRequired,
     TooMuchIndirection,
 }
 
@@ -28,7 +27,6 @@ impl Display for Message {
             Message::MissingClosingBracket => write!(f, "missing '}}'"),
             Message::MissingClosingAngleBracket => write!(f, "'>' expected here"),
             Message::MissingClosingSqBracket => write!(f, "']' expected here"),
-            Message::InitializerRequired => write!(f, "declaration must have an initializer"),
             Message::InvalidTopLevel => {
                 write!(f, "only functions, globals and directives are allowed here")
             }

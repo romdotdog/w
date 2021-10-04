@@ -10,7 +10,7 @@ pub struct Program {
 
 pub struct WFn {
     pub name: String,
-    pub params: Vec<(String, Type)>,
+    pub params: Vec<IdentPair>,
     pub atom: Atom,
     pub t: Type,
 }
@@ -39,16 +39,16 @@ pub enum AtomVariant {
     Index(BAtom, BAtom),
 
     Block(Vec<Atom>, Option<BAtom>),
-    Let(bool, Vec<Declaration>),
+    Let(IdentPair, Option<BAtom>),
     If(BAtom, BAtom, Option<BAtom>),
     Loop(BAtom, BAtom),
     Return(BAtom),
     Br(Option<BAtom>),
 }
 
-pub struct Declaration {
-    pub lvalue: Atom,
-    pub rvalue: Atom,
+pub struct IdentPair {
+    pub mutable: bool,
+    pub ident: String,
     pub t: Type,
 }
 

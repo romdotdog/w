@@ -19,7 +19,7 @@ use indir::Indir;
 mod ast;
 pub use ast::Atom;
 
-use self::ast::{AtomVariant, Declaration, IncDec, Program};
+use self::ast::{AtomVariant, IdentPair, IncDec, Program};
 
 pub struct Parser<'a> {
     session: &'a Session,
@@ -139,33 +139,51 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn ident_type_pair(&mut self) -> Option<(String, Type)> {
-        let t = self.next();
-        let name = match t {
-            Some(Token::Ident(s)) => s,
+    fn ident_type_pair(&mut self, require_type: bool) -> Option<IdentPair> {
+        let mut t = self.next();
+        let mutable = match t {
+            Some(Token::Mut) => {
+                t = self.next();
+                true
+            }
+            t_ => {
+                t = t_;
+                false
+            }
+        };
+
+        let ident = match t {
+            Some(Token::Ident(s)) => {
+                t = self.next();
+                s
+            }
             Some(Token::Colon) => {
                 self.session
                     .error(Message::MissingIdentifier, self.lex.span());
-                self.token_buffer = t;
                 "unknown".to_owned()
             }
             _ => {
+                t = self.next();
                 self.session
                     .error(Message::MalformedIdentifier, self.lex.span());
                 "unknown".to_owned()
             }
         };
 
-        match self.next() {
-            Some(Token::Colon) => {}
+        let t = match t {
+            Some(Token::Colon) => self.parse_type()?,
             t => {
-                self.session.error(Message::MissingType, self.lex.span());
                 self.token_buffer = t;
-                return None;
+                if require_type {
+                    self.session.error(Message::MissingType, self.lex.span());
+                    return None;
+                } else {
+                    Type::auto()
+                }
             }
-        }
+        };
 
-        Some((name, self.parse_type()?))
+        Some(IdentPair { mutable, ident, t })
     }
 
     fn postfixatom(&mut self, mut lhs: Atom) -> Option<Atom> {
@@ -331,51 +349,21 @@ impl<'a> Parser<'a> {
         Some(match self.next() {
             Some(Token::Let) => {
                 let start = self.lex.span();
-                let mut mutable = false;
-                match self.next() {
-                    Some(Token::Mut) => mutable = true,
-                    t => self.token_buffer = t,
-                }
+                let pair = self.ident_type_pair(false)?;
 
-                let mut v = Vec::with_capacity(1);
-                loop {
-                    let lvalue = self.primaryatom()?;
-                    let mut type_ = Type::auto();
-
-                    match self.next() {
-                        Some(Token::Colon) => {
-                            type_ = self.parse_type()?;
-                        }
-                        t => self.token_buffer = t,
+                let rhs = match self.next() {
+                    Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
+                        Some(Box::new(self.atom()?))
                     }
-
-                    let rvalue = match self.next() {
-                        Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => self.atom()?,
-                        _ => {
-                            self.session
-                                .error(Message::InitializerRequired, self.lex.span());
-                            return None;
-                        }
-                    };
-
-                    v.push(Declaration {
-                        lvalue,
-                        rvalue,
-                        t: type_,
-                    });
-
-                    match self.next() {
-                        Some(Token::Comma) => {}
-                        t => {
-                            self.token_buffer = t;
-                            break;
-                        }
+                    t => {
+                        self.token_buffer = t;
+                        None
                     }
-                }
+                };
 
                 Atom {
                     t: Type::void(),
-                    v: AtomVariant::Let(mutable, v),
+                    v: AtomVariant::Let(pair, rhs),
                     span: start.to(self.lex.span()),
                 }
             }
@@ -582,7 +570,7 @@ impl<'a> Parser<'a> {
                 // TODO: remove
 
                 loop {
-                    params.push(self.ident_type_pair()?);
+                    params.push(self.ident_type_pair(true)?);
                     match self.next() {
                         Some(Token::Comma) => {}
                         Some(Token::RightParen) => break,
