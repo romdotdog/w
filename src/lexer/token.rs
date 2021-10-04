@@ -3,24 +3,24 @@ pub enum Token {
     Fn,
     Return,
     If,
-	Loop,
-	Let,
+    Loop,
+    Let,
 
     Else,
     Mut,
-	Br,
+    Br,
 
     Semicolon,
     Colon,
     Comma,
-	Period,
-	
+    Period,
+
     LeftParen,
     RightParen,
     LeftBracket,
     RightBracket,
-	LeftSqBracket,
-	RightSqBracket,
+    LeftSqBracket,
+    RightSqBracket,
 
     BinOp(BinOp),
     UnOp(UnOp),

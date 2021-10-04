@@ -18,8 +18,8 @@ pub struct WFn {
 type BAtom = Box<Atom>;
 
 pub enum IncDec {
-	Inc,
-	Dec
+    Inc,
+    Dec,
 }
 
 pub enum AtomVariant {
@@ -32,18 +32,18 @@ pub enum AtomVariant {
     Paren(BAtom),
     BinOp(BAtom, BinOp, BAtom),
     UnOp(UnOp, BAtom),
-	PostIncDec(BAtom, IncDec),
+    PostIncDec(BAtom, IncDec),
 
-	Call(BAtom, Vec<Atom>),
-	Access(BAtom, String),
-	Index(BAtom, BAtom),
+    Call(BAtom, Vec<Atom>),
+    Access(BAtom, String),
+    Index(BAtom, BAtom),
 
     Block(Vec<Atom>, Option<BAtom>),
     Let(bool, Vec<Declaration>),
     If(BAtom, BAtom, Option<BAtom>),
-	Loop(BAtom, BAtom),
+    Loop(BAtom, BAtom),
     Return(BAtom),
-	Br(Option<BAtom>),
+    Br(Option<BAtom>),
 }
 
 pub struct Declaration {

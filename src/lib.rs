@@ -70,10 +70,10 @@ impl Session {
             let (line, col, (sol, eol)) = src.line_col(start_pos);
             let spaces = src.content()[sol..start_pos]
                 .chars()
-				.map(|c| match c.is_whitespace() {
-					true => c,
-					false => ' '
-				})
+                .map(|c| match c.is_whitespace() {
+                    true => c,
+                    false => ' ',
+                })
                 .collect::<String>();
 
             println!(

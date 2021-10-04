@@ -1,7 +1,7 @@
 use crate::lexer::{BinOp, BinOpVariant, UnOp};
 
 use super::{
-    ast::{AtomVariant, Program, Type, TypeVariant, WFn, IncDec},
+    ast::{AtomVariant, IncDec, Program, Type, TypeVariant, WFn},
     Atom,
 };
 
@@ -63,12 +63,12 @@ impl Display for Atom {
             AtomVariant::Char(c) => write!(f, "'{}'", c),
             AtomVariant::Paren(a) => write!(f, "({})", a),
             AtomVariant::BinOp(lhs, op, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
-			AtomVariant::Access(lhs, ident) => write!(f, "{}.{}", lhs, ident),
-			AtomVariant::Index(lhs, rhs) => write!(f, "{}[{}]", lhs, rhs),
-			AtomVariant::PostIncDec(lhs, incdec) => match incdec {
-				IncDec::Inc => write!(f, "{}++", lhs),
-				IncDec::Dec => write!(f, "{}--", lhs)
-			}
+            AtomVariant::Access(lhs, ident) => write!(f, "{}.{}", lhs, ident),
+            AtomVariant::Index(lhs, rhs) => write!(f, "{}[{}]", lhs, rhs),
+            AtomVariant::PostIncDec(lhs, incdec) => match incdec {
+                IncDec::Inc => write!(f, "{}++", lhs),
+                IncDec::Dec => write!(f, "{}--", lhs),
+            },
             AtomVariant::UnOp(o, rhs) => match o {
                 UnOp::Deref => write!(f, "*{}", rhs),
                 UnOp::AddrOf => write!(f, "&{}", rhs),
@@ -91,19 +91,19 @@ impl Display for Atom {
                     Some(l) => write!(f, "\t{}\n}}", format!("{}", l).replace("\n", "\n\t")),
                 }
             }
-			AtomVariant::Call(lhs, args) => {
-				write!(f, "{}(", lhs)?;
-				let l = args.len();
-				for (i, arg) in args.iter().enumerate() {
-					write!(f, "{}", arg)?;
+            AtomVariant::Call(lhs, args) => {
+                write!(f, "{}(", lhs)?;
+                let l = args.len();
+                for (i, arg) in args.iter().enumerate() {
+                    write!(f, "{}", arg)?;
 
-					if i + 1 < l {
-						write!(f, ", ")?;
-					}
-				}
+                    if i + 1 < l {
+                        write!(f, ", ")?;
+                    }
+                }
 
-				write!(f, ")")
-			}
+                write!(f, ")")
+            }
             AtomVariant::Let(mutable, v) => {
                 match mutable {
                     true => write!(f, "let mut ")?,
@@ -127,11 +127,11 @@ impl Display for Atom {
                 Some(e) => write!(f, "if {} {} else {}", cond, body, e),
                 None => write!(f, "if {} {}", cond, body),
             },
-			AtomVariant::Loop(init, body) => write!(f, "loop {} {}", init, body),
-			AtomVariant::Br(cond) => match cond {
-				Some(cond) => write!(f, "br if {}", cond),
-				None => write!(f, "br"),
-			}
+            AtomVariant::Loop(init, body) => write!(f, "loop {} {}", init, body),
+            AtomVariant::Br(cond) => match cond {
+                Some(cond) => write!(f, "br if {}", cond),
+                None => write!(f, "br"),
+            },
             AtomVariant::Return(r) => write!(f, "return {}", r),
         }
     }

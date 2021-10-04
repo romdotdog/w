@@ -60,8 +60,8 @@ impl<'a> Lexer<'a> {
             "else" => Token::Else,
             "let" => Token::Let,
             "mut" => Token::Mut,
-			"loop" => Token::Loop,
-			"br" => Token::Br,
+            "loop" => Token::Loop,
+            "br" => Token::Br,
             _ => Token::Ident(s),
         }
     }
@@ -125,12 +125,12 @@ impl<'a> Lexer<'a> {
             ':' => Token::Colon,
             ';' => Token::Semicolon,
             ',' => Token::Comma,
-			'.' => Token::Period,
+            '.' => Token::Period,
             '{' => Token::LeftBracket,
             '}' => Token::RightBracket,
             '(' => Token::LeftParen,
             ')' => Token::RightParen,
-			'[' => Token::LeftSqBracket,
+            '[' => Token::LeftSqBracket,
             ']' => Token::RightSqBracket,
 
             '*' => op!(@ambiguous Asterisk),
