@@ -1,11 +1,5 @@
+on: [push, pull_request, workflow_dispatch]
 name: Tests & Coverage
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
