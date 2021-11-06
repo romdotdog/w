@@ -23,7 +23,8 @@ pub struct Lexer<'a> {
     buffer: Option<char>,
     token_buffer: Option<(Token, Span)>,
 
-    p: isize,
+    skip_first: bool,
+    p: usize,
 
     start: usize,
     end: usize,
@@ -41,7 +42,9 @@ impl<'a> Lexer<'a> {
 
             buffer: None,
             token_buffer: None,
-            p: -1,
+
+            skip_first: false,
+            p: 0,
 
             start: 0,
             end: 0,
@@ -100,7 +103,7 @@ impl<'a> Lexer<'a> {
                     let header_char = self.nextc().expect("expected escape character, got <eof>");
 
                     if let Some(radix) = char_to_radix(header_char) {
-                        let radix = radix as u32;
+                        let radix = u32::from(radix);
 
                         //  ^ \x6e, \d71
                         // if there is no applicable digit after, then treat as normal escape
@@ -299,14 +302,14 @@ impl<'a> Lexer<'a> {
                     Floatable::Maybe
                 };
 
-                let mut radix: u32 = 10;
+                let mut radix = 10_u8;
                 if c == '0' {
                     let t = self.nextc();
                     match t {
                         Some(header_char) => {
                             if let Some(radix_) = char_to_radix(header_char) {
                                 float = Floatable::False;
-                                radix = radix_ as u32;
+                                radix = radix_;
                             } else {
                                 self.backtrack(t);
                             }
@@ -316,7 +319,7 @@ impl<'a> Lexer<'a> {
                 }
 
                 let mut num = c.to_string();
-                self.skip_digits(&mut num, radix);
+                self.skip_digits(&mut num, radix.into());
 
                 match self.nextc() {
                     Some('.') if c != '.' => {
@@ -337,7 +340,7 @@ impl<'a> Lexer<'a> {
                 if float == Floatable::True {
                     Token::Float(num.parse::<f64>().unwrap())
                 } else {
-                    let num = u64::from_str_radix(&num, radix).unwrap();
+                    let num = u64::from_str_radix(&num, radix.into()).unwrap();
                     Token::Integer(unsafe { std::mem::transmute::<u64, i64>(num) })
                 }
             }
@@ -346,21 +349,22 @@ impl<'a> Lexer<'a> {
     }
 
     fn try_tk_aip(&mut self, c: char) -> Option<(Token, Span)> {
-        let start = self.p as usize;
+        let start = self.p;
         let r = self.try_aip(c);
-        let end = self.p as usize + 1;
+        let end = self.p + 1;
         r.map(|t| (t, Span::new(self.src, start, end)))
     }
 
     fn try_tk_bip(&mut self, c: char) -> Option<Token> {
-        self.start = self.p as usize;
+        self.start = self.p;
         let r = self.try_bip(c);
-        self.end = self.p as usize + 1;
+        self.end = self.p + 1;
         r
     }
 
     fn nextc(&mut self) -> Option<char> {
-        self.p += 1;
+        self.p += self.skip_first as usize;
+        self.skip_first = true;
         self.buffer.take().or_else(|| self.stream.next())
     }
 
@@ -420,7 +424,7 @@ impl<'a> Iterator for Lexer<'a> {
 
         self.try_tk_bip(c).or_else(|| {
             let mut ident = c.to_string();
-            let start = self.p as usize;
+            let start = self.p;
             let mut end = start + 1;
 
             while let Some(c2) = self.nextc() {
@@ -428,7 +432,7 @@ impl<'a> Iterator for Lexer<'a> {
                     break;
                 }
 
-                end = self.p as usize;
+                end = self.p;
                 if let Some(t) = self.try_tk_aip(c2) {
                     self.token_buffer = Some(t);
                     break;
