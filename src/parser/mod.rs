@@ -113,17 +113,18 @@ impl<'a> Parser<'a> {
             match self.next() {
                 Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => {
                     match len.partial_cmp(&5).unwrap() {
-                        Ordering::Less => indir.add(match self.next() {
-                            Some(Token::Mut) => true,
-                            t => {
-                                self.token_buffer = t;
-                                false
-                            }
-                        }),
-                        Ordering::Equal => self
+                        Ordering::Less => {
+                            indir = indir.add(match self.next() {
+                                Some(Token::Mut) => true,
+                                t => {
+                                    self.token_buffer = t;
+                                    false
+                                }
+                            })
+                        }
+                        Ordering::Equal | Ordering::Greater => self
                             .session
                             .error(Message::TooMuchIndirection, self.lex.span()),
-                        Ordering::Greater => {}
                     }
                     len += 1;
                 }

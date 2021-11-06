@@ -30,7 +30,9 @@ impl Indir {
     /// # Panics
     /// if trying to add indir with .len() of 5
     /// first 5 - len bits aren't zeroed
-    pub fn add(&mut self, mutable: bool) {
+    #[allow(clippy::should_implement_trait)]
+    #[must_use]
+    pub fn add(self, mutable: bool) -> Self {
         let len = self.len();
         assert!(len <= 4_u8);
         assert!(self.0.leading_zeros() >= 5 - len as u32);
@@ -40,31 +42,36 @@ impl Indir {
     /// # Safety
     /// last three bits must be 4 or below
     /// first 5 - len bits must be zeroed
-    pub unsafe fn add_unchecked(&mut self, mutable: bool) {
+    #[must_use]
+    pub unsafe fn add_unchecked(mut self, mutable: bool) -> Self {
         let a = (mutable as u8) << 3_u8 << self.len();
         self.0 = self.0 & !a | a; // override the bit
         self.0 += 1_u8; // add one to length
+        self
     }
 
     /// # Panics
     /// if attempting to sub with 0 pointers
-    pub fn sub(&mut self) {
+    #[must_use]
+    pub fn sub(self) -> Self {
         assert!(!self.is_empty());
         unsafe { self.sub_unchecked() }
     }
 
     /// # Safety
     /// last three bits must be 1 or above
-    pub unsafe fn sub_unchecked(&mut self) {
+    #[must_use]
+    pub unsafe fn sub_unchecked(mut self) -> Self {
         self.0 -= 1_u8;
         self.0 &= (0b0000_1000 << self.len()) - 1_u8; // zero what's unneeded
+        self
     }
 
-    pub fn len(&self) -> u8 {
+    pub fn len(self) -> u8 {
         self.0 & 0b111_u8
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub fn is_empty(self) -> bool {
         self.len() == 0
     }
 
@@ -105,19 +112,19 @@ mod tests {
     fn add() {
         let mut indir = Indir::none();
         assert_eq!(indir.into_inner(), 0b00000_000);
-        indir.add(false);
+        indir = indir.add(false);
         // *x
         assert_eq!(indir.into_inner(), 0b00000_001);
-        indir.add(true);
+        indir = indir.add(true);
         // *mut *x
         assert_eq!(indir.into_inner(), 0b00010_010);
-        indir.add(false);
+        indir = indir.add(false);
         // **mut *x
         assert_eq!(indir.into_inner(), 0b00010_011);
-        indir.add(true);
+        indir = indir.add(true);
         // *mut **mut *x
         assert_eq!(indir.into_inner(), 0b01010_100);
-        indir.add(false);
+        indir = indir.add(false);
         // **mut **mut *x
         assert_eq!(indir.into_inner(), 0b01010_101);
     }
@@ -127,19 +134,19 @@ mod tests {
         let mut indir = Indir::pointers(0b01010, 5);
         // **mut **mut *x
         assert_eq!(indir.into_inner(), 0b01010_101);
-        indir.sub();
+        indir = indir.sub();
         // *mut **mut *x
         assert_eq!(indir.into_inner(), 0b01010_100);
-        indir.sub();
+        indir = indir.sub();
         // **mut *x
         assert_eq!(indir.into_inner(), 0b00010_011);
-        indir.sub();
+        indir = indir.sub();
         // *mut *x
         assert_eq!(indir.into_inner(), 0b00010_010);
-        indir.sub();
+        indir = indir.sub();
         // *x
         assert_eq!(indir.into_inner(), 0b00000_001);
-        indir.sub();
+        indir = indir.sub();
         // x
         assert_eq!(indir.into_inner(), 0b00000_000);
     }
