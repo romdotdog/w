@@ -41,7 +41,7 @@ pub enum BinOp {
 }
 
 impl BinOp {
-    pub fn prec(&self) -> u8 {
+    pub fn prec(self) -> u8 {
         match self {
             BinOp::Compound(_) => return 20,
             BinOp::Regular(t) => t,
@@ -80,7 +80,7 @@ pub enum BinOpVariant {
 }
 
 impl BinOpVariant {
-    pub fn prec(&self) -> u8 {
+    pub fn prec(self) -> u8 {
         match self {
             BinOpVariant::Mul | BinOpVariant::Div | BinOpVariant::Mod => 10,
             BinOpVariant::Add | BinOpVariant::Sub => 11,
