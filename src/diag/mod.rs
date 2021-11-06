@@ -22,7 +22,6 @@ pub enum Message {
 #[derive(Default)]
 pub struct Diagnostics {
     errors: Vec<Diagnostic>,
-    warnings: Vec<Diagnostic>,
 }
 
 impl Diagnostics {

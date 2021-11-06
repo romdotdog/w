@@ -7,7 +7,7 @@
         AIP - Above Ident Priority
 */
 
-use crate::{span::Span, Session, SourceRef};
+use crate::{diag::Message, span::Span, Session, SourceRef};
 
 mod token;
 pub use token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
@@ -218,12 +218,11 @@ impl<'a> Lexer<'a> {
 
             '\'' => {
                 let c2 = self.nextc();
-                match self.nextc() {
-                    Some('\'') => {
-                        Token::Char(c2.expect("reached <eof>, expected character in quote"))
-                    }
-                    Some(c3) => panic!("unexpected character {}, expected '", c3),
-                    None => panic!("reached <eof>, expected '"),
+                if let Some('\'') = self.nextc() {
+                    Token::Char(c2.unwrap())
+                } else {
+                    self.session.error(Message::UnexpectedToken, self.span());
+                    return None;
                 }
             }
 
