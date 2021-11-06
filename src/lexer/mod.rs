@@ -230,7 +230,7 @@ impl<'a> Lexer<'a> {
                 let c2 = self.nextc();
                 match (c, c2) {
                     ('>', Some('=')) => op!(@binary Ge),
-                    ('<', Some('=')) => op!(@binary Ge),
+                    ('<', Some('=')) => op!(@binary Le),
                     ('<', Some('<')) => op!(@binary Lsh),
                     ('>', Some('>')) => op!(@binary Rsh),
                     ('<', _) => {
