@@ -8,26 +8,32 @@ impl Indir {
         Self(0)
     }
 
-    /// example inputs:
+    /// # Examples
     ///
-    /// u: `0b1`
+    /// u: `0b1` l: 1
     /// output: *mut x
     ///
-    /// u: `0b10`
+    /// u: `0b10` l: 2
     /// output: *mut *x
     ///
-    /// u: `0b10101`
+    /// u: `0b10101` l: 5
     /// output: *mut **mut **mut x
+    /// # Panics
+    /// if l > 5
+    /// if u has more than 5 bitflags
     pub fn pointers(u: u8, l: u8) -> Self {
-        assert_eq!(0b11100000u8 & u, 0u8);
+        assert_eq!(0b1110_0000_u8 & u, 0_u8);
         assert!(l <= 5);
-        Self((u << 3u8) | l)
+        Self((u << 3_u8) | l)
     }
 
+    /// # Panics
+    /// if trying to add indir with .len() of 5
+    /// first 5 - len bits aren't zeroed
     pub fn add(&mut self, mutable: bool) {
         let len = self.len();
-        assert!(len <= 4u8);
-        assert!(self.0.leading_zeros() as u8 >= 5u8 - len);
+        assert!(len <= 4_u8);
+        assert!(self.0.leading_zeros() >= 5 - len as u32);
         unsafe { self.add_unchecked(mutable) }
     }
 
@@ -35,11 +41,13 @@ impl Indir {
     /// last three bits must be 4 or below
     /// first 5 - len bits must be zeroed
     pub unsafe fn add_unchecked(&mut self, mutable: bool) {
-        let a = (mutable as u8) << 3u8 << self.len();
+        let a = (mutable as u8) << 3_u8 << self.len();
         self.0 = self.0 & !a | a; // override the bit
-        self.0 += 1u8; // add one to length
+        self.0 += 1_u8; // add one to length
     }
 
+    /// # Panics
+    /// if attempting to sub with 0 pointers
     pub fn sub(&mut self) {
         assert!(!self.is_empty());
         unsafe { self.sub_unchecked() }
@@ -48,12 +56,12 @@ impl Indir {
     /// # Safety
     /// last three bits must be 1 or above
     pub unsafe fn sub_unchecked(&mut self) {
-        self.0 -= 1u8;
-        self.0 &= (0b00001000 << self.len()) - 1u8; // zero what's unneeded
+        self.0 -= 1_u8;
+        self.0 &= (0b0000_1000 << self.len()) - 1_u8; // zero what's unneeded
     }
 
     pub fn len(&self) -> u8 {
-        self.0 & 0b111u8
+        self.0 & 0b111_u8
     }
 
     pub fn is_empty(&self) -> bool {
@@ -69,14 +77,14 @@ impl Indir {
 impl Display for Indir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let l = self.len();
-        let mut n = 0b00001000u8;
+        let mut n = 0b0000_1000_u8;
         for _ in 0..l {
             if self.0 & n == 0 {
                 write!(f, "*")?;
             } else {
                 write!(f, "*mut ")?;
             }
-            n <<= 1u8;
+            n <<= 1_u8;
         }
         Ok(())
     }
