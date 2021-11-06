@@ -68,7 +68,7 @@ impl<'a> Parser<'a> {
                             loop {
                                 let t = self.next();
                                 match t {
-                                    Some(Token::RightBracket) | Some(Token::Semicolon) => {
+                                    Some(Token::RightBracket | Token::Semicolon) => {
                                         self.token_buffer = t;
                                         break;
                                     }
@@ -174,12 +174,13 @@ impl<'a> Parser<'a> {
             Some(Token::Colon) => self.parse_type()?,
             t => {
                 self.token_buffer = t;
+
                 if require_type {
                     self.session.error(Message::MissingType, self.lex.span());
                     return None;
-                } else {
-                    Type::auto()
                 }
+
+                Type::auto()
             }
         };
 
@@ -500,21 +501,17 @@ impl<'a> Parser<'a> {
                     // Wikipedia's pseudocode is wrong. if t1 is a right associative op
                     // with equal precedence, then trying to match t2 with a higher
                     // min_prec is impossible
-                    let (cond, next_prec) = match l {
-                        Some(Token::BinOp(BinOp::Compound(v))) => {
-                            let t2_prec = v.prec();
-                            (t_prec == t2_prec, t_prec + 1)
-                        }
+                    let (cond, next_prec) = if let Some(Token::BinOp(BinOp::Compound(v))) = l {
+                        let t2_prec = v.prec();
+                        (t_prec == t2_prec, t_prec + 1)
+                    } else {
+                        let t2_prec = match l {
+                            Some(Token::BinOp(t)) => t.prec(),
+                            Some(Token::AmbiguousOp(t)) => t.binary().prec(),
+                            _ => break,
+                        };
 
-                        _ => {
-                            let t2_prec = match l {
-                                Some(Token::BinOp(t)) => t.prec(),
-                                Some(Token::AmbiguousOp(t)) => t.binary().prec(),
-                                _ => break,
-                            };
-
-                            (t2_prec > t_prec, t_prec)
-                        }
+                        (t2_prec > t_prec, t_prec)
                     };
 
                     if cond {
@@ -619,16 +616,15 @@ impl<'a> Parser<'a> {
     pub fn parse(mut self) -> Program {
         let mut fns = Vec::new();
         while let Some(t) = self.next() {
-            match t {
-                Token::Fn => match self.function() {
+            if t == Token::Fn {
+                match self.function() {
                     Some(f) => fns.push(f),
                     None => self.panic_top_level(),
-                },
-                _ => {
-                    self.session
-                        .error(Message::InvalidTopLevel, self.lex.span());
-                    self.panic_top_level()
                 }
+            } else {
+                self.session
+                    .error(Message::InvalidTopLevel, self.lex.span());
+                self.panic_top_level()
             }
         }
 
