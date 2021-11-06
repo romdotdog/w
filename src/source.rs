@@ -38,6 +38,8 @@ impl Source {
         &self.src
     }
 
+    /// # Panics
+    /// if i >= size of source
     pub fn line_col(&self, i: usize) -> (usize, usize, (usize, usize)) {
         assert!(i < self.src_size);
 

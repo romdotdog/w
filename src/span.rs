@@ -7,15 +7,20 @@ pub struct Span {
     pub src: SourceRef,
 }
 
+/// start is inclusive, end is exclusive
 impl Span {
+    /// # Panics
+    /// `start >= end`
     pub fn new(src: SourceRef, start: usize, end: usize) -> Self {
-        assert!(start <= end, "{} .. {}", start, end);
+        assert!(start < end, "{} .. {}", start, end);
         Span { start, end, src }
     }
 
+    /// # Panics
+    /// `self.start >= end`
     pub fn to(mut self, end: Self) -> Self {
         self.end = end.end;
-        assert!(self.start <= self.end, "{} .. {}", self.start, self.end);
+        assert!(self.start < self.end, "{} .. {}", self.start, self.end);
         self
     }
 

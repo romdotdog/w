@@ -60,6 +60,8 @@ impl Session {
 
     // TODO: Limit to non-wasm targets
     // Diagnostics will be handled on the JS side
+    /// # Panics
+    /// error span start (inclusive) >= error span end (exclusive)
     pub fn diagnostics(&self) {
         for i in 0..self.errors.len() {
             let (m, s) = self.errors.get(i).unwrap();
@@ -69,22 +71,19 @@ impl Session {
 
             assert!(start_pos < end_pos, "{} - {} / {}", start_pos, end_pos, m);
 
-            let (line, col, (sol, eol)) = src.line_col(start_pos);
-            let spaces = src.content()[sol..start_pos]
+            let (line, column, (start_of_line, end_of_line)) = src.line_col(start_pos);
+            let spaces = src.content()[start_of_line..start_pos]
                 .chars()
-                .map(|c| match c.is_whitespace() {
-                    true => c,
-                    false => ' ',
-                })
+                .map(|c| if c.is_whitespace() { c } else { ' ' })
                 .collect::<String>();
 
             println!(
                 "\x1b[1m{}:{}:{}: \x1b[91merror:\x1b[0m {}\n{}\n{}\x1b[91m\x1b[1m{}\x1b[0m",
                 src.name(),
                 line,
-                col,
+                column,
                 m,
-                src.content()[sol..eol].trim_end(),
+                src.content()[start_of_line..end_of_line].trim_end(),
                 spaces,
                 "^".repeat(s.end - start_pos),
             )
