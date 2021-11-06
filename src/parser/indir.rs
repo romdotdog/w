@@ -35,7 +35,7 @@ impl Indir {
     pub fn add(self, mutable: bool) -> Self {
         let len = self.len();
         assert!(len <= 4_u8);
-        assert!(self.0.leading_zeros() >= 5 - len as u32);
+        assert!(self.0.leading_zeros() >= 5 - u32::from(len));
         unsafe { self.add_unchecked(mutable) }
     }
 

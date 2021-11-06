@@ -363,7 +363,7 @@ impl<'a> Parser<'a> {
 
             // from the article:
             // binary operator whose precedence is >= min_precedence
-            let t_prec = t.prec();
+            let current_prec = t.prec();
             if t.prec() >= min_prec {
                 let mut rhs = self.primaryatom()?;
 
@@ -373,16 +373,16 @@ impl<'a> Parser<'a> {
                     // with equal precedence, then trying to match t2 with a higher
                     // min_prec is impossible
                     let (cond, next_prec) = if let Some(Token::BinOp(BinOp::Compound(v))) = l {
-                        let t2_prec = v.prec();
-                        (t_prec == t2_prec, t_prec + 1)
+                        let lookahead_prec = v.prec();
+                        (current_prec == lookahead_prec, current_prec + 1)
                     } else {
-                        let t2_prec = match l {
+                        let lookahead_prec = match l {
                             Some(Token::BinOp(t)) => t.prec(),
                             Some(Token::AmbiguousOp(t)) => t.binary().prec(),
                             _ => break,
                         };
 
-                        (t2_prec > t_prec, t_prec)
+                        (lookahead_prec > current_prec, current_prec)
                     };
 
                     if cond {
