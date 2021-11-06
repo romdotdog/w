@@ -368,6 +368,41 @@ impl<'a> Lexer<'a> {
         self.buffer = t;
         self.p -= 1;
     }
+
+    /// returns the first non-comment character
+    #[allow(clippy::single_match)]
+    fn skip_comments(&mut self) -> Option<char> {
+        loop {
+            match self.nextc() {
+                Some('/') => match self.nextc() {
+                    // single comment
+                    Some('/') => loop {
+                        match self.nextc() {
+                            Some('\n') => break,
+                            None => return None,
+                            _ => {}
+                        }
+                    },
+                    // multi-line comment
+                    Some('*') => loop {
+                        match self.nextc() {
+                            Some('*') => match self.nextc() {
+                                Some('/') => break,
+                                _ => {}
+                            },
+                            None => todo!(),
+                            _ => {}
+                        }
+                    },
+                    // neither, break loop
+                    _ => break Some('/'),
+                },
+                Some(c) if !c.is_whitespace() => break Some(c),
+                None => return None,
+                _ => {}
+            }
+        }
+    }
 }
 
 impl<'a> Iterator for Lexer<'a> {
@@ -381,33 +416,7 @@ impl<'a> Iterator for Lexer<'a> {
             return Some(token);
         }
 
-        let c = loop {
-            match self.nextc() {
-                Some('/') => match self.nextc() {
-                    Some('/') => loop {
-                        match self.nextc() {
-                            Some('\n') => break,
-                            None => return None,
-                            _ => {}
-                        }
-                    },
-                    Some('*') => loop {
-                        match self.nextc() {
-                            Some('*') => match self.nextc() {
-                                Some('/') => break,
-                                _ => {}
-                            },
-                            None => todo!(),
-                            _ => {}
-                        }
-                    },
-                    _ => break '/',
-                },
-                Some(c) if !c.is_whitespace() => break c,
-                None => return None,
-                _ => {}
-            }
-        };
+        let c = self.skip_comments()?;
 
         self.try_tk_bip(c).or_else(|| {
             let mut ident = c.to_string();
