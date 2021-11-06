@@ -12,13 +12,11 @@ use crate::{span::Span, Session, SourceRef};
 mod token;
 pub use token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
 
-use std::str::Chars;
-
 pub struct Lexer<'a> {
     session: &'a Session,
 
-    stream: Chars<'a>,
-    src: SourceRef,
+    stream: std::vec::IntoIter<char>,
+    src_ref: SourceRef,
 
     buffer: Option<char>,
     token_buffer: Option<(Token, Span)>,
@@ -31,14 +29,17 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(session: &'a Session, src: SourceRef) -> Self {
-        let s = session.get_source(&src);
+    pub fn new(session: &'a Session, src_ref: SourceRef) -> Self {
+        let src = session.source_map().get_source(src_ref);
+
+        // TODO: can we remove this allocation?
+        let s: Vec<char> = src.content().chars().collect();
 
         Lexer {
             session,
 
-            stream: s.content().chars(),
-            src,
+            stream: s.into_iter(),
+            src_ref,
 
             buffer: None,
             token_buffer: None,
@@ -52,7 +53,7 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn span(&self) -> Span {
-        Span::new(self.src, self.start, self.end)
+        Span::new(self.src_ref, self.start, self.end)
     }
 
     fn keyword(s: String) -> Token {
@@ -352,7 +353,7 @@ impl<'a> Lexer<'a> {
         let start = self.p;
         let r = self.try_aip(c);
         let end = self.p + 1;
-        r.map(|t| (t, Span::new(self.src, start, end)))
+        r.map(|t| (t, Span::new(self.src_ref, start, end)))
     }
 
     fn try_tk_bip(&mut self, c: char) -> Option<Token> {

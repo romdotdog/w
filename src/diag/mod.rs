@@ -1,4 +1,9 @@
-use std::fmt::Display;
+use crate::{source::Source, span::Span};
+use std::rc::Rc;
+
+#[cfg(not(wasm))]
+mod for_humans;
+
 pub enum Message {
     UnexpectedToken,
     InvalidTopLevel,
@@ -14,25 +19,24 @@ pub enum Message {
     TooMuchIndirection,
 }
 
-impl Display for Message {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Message::UnexpectedToken => write!(f, "unexpected token"),
-            Message::MissingSemicolon => write!(f, "missing a semicolon or closing brace"),
-            Message::MissingIdentifier => write!(f, "missing identifier here"),
-            Message::MalformedIdentifier => write!(f, "invalid identifier here"),
-            Message::MissingType => write!(f, "missing type here"),
-            Message::MalformedType => write!(f, "found malformed type"),
-            Message::MissingClosingParen => write!(f, "')' expected here"),
-            Message::MissingClosingBracket => write!(f, "missing '}}'"),
-            Message::MissingClosingAngleBracket => write!(f, "'>' expected here"),
-            Message::MissingClosingSqBracket => write!(f, "']' expected here"),
-            Message::InvalidTopLevel => {
-                write!(f, "only functions, globals and directives are allowed here")
-            }
-            Message::TooMuchIndirection => {
-                write!(f, "at most only 5 levels of indirection are allowed")
-            }
-        }
+#[derive(Default)]
+pub struct Diagnostics {
+    errors: Vec<Diagnostic>,
+    warnings: Vec<Diagnostic>,
+}
+
+impl Diagnostics {
+    pub fn error(&mut self, diagnostic: Diagnostic) {
+        self.errors.push(diagnostic);
     }
+
+    pub fn errors(&self) -> &[Diagnostic] {
+        &self.errors
+    }
+}
+
+pub struct Diagnostic {
+    pub source: Rc<Source>,
+    pub span: Span,
+    pub message: Message,
 }

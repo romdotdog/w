@@ -1,36 +1,36 @@
 use similar::{ChangeTag, TextDiff};
 use std::fs;
-use w::diag::Message;
+
+use w::diag::{Diagnostic, Message};
+use w::source_map::FileLoader;
 use w::Session;
 
 macro_rules! test {
     ($f: ident $(, $e: ident)*) => {
         #[test]
         fn $f() {
-            let sess = Session::new();
+            let mut sess = Session::new(Box::new(FileLoader));
 
             let filename = concat!("tests/parser/", stringify!($f), ".w");
             let fixture = concat!("tests/parser/", stringify!($f), ".fixture.w");
             let entry =
-                sess.register_source(filename.to_owned(), fs::read_to_string(filename).unwrap());
+                sess.source_map().register_source(filename.to_owned(), fs::read_to_string(filename).unwrap());
             let t = format!("{}", sess.parse(entry).parse());
-
-			sess.diagnostics();
 
 			// check errors
 			#[allow(unused_mut)]
 			let mut n = 0;
 
 			$({
-				match sess.errors.get(n) {
-					Some((Message::$e, _)) => {}
-					Some(t) => panic!("expected '{}', got '{}'", Message::$e, t.0),
+				match sess.diagnostics().errors().get(n) {
+					Some(Diagnostic { message: Message::$e, .. }) => {}
+					Some(t) => panic!("expected '{}', got '{}'", Message::$e, t.message),
 					None => panic!("expected '{}', got no error", Message::$e)
 				};
 				n += 1;
 			})*
 
-			match sess.errors.get(n) {
+			match sess.diagnostics().errors().get(n) {
 				Some(_) => panic!("found additional errors"),
 				None => {},
 			}
