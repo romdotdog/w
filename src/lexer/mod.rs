@@ -90,6 +90,76 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    fn parse_string(&mut self) -> String {
+        let mut res = String::new();
+
+        loop {
+            match self.nextc() {
+                Some('\\') => {
+                    // check the first character
+                    let header_char = self.nextc().expect("expected escape character, got <eof>");
+
+                    if let Some(radix) = char_to_radix(header_char) {
+                        let radix = radix as u32;
+
+                        //  ^ \x6e, \d71
+                        // if there is no applicable digit after, then treat as normal escape
+                        match self.nextc() {
+                            Some(header_digit) if header_digit.is_digit(radix) => {
+                                // go on parsing as normal
+                                let mut num = header_digit.to_string();
+                                loop {
+                                    match self.nextc() {
+                                        Some(t) if t.is_digit(radix) => {
+                                            num.push(t);
+                                        }
+                                        c1 => {
+                                            self.backtrack(c1);
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                let codepoint = u32::from_str_radix(&num, radix);
+                                assert!(codepoint.is_ok(), "max escape value is {}", u32::MAX);
+
+                                let escaped = std::char::from_u32(codepoint.unwrap());
+                                assert!(
+                                    escaped.is_some(),
+                                    "invalid codepoint, cannot add \\{}{} as part of escape",
+                                    header_char,
+                                    num
+                                );
+
+                                // push the codepoint
+                                res.push(escaped.unwrap());
+                            }
+                            t => self.backtrack(t),
+                        }
+                    } else {
+                        // TODO: Figure out the semantics of this
+                        res.push(match header_char {
+                            't' => '\t',
+                            'r' => '\r',
+                            'n' => '\n',
+                            _ => {
+                                // is not an escape
+                                header_char
+                            }
+                        })
+                    }
+                }
+                Some('"') => {
+                    break;
+                }
+                Some(c) => res.push(c),
+                None => panic!("incomplete string literal"),
+            }
+        }
+
+        res
+    }
+
     fn try_aip(&mut self, c: char) -> Option<Token> {
         // TODO: Refactor for code size
         macro_rules! op {
@@ -153,80 +223,7 @@ impl<'a> Lexer<'a> {
                 }
             }
 
-            '"' => {
-                let mut res = String::new();
-
-                loop {
-                    match self.nextc() {
-                        Some('\\') => {
-                            // check the first character
-                            let header_char =
-                                self.nextc().expect("expected escape character, got <eof>");
-
-                            if let Some(radix) = char_to_radix(header_char) {
-                                let radix = radix as u32;
-
-                                //  ^ \x6e, \d71
-                                // if there is no applicable digit after, then treat as normal escape
-                                match self.nextc() {
-                                    Some(header_digit) if header_digit.is_digit(radix) => {
-                                        // go on parsing as normal
-                                        let mut num = header_digit.to_string();
-                                        loop {
-                                            match self.nextc() {
-                                                Some(t) if t.is_digit(radix) => {
-                                                    num.push(t);
-                                                }
-                                                c1 => {
-                                                    self.backtrack(c1);
-                                                    break;
-                                                }
-                                            }
-                                        }
-
-                                        let codepoint = u32::from_str_radix(&num, radix);
-                                        assert!(
-                                            codepoint.is_ok(),
-                                            "max escape value is {}",
-                                            u32::MAX
-                                        );
-
-                                        let escaped = std::char::from_u32(codepoint.unwrap());
-                                        assert!(
-											escaped.is_some(),
-											"invalid codepoint, cannot add \\{}{} as part of escape",
-											header_char,
-											num
-										);
-
-                                        // push the codepoint
-                                        res.push(escaped.unwrap());
-                                    }
-                                    t => self.backtrack(t),
-                                }
-                            } else {
-                                // TODO: Figure out the semantics of this
-                                res.push(match header_char {
-                                    't' => '\t',
-                                    'r' => '\r',
-                                    'n' => '\n',
-                                    _ => {
-                                        // is not an escape
-                                        header_char
-                                    }
-                                })
-                            }
-                        }
-                        Some('"') => {
-                            break;
-                        }
-                        Some(c) => res.push(c),
-                        None => panic!("incomplete string literal"),
-                    }
-                }
-
-                Token::String(res)
-            }
+            '"' => Token::String(self.parse_string()),
 
             '>' | '<' | '=' | '!' | '+' | '-' => {
                 // two char ops
