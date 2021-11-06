@@ -31,7 +31,7 @@ impl Indir {
         unsafe { self.add_unchecked(mutable) }
     }
 
-    /// invariants:
+    /// # Safety
     /// last three bits must be 4 or below
     /// first 5 - len bits must be zeroed
     pub unsafe fn add_unchecked(&mut self, mutable: bool) {
@@ -41,23 +41,27 @@ impl Indir {
     }
 
     pub fn sub(&mut self) {
-        assert!(self.len() >= 1);
+        assert!(!self.is_empty());
         unsafe { self.sub_unchecked() }
     }
 
-    /// invariants:
+    /// # Safety
     /// last three bits must be 1 or above
     pub unsafe fn sub_unchecked(&mut self) {
         self.0 -= 1u8;
-        self.0 = self.0 & ((0b00001000 << self.len()) - 1u8); // zero what's unneeded
+        self.0 &= (0b00001000 << self.len()) - 1u8; // zero what's unneeded
     }
 
     pub fn len(&self) -> u8 {
         self.0 & 0b111u8
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     #[cfg(test)]
-    pub fn into_inner(&self) -> u8 {
+    pub fn into_inner(self) -> u8 {
         self.0
     }
 }
@@ -78,6 +82,7 @@ impl Display for Indir {
     }
 }
 
+#[allow(clippy::unusual_byte_groupings)]
 #[cfg(test)]
 mod tests {
     use super::Indir;

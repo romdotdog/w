@@ -10,7 +10,7 @@ pub struct Span {
 impl Span {
     pub fn new(src: SourceRef, start: usize, end: usize) -> Self {
         assert!(start <= end, "{} .. {}", start, end);
-        Span { src, start, end }
+        Span { start, end, src }
     }
 
     pub fn to(mut self, end: Self) -> Self {

@@ -47,9 +47,8 @@ impl<'a> Parser<'a> {
         let mut last = None;
 
         loop {
-            match last.take() {
-                Some(t) => r.push(t),
-                None => {}
+            if let Some(t) = last.take() {
+                r.push(t)
             }
 
             match self.next() {
@@ -101,8 +100,8 @@ impl<'a> Parser<'a> {
 
         let span = start.to(self.lex.span());
         Some(Atom {
-            t: last.as_ref().map_or_else(|| Type::void(), |a| a.t),
-            v: AtomVariant::Block(r, last.map(|a| Box::new(a))),
+            t: last.as_ref().map_or_else(Type::void, |a| a.t),
+            v: AtomVariant::Block(r, last.map(Box::new)),
             span,
         })
     }
@@ -458,7 +457,7 @@ impl<'a> Parser<'a> {
 
                 Atom {
                     t: e.t,
-                    v: AtomVariant::UnOp(o.to_unary(), Box::new(e)),
+                    v: AtomVariant::UnOp(o.unary(), Box::new(e)),
                     span: start.to(self.lex.span()),
                 }
             }
@@ -482,7 +481,7 @@ impl<'a> Parser<'a> {
         loop {
             let t = match l {
                 Some(Token::BinOp(t)) => t,
-                Some(Token::AmbiguousOp(ref t)) => BinOp::Regular(t.to_binary()),
+                Some(Token::AmbiguousOp(ref t)) => BinOp::Regular(t.binary()),
                 _ => {
                     self.token_buffer = l;
                     break;
@@ -509,7 +508,7 @@ impl<'a> Parser<'a> {
                         _ => {
                             let t2_prec = match l {
                                 Some(Token::BinOp(t)) => t.prec(),
-                                Some(Token::AmbiguousOp(t)) => t.to_binary().prec(),
+                                Some(Token::AmbiguousOp(t)) => t.binary().prec(),
                                 _ => break,
                             };
 

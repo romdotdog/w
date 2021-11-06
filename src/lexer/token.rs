@@ -122,7 +122,7 @@ macro_rules! ambiguous {
 		}
 
 		impl AmbiguousOp {
-			pub fn to_binary(&self) -> BinOpVariant {
+			pub fn binary(&self) -> BinOpVariant {
 				match self {
 					$(
 						AmbiguousOp::$n => BinOpVariant::$b
@@ -130,7 +130,7 @@ macro_rules! ambiguous {
 				}
 			}
 
-			pub fn to_unary(&self) -> UnOp {
+			pub fn unary(&self) -> UnOp {
 				match self {
 					$(
 						AmbiguousOp::$n => UnOp::$u

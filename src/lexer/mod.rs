@@ -96,7 +96,7 @@ impl<'a> Lexer<'a> {
             (@ambiguous $t: ident) => {{
                 let amb = AmbiguousOp::$t;
                 match self.try_take_equals() {
-                    true => Token::BinOp(BinOp::Compound(amb.to_binary())),
+                    true => Token::BinOp(BinOp::Compound(amb.binary())),
                     false => Token::AmbiguousOp(amb),
                 }
             }};

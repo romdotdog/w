@@ -34,11 +34,11 @@ impl Session {
         }
     }
 
-    pub fn lexer<'a>(&'a self, src: SourceRef) -> Lexer<'a> {
+    pub fn lexer(&self, src: SourceRef) -> Lexer<'_> {
         Lexer::new(self, src)
     }
 
-    pub fn parse<'a>(&'a self, src: SourceRef) -> Parser<'a> {
+    pub fn parse(&self, src: SourceRef) -> Parser<'_> {
         Parser::new(self, src)
     }
 
@@ -87,6 +87,12 @@ impl Session {
                 "^".repeat(s.end - start_pos),
             )
         }
+    }
+}
+
+impl Default for Session {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
