@@ -19,6 +19,8 @@ use indir::Indir;
 mod ast;
 pub use ast::Atom;
 
+mod primaryatom;
+
 use self::ast::{AtomVariant, IdentPair, IncDec, Program};
 
 pub struct Parser<'a> {
@@ -344,137 +346,6 @@ impl<'a> Parser<'a> {
         };
 
         self.postfixatom(lhs)
-    }
-
-    fn primaryatom(&mut self) -> Option<Atom> {
-        Some(match self.next() {
-            Some(Token::Let) => {
-                let start = self.lex.span();
-                let pair = self.ident_type_pair(false)?;
-
-                let rhs = match self.next() {
-                    Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
-                        Some(Box::new(self.atom()?))
-                    }
-                    t => {
-                        self.token_buffer = t;
-                        None
-                    }
-                };
-
-                Atom {
-                    t: Type::void(),
-                    v: AtomVariant::Let(pair, rhs),
-                    span: start.to(self.lex.span()),
-                }
-            }
-            Some(Token::BinOp(BinOp::Regular(BinOpVariant::Lt))) => {
-                let start = self.lex.span();
-                let t = self.parse_type()?;
-                let mut op = UnOp::Cast;
-
-                match self.next() {
-                    Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => {}
-                    t1 => {
-                        match t1 {
-                            Some(Token::UnOp(UnOp::LNot)) => op = UnOp::Reinterpret,
-                            t => self.token_buffer = t,
-                        }
-
-                        match self.next() {
-                            Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => {}
-                            t => {
-                                self.session
-                                    .error(Message::MissingClosingAngleBracket, self.lex.span());
-                                self.token_buffer = t;
-                                return None;
-                            }
-                        }
-                    }
-                }
-
-                Atom {
-                    v: AtomVariant::UnOp(op, Box::new(self.primaryatom()?)),
-                    span: start.to(self.lex.span()),
-                    t,
-                }
-            }
-            Some(Token::If) => {
-                let start = self.lex.span();
-                let cond = Box::new(self.atom()?);
-                let body = Box::new(self.atom()?);
-                let mut else_body = None;
-                match self.next() {
-                    Some(Token::Else) => {
-                        else_body = Some(Box::new(self.atom()?));
-                    }
-                    t => self.token_buffer = t,
-                }
-
-                Atom {
-                    t: Type::auto(),
-                    v: AtomVariant::If(cond, body, else_body),
-                    span: start.to(self.lex.span()),
-                }
-            }
-            Some(Token::Loop) => {
-                let start = self.lex.span();
-                let initial = Box::new(self.atom()?);
-                let loop_body = Box::new(self.atom()?);
-
-                Atom {
-                    t: Type::auto(),
-                    v: AtomVariant::Loop(initial, loop_body),
-                    span: start.to(self.lex.span()),
-                }
-            }
-            Some(Token::Br) => {
-                let start = self.lex.span();
-
-                Atom {
-                    t: Type::auto(),
-                    v: AtomVariant::Br(match self.next() {
-                        Some(Token::If) => Some(Box::new(self.atom()?)),
-                        t => {
-                            self.token_buffer = t;
-                            None
-                        }
-                    }),
-                    span: start.to(self.lex.span()),
-                }
-            }
-            Some(Token::Return) => {
-                let start = self.lex.span();
-                let e = self.atom()?;
-
-                Atom {
-                    t: e.t,
-                    v: AtomVariant::Return(Box::new(e)),
-                    span: start.to(self.lex.span()),
-                }
-            }
-            Some(Token::AmbiguousOp(o)) => {
-                let start = self.lex.span();
-                let e = self.primaryatom()?;
-
-                Atom {
-                    t: e.t,
-                    v: AtomVariant::UnOp(o.unary(), Box::new(e)),
-                    span: start.to(self.lex.span()),
-                }
-            }
-            Some(Token::UnOp(u)) => {
-                let start = self.lex.span();
-                let e = self.primaryatom()?;
-
-                Atom {
-                    t: e.t,
-                    v: AtomVariant::UnOp(u, Box::new(e)),
-                    span: start.to(self.lex.span()),
-                }
-            }
-            t => self.simpleatom(t)?,
-        })
     }
 
     fn subatom(&mut self, mut lhs: Atom, min_prec: u8) -> Option<Atom> {
