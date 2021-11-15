@@ -1,0 +1,14 @@
+[package]
+name = "w_driver"
+version = "0.0.0"
+edition = "2018"
+
+
+[[bin]]
+name = "w"
+path = "lib.rs"
+test = false
+
+[dependencies]
+getopts = "0.2"
+w_session = { path = "../w_session" }

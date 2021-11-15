@@ -1,9 +1,5 @@
-use crate::lexer::{BinOp, BinOpVariant, UnOp};
-
-use super::{
-    ast::{AtomVariant, IdentPair, IncDec, Program, Type, TypeVariant, WFn},
-    Atom,
-};
+use super::{Atom, AtomVariant, IdentPair, IncDec, Program, Type, TypeVariant, WFn};
+use w_lexer::{BinOp, BinOpVariant, UnOp};
 
 use std::fmt::Display;
 

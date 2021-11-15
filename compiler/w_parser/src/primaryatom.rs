@@ -1,6 +1,9 @@
-use super::{Atom, AtomVariant, BinOp, BinOpVariant, Message, Parser, Token, Type, UnOp};
+use super::{Handler, Parser};
+use w_ast::{Atom, AtomVariant, Type};
+use w_errors::Message;
+use w_lexer::{BinOp, BinOpVariant, Token, UnOp};
 
-impl Parser<'_> {
+impl<'a, H: Handler> Parser<'a, H> {
     fn parse_let(&mut self) -> Option<Atom> {
         let start = self.lex.span();
         let pair = self.ident_type_pair(false)?;
@@ -36,8 +39,7 @@ impl Parser<'_> {
                 match self.next() {
                     Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => {}
                     t => {
-                        self.session
-                            .error(Message::MissingClosingAngleBracket, self.lex.span());
+                        self.error(Message::MissingClosingAngleBracket, self.lex.span());
                         self.token_buffer = t;
                         return None;
                     }

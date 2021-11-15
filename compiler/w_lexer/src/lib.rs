@@ -7,16 +7,16 @@
         AIP - Above Ident Priority
 */
 
-use crate::{diag::Message, span::Span, Session, SourceRef};
-
+mod span;
 mod token;
+
+use std::iter::FromIterator;
+
+pub use span::Span;
 pub use token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
 
-pub struct Lexer<'a> {
-    session: &'a Session,
-
-    stream: std::vec::IntoIter<char>,
-    src_ref: SourceRef,
+pub struct Lexer {
+    stream: <Vec<char> as IntoIterator>::IntoIter,
 
     buffer: Option<char>,
     token_buffer: Option<(Token, Span)>,
@@ -28,18 +28,11 @@ pub struct Lexer<'a> {
     end: usize,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn new(session: &'a Session, src_ref: SourceRef) -> Self {
-        let src = session.source_map().get_source(src_ref);
-
-        // TODO: can we remove this allocation?
-        let s: Vec<char> = src.content().chars().collect();
-
+impl Lexer {
+    pub fn new(stream: String) -> Self {
         Lexer {
-            session,
-
-            stream: s.into_iter(),
-            src_ref,
+            // TODO: FIX
+            stream: stream.chars().collect::<Vec<_>>().into_iter(),
 
             buffer: None,
             token_buffer: None,
@@ -53,21 +46,7 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn span(&self) -> Span {
-        Span::new(self.src_ref, self.start, self.end)
-    }
-
-    fn keyword(s: String) -> Token {
-        match s.as_str() {
-            "fn" => Token::Fn,
-            "return" => Token::Return,
-            "if" => Token::If,
-            "else" => Token::Else,
-            "let" => Token::Let,
-            "mut" => Token::Mut,
-            "loop" => Token::Loop,
-            "br" => Token::Br,
-            _ => Token::Ident(s),
-        }
+        Span::new(self.start, self.end)
     }
 
     fn try_take_equals(&mut self) -> bool {
@@ -164,6 +143,20 @@ impl<'a> Lexer<'a> {
         res
     }
 
+    fn parse_char(&mut self) -> Token {
+        let c2 = self.nextc();
+        match self.nextc() {
+            Some('\'') => Token::Char(c2.unwrap()),
+
+            // Errors are idents
+            Some(t) => Token::Ident(String::from_iter(['\'', c2.unwrap(), t])),
+            None => match c2 {
+                Some(t) => Token::Ident(String::from_iter(['\'', t])),
+                None => Token::Ident('\''.into()),
+            },
+        }
+    }
+
     fn try_aip(&mut self, c: char) -> Option<Token> {
         // TODO: Refactor for code size
         macro_rules! op {
@@ -216,16 +209,7 @@ impl<'a> Lexer<'a> {
             '|' => op!(@binary Or),
             '~' => op!(@unary BNot),
 
-            '\'' => {
-                let c2 = self.nextc();
-                if let Some('\'') = self.nextc() {
-                    Token::Char(c2.unwrap())
-                } else {
-                    self.session.error(Message::UnexpectedToken, self.span());
-                    return None;
-                }
-            }
-
+            '\'' => self.parse_char(),
             '"' => Token::String(self.parse_string()),
 
             '>' | '<' | '=' | '!' | '+' | '-' => {
@@ -352,7 +336,7 @@ impl<'a> Lexer<'a> {
         let start = self.p;
         let r = self.try_aip(c);
         let end = self.p + 1;
-        r.map(|t| (t, Span::new(self.src_ref, start, end)))
+        r.map(|t| (t, Span::new(start, end)))
     }
 
     fn try_tk_bip(&mut self, c: char) -> Option<Token> {
@@ -409,7 +393,21 @@ impl<'a> Lexer<'a> {
     }
 }
 
-impl<'a> Iterator for Lexer<'a> {
+fn keyword(s: String) -> Token {
+    match s.as_str() {
+        "fn" => Token::Fn,
+        "return" => Token::Return,
+        "if" => Token::If,
+        "else" => Token::Else,
+        "let" => Token::Let,
+        "mut" => Token::Mut,
+        "loop" => Token::Loop,
+        "br" => Token::Br,
+        _ => Token::Ident(s),
+    }
+}
+
+impl Iterator for Lexer {
     type Item = Token;
 
     fn next(&mut self) -> Option<Token> {
@@ -443,7 +441,7 @@ impl<'a> Iterator for Lexer<'a> {
 
             self.start = start;
             self.end = end;
-            Some(Lexer::keyword(ident))
+            Some(keyword(ident))
         })
     }
 }

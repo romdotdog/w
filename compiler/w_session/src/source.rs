@@ -1,10 +1,20 @@
+use std::{
+    marker::PhantomPinned,
+    ops::{Deref, DerefMut},
+    pin::Pin,
+    ptr::NonNull,
+    rc::Rc,
+    str::Chars,
+};
+
 use unicode_segmentation::UnicodeSegmentation;
 
+#[derive(Clone)]
 pub struct Source {
-    name: String,
+    pub name: String,
 
-    src: String,
-    src_size: usize,
+    pub src: String,
+    pub src_size: usize,
 
     line_pos: Vec<usize>,
     line_count: usize,
@@ -28,14 +38,6 @@ impl Source {
             line_count: line_pos.len(),
             line_pos,
         }
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn content(&self) -> &str {
-        &self.src
     }
 
     /// # Panics

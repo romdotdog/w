@@ -3,10 +3,19 @@
 version = 3
 
 [[package]]
-name = "similar"
-version = "2.0.0"
+name = "getopts"
+version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bf11003835e462f07851028082d2a1c89d956180ce4b4b50e07fb085ec4131a"
+checksum = "14dbbfd5c71d70241ecf9e6f13737f7b5ce823821063188d7e46c41d371eebd5"
+dependencies = [
+ "unicode-width",
+]
+
+[[package]]
+name = "similar"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e24979f63a11545f5f2c60141afe249d4f19f84581ea2138065e400941d83d3"
 
 [[package]]
 name = "unicode-segmentation"
@@ -15,9 +24,50 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8895849a949e7845e06bd6dc1aa51731a103c42707010a5b591c0038fb73385b"
 
 [[package]]
-name = "w"
-version = "0.1.0"
+name = "unicode-width"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ed742d4ea2bd1176e236172c8429aaf54486e7ac098db29ffe6529e0ce50973"
+
+[[package]]
+name = "w_ast"
+version = "0.0.0"
+dependencies = [
+ "w_lexer",
+]
+
+[[package]]
+name = "w_driver"
+version = "0.0.0"
+dependencies = [
+ "getopts",
+ "w_session",
+]
+
+[[package]]
+name = "w_errors"
+version = "0.0.0"
+
+[[package]]
+name = "w_lexer"
+version = "0.0.0"
+
+[[package]]
+name = "w_parser"
+version = "0.0.0"
 dependencies = [
  "similar",
+ "w_ast",
+ "w_errors",
+ "w_lexer",
+]
+
+[[package]]
+name = "w_session"
+version = "0.0.0"
+dependencies = [
  "unicode-segmentation",
+ "w_errors",
+ "w_lexer",
+ "w_parser",
 ]

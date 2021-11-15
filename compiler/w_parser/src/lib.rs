@@ -1,45 +1,36 @@
-/*
-    TODO:
-    * Diagnostics
-    * Fill all `todo!()`s
-*/
-
 use std::cmp::Ordering;
+use w_errors::Message;
+use w_lexer::{AmbiguousOp, BinOp, Lexer, Span, Token, UnOp};
 
-use crate::{
-    diag::Message,
-    lexer::{AmbiguousOp, BinOp, BinOpVariant, Lexer, Token, UnOp},
-    parser::ast::{Type, WFn},
-    Session, SourceRef,
-};
-
-pub mod codegen;
-pub mod indir;
-use indir::Indir;
-mod ast;
-pub use ast::Atom;
-
+mod handler;
 mod primaryatom;
 
-use self::ast::{AtomVariant, IdentPair, IncDec, Program};
+pub use handler::Handler;
+use w_ast::{Atom, AtomVariant, IdentPair, IncDec, Indir, Program, Type, WFn};
 
-pub struct Parser<'a> {
-    session: &'a Session,
-    lex: Lexer<'a>,
+pub struct Parser<'a, H: Handler> {
+    session: &'a H,
+    src_ref: H::SourceRef,
+    lex: Lexer,
     token_buffer: Option<Token>,
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(session: &'a Session, src: SourceRef) -> Self {
+impl<'a, H: Handler> Parser<'a, H> {
+    pub fn new(session: &'a H, src_ref: H::SourceRef, lex: Lexer) -> Self {
         Parser {
             session,
-            lex: Lexer::new(session, src),
+            src_ref,
+            lex,
             token_buffer: None,
         }
     }
 
     fn next(&mut self) -> Option<Token> {
         self.token_buffer.take().or_else(|| self.lex.next())
+    }
+
+    pub fn error(&self, msg: Message, span: Span) {
+        self.session.error(&self.src_ref, msg, span);
     }
 
     pub fn block(&mut self) -> Option<Atom> {
@@ -89,12 +80,12 @@ impl<'a> Parser<'a> {
                 Some(Token::RightBracket) => break,
                 Some(Token::Semicolon) => {}
                 None => {
-                    self.session.error(Message::MissingClosingBracket, err_span);
+                    self.error(Message::MissingClosingBracket, err_span);
                     break;
                 }
                 t => {
                     // try to continue
-                    self.session.error(Message::MissingSemicolon, err_span);
+                    self.error(Message::MissingSemicolon, err_span);
                     self.token_buffer = t;
                 }
             }
@@ -124,9 +115,9 @@ impl<'a> Parser<'a> {
                                 }
                             })
                         }
-                        Ordering::Equal | Ordering::Greater => self
-                            .session
-                            .error(Message::TooMuchIndirection, self.lex.span()),
+                        Ordering::Equal | Ordering::Greater => {
+                            self.error(Message::TooMuchIndirection, self.lex.span())
+                        }
                     }
                     len += 1;
                 }
@@ -134,7 +125,7 @@ impl<'a> Parser<'a> {
                     return Some(Type::with_indir(s.into(), indir));
                 }
                 _ => {
-                    self.session.error(Message::MalformedType, self.lex.span());
+                    self.error(Message::MalformedType, self.lex.span());
                     return None;
                 }
             }
@@ -160,14 +151,12 @@ impl<'a> Parser<'a> {
                 s
             }
             Some(Token::Colon) => {
-                self.session
-                    .error(Message::MissingIdentifier, self.lex.span());
+                self.error(Message::MissingIdentifier, self.lex.span());
                 "unknown".to_owned()
             }
             _ => {
                 t = self.next();
-                self.session
-                    .error(Message::MalformedIdentifier, self.lex.span());
+                self.error(Message::MalformedIdentifier, self.lex.span());
                 "unknown".to_owned()
             }
         };
@@ -178,7 +167,7 @@ impl<'a> Parser<'a> {
                 self.token_buffer = t;
 
                 if require_type {
-                    self.session.error(Message::MissingType, self.lex.span());
+                    self.error(Message::MissingType, self.lex.span());
                     return None;
                 }
 
@@ -220,8 +209,7 @@ impl<'a> Parser<'a> {
                         }
                         t => {
                             self.token_buffer = t;
-                            self.session
-                                .error(Message::MissingIdentifier, period_span.move_by(1));
+                            self.error(Message::MissingIdentifier, period_span.move_by(1));
                             return None;
                         }
                     }
@@ -240,8 +228,7 @@ impl<'a> Parser<'a> {
                         }
                         t => {
                             self.token_buffer = t;
-                            self.session
-                                .error(Message::MissingClosingSqBracket, self.lex.span());
+                            self.error(Message::MissingClosingSqBracket, self.lex.span());
                             return None;
                         }
                     }
@@ -264,8 +251,7 @@ impl<'a> Parser<'a> {
                                     Some(Token::RightParen) => break,
                                     t => {
                                         self.token_buffer = t;
-                                        self.session
-                                            .error(Message::MissingClosingParen, self.lex.span());
+                                        self.error(Message::MissingClosingParen, self.lex.span());
                                         return None;
                                     }
                                 }
@@ -300,8 +286,7 @@ impl<'a> Parser<'a> {
                     Some(Token::RightParen) => {}
                     t => {
                         self.token_buffer = t;
-                        self.session
-                            .error(Message::MissingClosingParen, self.lex.span());
+                        self.error(Message::MissingClosingParen, self.lex.span());
                         return None;
                     }
                 }
@@ -339,8 +324,7 @@ impl<'a> Parser<'a> {
             },
             Some(Token::LeftBracket) => self.block()?,
             _ => {
-                self.session
-                    .error(Message::UnexpectedToken, self.lex.span());
+                self.error(Message::UnexpectedToken, self.lex.span());
                 return None;
             }
         };
@@ -444,8 +428,7 @@ impl<'a> Parser<'a> {
                         Some(Token::RightParen) => break,
                         t => {
                             self.token_buffer = t;
-                            self.session
-                                .error(Message::MissingClosingParen, self.lex.span());
+                            self.error(Message::MissingClosingParen, self.lex.span());
                             return None;
                         }
                     }
@@ -493,8 +476,7 @@ impl<'a> Parser<'a> {
                     None => self.panic_top_level(),
                 }
             } else {
-                self.session
-                    .error(Message::InvalidTopLevel, self.lex.span());
+                self.error(Message::InvalidTopLevel, self.lex.span());
                 self.panic_top_level()
             }
         }

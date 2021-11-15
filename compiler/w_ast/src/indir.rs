@@ -54,7 +54,7 @@ impl Indir {
     /// if attempting to sub with 0 pointers
     #[must_use]
     pub fn sub(self) -> Self {
-        assert!(!self.is_empty());
+        assert!(self.len() != 0);
         unsafe { self.sub_unchecked() }
     }
 
@@ -67,12 +67,10 @@ impl Indir {
         self
     }
 
+    // len is O(1) so this lint can be allowed
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(self) -> u8 {
         self.0 & 0b111_u8
-    }
-
-    pub fn is_empty(self) -> bool {
-        self.len() == 0
     }
 
     #[cfg(test)]

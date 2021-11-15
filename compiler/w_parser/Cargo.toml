@@ -1,0 +1,15 @@
+[package]
+name = "w_parser"
+version = "0.0.0"
+edition = "2018"
+
+[lib]
+doctest = false
+
+[dev-dependencies]
+similar = "2.1"
+
+[dependencies]
+w_lexer = { path = "../w_lexer" }
+w_ast = { path = "../w_ast" }
+w_errors = { path = "../w_errors" }

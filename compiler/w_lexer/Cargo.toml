@@ -1,0 +1,9 @@
+[package]
+name = "w_lexer"
+version = "0.0.0"
+edition = "2018"
+
+[lib]
+doctest = false
+
+[dependencies]
