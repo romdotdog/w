@@ -29,7 +29,7 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(stream: String) -> Self {
+    pub fn new(stream: &str) -> Self {
         Lexer {
             // TODO: FIX
             stream: stream.chars().collect::<Vec<_>>().into_iter(),
@@ -129,7 +129,7 @@ impl Lexer {
                                 // is not an escape
                                 header_char
                             }
-                        })
+                        });
                     }
                 }
                 Some('"') => {
@@ -308,7 +308,7 @@ impl Lexer {
                 match self.nextc() {
                     Some('.') if c != '.' => {
                         if float == Floatable::False {
-                            panic!("floats in different radix are not supported")
+                            panic!("floats in different radix are not supported");
                         }
 
                         float = Floatable::True;

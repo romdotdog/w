@@ -1,7 +1,6 @@
 #![allow(clippy::must_use_candidate)]
 
 use std::cell::RefCell;
-use std::pin::Pin;
 use std::rc::Rc;
 
 pub mod diag;
@@ -32,7 +31,7 @@ impl<L: Loader, E: Emitter> Session<L, E> {
     }
 
     pub fn parse(&self, src: Rc<Source>) -> Parser<'_, Self> {
-        let lex = Lexer::new(src.src.to_owned());
+        let lex = Lexer::new(&src.src);
         Parser::new(self, src, lex)
     }
 }

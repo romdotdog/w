@@ -41,7 +41,7 @@ impl<'a, H: Handler> Parser<'a, H> {
 
         loop {
             if let Some(t) = last.take() {
-                r.push(t)
+                r.push(t);
             }
 
             match self.next() {
@@ -113,10 +113,10 @@ impl<'a, H: Handler> Parser<'a, H> {
                                     self.token_buffer = t;
                                     false
                                 }
-                            })
+                            });
                         }
                         Ordering::Equal | Ordering::Greater => {
-                            self.error(Message::TooMuchIndirection, self.lex.span())
+                            self.error(Message::TooMuchIndirection, self.lex.span());
                         }
                     }
                     len += 1;
@@ -372,7 +372,7 @@ impl<'a, H: Handler> Parser<'a, H> {
                     if cond {
                         self.token_buffer = l;
                         rhs = self.subatom(rhs, next_prec)?;
-                        l = self.next()
+                        l = self.next();
                     } else {
                         break;
                     }
@@ -477,7 +477,7 @@ impl<'a, H: Handler> Parser<'a, H> {
                 }
             } else {
                 self.error(Message::InvalidTopLevel, self.lex.span());
-                self.panic_top_level()
+                self.panic_top_level();
             }
         }
 

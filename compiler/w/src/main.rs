@@ -24,6 +24,8 @@ OPTIONS:
     );
 }
 
+/// # Panics
+/// if matching was unsuccessful
 pub fn handle_options(args: &[String]) -> Option<getopts::Matches> {
     if args.is_empty() {
         usage();

@@ -6,7 +6,7 @@ edition = "2018"
 
 [[bin]]
 name = "w"
-path = "lib.rs"
+path = "main.rs"
 test = false
 
 [dependencies]

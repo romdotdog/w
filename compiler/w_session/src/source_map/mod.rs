@@ -17,6 +17,8 @@ impl<L: Loader> SourceMap<L> {
         }
     }
 
+    /// # Errors
+    /// returns the original `name` string
     pub fn load_source(&self, name: String) -> Result<Rc<Source>, String> {
         match self.loader.load(&name) {
             Some(src) => Ok(self.register_source(name, src)),
@@ -26,7 +28,8 @@ impl<L: Loader> SourceMap<L> {
 
     pub fn register_source(&self, name: String, src: String) -> Rc<Source> {
         let mut sources = self.sources.borrow_mut();
+        let r = sources.len();
         sources.push(Rc::new(Source::new(name, src)));
-        Rc::clone(sources.last().unwrap())
+        Rc::clone(&sources[r])
     }
 }

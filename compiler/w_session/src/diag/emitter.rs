@@ -4,6 +4,7 @@ pub trait Emitter {
     fn emit_errors(self, errors: Vec<Diagnostic>);
 }
 
+#[allow(clippy::module_name_repetitions)]
 pub struct DefaultEmitter;
 
 impl Emitter for DefaultEmitter {
@@ -36,7 +37,7 @@ impl Emitter for DefaultEmitter {
                 src.src[start_of_line..end_of_line].trim_end(),
                 spaces,
                 "^".repeat(end_pos - start_pos),
-            )
+            );
         }
     }
 }

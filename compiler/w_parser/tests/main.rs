@@ -28,17 +28,17 @@ impl ErrorHandler {
 }
 
 impl Handler for ErrorHandler {
-    type SourceRef = u8;
+    type SourceRef = ();
 
-    fn error(&self, src_ref: &Self::SourceRef, msg: Message, span: w_lexer::Span) {
+    fn error(&self, _src_ref: &Self::SourceRef, msg: Message, _span: w_lexer::Span) {
         self.errors.borrow_mut().push(msg);
     }
 
-    fn load_source(&self, name: String) -> Option<Self::SourceRef> {
+    fn load_source(&self, _name: String) -> Option<Self::SourceRef> {
         panic!("imports are not allowed in parser tests.");
     }
 
-    fn get_source<'a>(&'a self, src_ref: &'a Self::SourceRef) -> &'a str {
+    fn get_source<'a>(&'a self, _src_ref: &'a Self::SourceRef) -> &'a str {
         todo!()
     }
 }
@@ -55,7 +55,8 @@ macro_rules! test {
 				expected_errors: &[$(Message::$e), *]
 			};
 
-			let parser = Parser::new(&handler, 0, Lexer::new(fs::read_to_string(filename).unwrap()));
+			let src = fs::read_to_string(filename).unwrap();
+			let parser = Parser::new(&handler, (), Lexer::new(&src));
 			parser.parse();
 
 			handler.check_errors();
