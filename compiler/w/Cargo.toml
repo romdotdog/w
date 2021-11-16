@@ -1,12 +1,11 @@
 [package]
-name = "w_driver"
+name = "w"
 version = "0.0.0"
 edition = "2018"
 
-
 [[bin]]
 name = "w"
-path = "main.rs"
+path = "src/main.rs"
 test = false
 
 [dependencies]

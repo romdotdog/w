@@ -1,20 +1,16 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use w::Session;
+use w_lexer::Lexer;
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let sess = Session::new();
-    let file = sess.register_source(
-        "fn.w".to_string(),
-        std::fs::read_to_string("benches/fn.w").unwrap(),
-    );
+    let src = std::fs::read_to_string("log10/log10.w").unwrap();
 
     let mut count = 0;
-    for _ in sess.lexer(file) {
+    for _ in Lexer::new(&src) {
         count += 1;
     }
 
     c.bench_function(format!("lexer {} tk", count).as_str(), |b| {
-        b.iter(|| for _ in sess.lexer(black_box(file)) {})
+        b.iter(|| for _ in Lexer::new(black_box(&src)) {})
     });
 }
 

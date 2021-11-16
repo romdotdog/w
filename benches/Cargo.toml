@@ -1,0 +1,18 @@
+[package]
+name = "w_benches"
+version = "0.0.0"
+edition = "2018"
+
+[[bench]]
+name = "log10"
+path = "log10/bench.rs"
+harness = false
+
+[lib]
+path = "lib.rs"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[dependencies]
+w_lexer = { path = "../compiler/w_lexer" }
