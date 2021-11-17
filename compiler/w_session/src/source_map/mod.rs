@@ -1,7 +1,8 @@
 pub mod loader;
+pub mod source;
 use loader::Loader;
 
-use crate::source::Source;
+use source::Source;
 use std::{cell::RefCell, rc::Rc};
 
 pub struct SourceMap<L: Loader> {

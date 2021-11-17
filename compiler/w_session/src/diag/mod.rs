@@ -3,7 +3,7 @@ use std::rc::Rc;
 use w_errors::Message;
 use w_lexer::Span;
 
-use crate::source::Source;
+use crate::source_map::source::Source;
 
 pub mod emitter;
 

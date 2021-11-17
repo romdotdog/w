@@ -15,8 +15,11 @@ use std::iter::FromIterator;
 pub use span::Span;
 pub use token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
 
-pub struct Lexer {
-    stream: <Vec<char> as IntoIterator>::IntoIter,
+pub struct Lexer<I>
+where
+    I: Iterator<Item = char>,
+{
+    stream: I,
 
     buffer: Option<char>,
     token_buffer: Option<(Token, Span)>,
@@ -28,11 +31,13 @@ pub struct Lexer {
     end: usize,
 }
 
-impl Lexer {
-    pub fn new(stream: &str) -> Self {
+impl<I> Lexer<I>
+where
+    I: Iterator<Item = char>,
+{
+    pub fn new(stream: I) -> Self {
         Lexer {
-            // TODO: FIX
-            stream: stream.chars().collect::<Vec<_>>().into_iter(),
+            stream,
 
             buffer: None,
             token_buffer: None,
@@ -407,7 +412,10 @@ fn keyword(s: String) -> Token {
     }
 }
 
-impl Iterator for Lexer {
+impl<I> Iterator for Lexer<I>
+where
+    I: Iterator<Item = char>,
+{
     type Item = Token;
 
     fn next(&mut self) -> Option<Token> {

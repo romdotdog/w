@@ -3,7 +3,11 @@ use w_ast::{Atom, AtomVariant, Type};
 use w_errors::Message;
 use w_lexer::{BinOp, BinOpVariant, Token, UnOp};
 
-impl<'a, H: Handler> Parser<'a, H> {
+impl<'a, H, I> Parser<'a, H, I>
+where
+    H: Handler<LexerInput = I>,
+    I: Iterator<Item = char>,
+{
     fn parse_let(&mut self) -> Option<Atom> {
         let start = self.lex.span();
         let pair = self.ident_type_pair(false)?;

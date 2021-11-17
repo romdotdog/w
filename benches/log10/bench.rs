@@ -2,15 +2,15 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use w_lexer::Lexer;
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let src = std::fs::read_to_string("log10/log10.w").unwrap();
+    let src = std::fs::read_to_string("D:/w/benches/log10/log10.w").unwrap();
 
     let mut count = 0;
-    for _ in Lexer::new(&src) {
+    for _ in Lexer::new(src.chars().collect::<Vec<_>>().into_iter()) {
         count += 1;
     }
 
     c.bench_function(format!("lexer {} tk", count).as_str(), |b| {
-        b.iter(|| for _ in Lexer::new(black_box(&src)) {})
+        b.iter(|| for _ in Lexer::new(black_box(&src).chars()) {})
     });
 }
 

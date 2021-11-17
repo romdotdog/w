@@ -1,16 +1,17 @@
 //use similar::{ChangeTag, TextDiff};
-use std::{cell::RefCell, fs};
+use std::{cell::RefCell, fs, str::Chars};
 
 use w_errors::Message;
 use w_lexer::Lexer;
 use w_parser::{Handler, Parser};
 
-struct ErrorHandler {
-    pub errors: RefCell<Vec<Message>>,
-    pub expected_errors: &'static [Message],
+struct ErrorHandler<'a> {
+    src: Chars<'a>,
+    errors: RefCell<Vec<Message>>,
+    expected_errors: &'static [Message],
 }
 
-impl ErrorHandler {
+impl ErrorHandler<'_> {
     fn check_errors(&self) {
         let errors = self.errors.borrow();
         for i in 0..self.expected_errors.len() {
@@ -27,8 +28,9 @@ impl ErrorHandler {
     }
 }
 
-impl Handler for ErrorHandler {
+impl<'a> Handler for ErrorHandler<'a> {
     type SourceRef = ();
+    type LexerInput = Chars<'a>;
 
     fn error(&self, _src_ref: &Self::SourceRef, msg: Message, _span: w_lexer::Span) {
         self.errors.borrow_mut().push(msg);
@@ -38,8 +40,8 @@ impl Handler for ErrorHandler {
         panic!("imports are not allowed in parser tests.");
     }
 
-    fn get_source<'a>(&'a self, _src_ref: &'a Self::SourceRef) -> &'a str {
-        todo!()
+    fn get_source(&self, _src_ref: &Self::SourceRef) -> Self::LexerInput {
+        self.src.clone()
     }
 }
 
@@ -49,14 +51,14 @@ macro_rules! test {
         fn $f() {
 			let filename = concat!("tests/", stringify!($f), ".w");
             //let fixture = concat!("tests/", stringify!($f), ".fixture.w");
-
+			let src = fs::read_to_string(filename).unwrap();
 			let handler = ErrorHandler {
+				src: src.chars(),
 				errors: RefCell::new(Vec::new()),
 				expected_errors: &[$(Message::$e), *]
 			};
 
-			let src = fs::read_to_string(filename).unwrap();
-			let parser = Parser::new(&handler, (), Lexer::new(&src));
+			let parser = Parser::new(&handler, ());
 			parser.parse();
 
 			handler.check_errors();

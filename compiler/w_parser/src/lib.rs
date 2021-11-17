@@ -8,19 +8,29 @@ mod primaryatom;
 pub use handler::Handler;
 use w_ast::{Atom, AtomVariant, IdentPair, IncDec, Indir, Program, Type, WFn};
 
-pub struct Parser<'a, H: Handler> {
+pub struct Parser<'a, H, I>
+where
+    H: Handler<LexerInput = I>,
+    I: Iterator<Item = char>,
+{
     session: &'a H,
     src_ref: H::SourceRef,
-    lex: Lexer,
+    lex: Lexer<I>,
     token_buffer: Option<Token>,
 }
 
-impl<'a, H: Handler> Parser<'a, H> {
-    pub fn new(session: &'a H, src_ref: H::SourceRef, lex: Lexer) -> Self {
+impl<'a, H, I> Parser<'a, H, I>
+where
+    H: Handler<LexerInput = I>,
+    I: Iterator<Item = char>,
+{
+    pub fn new(session: &'a H, src_ref: H::SourceRef) -> Self {
+        let src = session.get_source(&src_ref);
+
         Parser {
             session,
             src_ref,
-            lex,
+            lex: Lexer::new(src),
             token_buffer: None,
         }
     }

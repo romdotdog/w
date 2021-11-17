@@ -1,3 +1,5 @@
+mod reader;
+pub use reader::SourceReader;
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Clone)]

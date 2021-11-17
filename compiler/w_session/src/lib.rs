@@ -4,16 +4,17 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 pub mod diag;
-pub mod source;
 pub mod source_map;
 
 use diag::emitter::Emitter;
 use diag::Diagnostic;
 use diag::Diagnostics;
-use source::Source;
-use source_map::{loader::Loader, SourceMap};
+use source_map::{
+    loader::Loader,
+    source::{Source, SourceReader},
+    SourceMap,
+};
 use w_errors::Message;
-use w_lexer::Lexer;
 use w_lexer::Span;
 use w_parser::Parser;
 
@@ -30,14 +31,14 @@ impl<L: Loader, E: Emitter> Session<L, E> {
         }
     }
 
-    pub fn parse(&self, src: Rc<Source>) -> Parser<'_, Self> {
-        let lex = Lexer::new(&src.src);
-        Parser::new(self, src, lex)
+    pub fn parse(&self, src: Rc<Source>) -> Parser<'_, Self, SourceReader> {
+        Parser::new(self, src)
     }
 }
 
 impl<L: Loader, E: Emitter> w_parser::Handler for Session<L, E> {
     type SourceRef = Rc<Source>;
+    type LexerInput = SourceReader;
 
     fn error(&self, src_ref: &Self::SourceRef, msg: Message, span: Span) {
         self.diags.borrow_mut().error(Diagnostic {
@@ -52,8 +53,8 @@ impl<L: Loader, E: Emitter> w_parser::Handler for Session<L, E> {
         self.source_map.load_source(name).ok()
     }
 
-    fn get_source<'a>(&'a self, src_ref: &'a Self::SourceRef) -> &'a str {
-        &src_ref.src
+    fn get_source(&self, src_ref: &Self::SourceRef) -> Self::LexerInput {
+        SourceReader::new(Rc::clone(src_ref))
     }
 }
 
