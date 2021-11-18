@@ -2,7 +2,6 @@
 use std::{cell::RefCell, fs, str::Chars};
 
 use w_errors::Message;
-use w_lexer::Lexer;
 use w_parser::{Handler, Parser};
 
 struct ErrorHandler<'a> {
