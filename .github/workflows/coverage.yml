@@ -19,16 +19,17 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all-features --no-fail-fast
+          args: --all-features --no-fail-fast --verbose
         env:
           RUSTFLAGS: "-Zinstrument-coverage"
           RUSTDOCFLAGS: "-Zinstrument-coverage"
           LLVM_PROFILE_FILE: "w-%p-%m.profraw"
-      - id: coverage
-        uses: actions-rs/grcov@v0.1
+      - run: |
+        cargo install grcov
+        grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
       - uses: codecov/codecov-action@v1
         with:
-          files: ${{ steps.coverage.outputs.report }}
+          files: lcov.info
           flags: unittests
           fail_ci_if_error: true
           verbose: true
