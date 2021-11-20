@@ -25,8 +25,8 @@ jobs:
           RUSTDOCFLAGS: "-Zinstrument-coverage"
           LLVM_PROFILE_FILE: "w-%p-%m.profraw"
       - run: |
-        cargo install grcov
-        grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
+          cargo install grcov
+          grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" -o lcov.info
       - uses: codecov/codecov-action@v1
         with:
           files: lcov.info
