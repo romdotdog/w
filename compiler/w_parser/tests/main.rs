@@ -1,5 +1,5 @@
 //use similar::{ChangeTag, TextDiff};
-use std::{cell::RefCell, fs, str::Chars};
+use std::{cell::RefCell, cmp::max, fs, str::Chars};
 
 use w_errors::Message;
 use w_parser::{Handler, Parser};
@@ -13,14 +13,18 @@ struct ErrorHandler<'a> {
 impl ErrorHandler<'_> {
     fn check_errors(&self) {
         let errors = self.errors.borrow();
-        for i in 0..self.expected_errors.len() {
+        let expected_len = self.expected_errors.len();
+        let got_len = errors.len();
+        for i in 0..max(expected_len, got_len) {
             match errors.get(i) {
-                Some(got) => {
-                    let expected = &self.expected_errors[i];
-                    if got != expected {
-                        panic!("expected {}, got {}", expected, got);
+                Some(got) => match self.expected_errors.get(i) {
+                    Some(expected) => {
+                        if got != expected {
+                            panic!("expected {}, got {}", expected, got);
+                        }
                     }
-                }
+                    None => panic!("got extra error: {}", got),
+                },
                 None => panic!("missing error {}", self.expected_errors[i]),
             }
         }
@@ -94,7 +98,7 @@ macro_rules! test {
 test!(literals);
 test!(operations);
 test!(types, TooMuchIndirection);
-test!(controlflow);
+test!(controlflow, MissingSemicolon);
 test!(
     errors,
     MissingSemicolon,

@@ -43,7 +43,7 @@ pub enum AtomVariant {
     Block(Vec<Atom>, Option<BAtom>),
     Let(IdentPair, Option<BAtom>),
     If(BAtom, BAtom, Option<BAtom>),
-    Loop(BAtom, BAtom),
+    Loop(Option<BAtom>, BAtom),
     Return(BAtom),
     Br(Option<BAtom>),
 }

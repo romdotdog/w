@@ -79,7 +79,11 @@ where
 
     fn parse_loop(&mut self) -> Option<Atom> {
         let start = self.lex.span();
-        let initial = Box::new(self.atom()?);
+        let initial = match self.next() {
+            Some(Token::Let) => Some(Box::new(self.parse_let()?)),
+            _ => None,
+        };
+
         let loop_body = Box::new(self.atom()?);
 
         Some(Atom {
