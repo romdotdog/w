@@ -452,7 +452,15 @@ where
 
             self.start = start;
             self.end = end;
-            Some(if is_label { Token::Label(ident) } else { keyword(ident) })
+            Some(if is_label {
+				if ident.len() == 0 {
+					Token::Ident("$".to_owned())
+				} else {
+					Token::Label(ident)
+				}
+			} else {
+				keyword(ident)
+			})
         })
     }
 }

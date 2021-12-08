@@ -7,6 +7,7 @@ fn main() {
 	let mut c = 3;
 	let mut d = 4;
 	let $f = 5; // illegal
+	let $ = 5; // legal
 
 	a > b >= c < d <= e == f != g;
 	a + b - c * d / e % f;
