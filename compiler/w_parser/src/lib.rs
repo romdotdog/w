@@ -71,7 +71,7 @@ where
                             loop {
                                 let t = self.next();
                                 match t {
-                                    Some(Token::RightBracket | Token::Semicolon) => {
+                                    Some(Token::RightBracket) | Some(Token::Semicolon) => {
                                         self.token_buffer = t;
                                         break;
                                     }

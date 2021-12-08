@@ -154,10 +154,10 @@ where
             Some('\'') => Token::Char(c2.unwrap()),
 
             // Errors are idents
-            Some(t) => Token::Ident(String::from_iter(['\'', c2.unwrap(), t])),
+            Some(t) => Token::Ident(String::from_iter(&['\'', c2.unwrap(), t])),
             None => match c2 {
-                Some(t) => Token::Ident(String::from_iter(['\'', t])),
-                None => Token::Ident('\''.into()),
+                Some(t) => Token::Ident(String::from_iter(&['\'', t])),
+                None => Token::Ident("\'".to_owned()),
             },
         }
     }

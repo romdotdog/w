@@ -13,7 +13,7 @@ impl Iterator for SourceReader {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_code_point()
-            .map(|ch| unsafe { char::from_u32_unchecked(ch) })
+            .map(|ch| unsafe { std::char::from_u32_unchecked(ch) })
     }
 }
 
