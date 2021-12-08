@@ -30,6 +30,7 @@ pub enum AtomVariant {
     Integer(i64),
     Float(f64),
     Ident(String),
+	Label(String),
 
     Paren(BAtom),
     BinOp(BAtom, BinOp, BAtom),

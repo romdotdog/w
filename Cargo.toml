@@ -1,2 +1,2 @@
 [workspace]
-members = ["compiler/w", "benches"]
+members = ["compiler/w"]

@@ -32,6 +32,7 @@ pub enum Token {
     String(String),
     Char(char),
     Ident(String),
+	Label(String)
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]

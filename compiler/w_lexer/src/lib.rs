@@ -429,9 +429,12 @@ where
         let c = self.skip_comments()?;
 
         self.try_tk_bip(c).or_else(|| {
-            let mut ident = c.to_string();
-            let start = self.p;
+			let start = self.p;
             let mut end = start + 1;
+
+			let is_label = c == '$'; 
+            let mut ident = if is_label { String::new() } else { c.to_string() };
+            
 
             while let Some(c2) = self.nextc() {
                 if c2.is_whitespace() {
@@ -449,7 +452,7 @@ where
 
             self.start = start;
             self.end = end;
-            Some(keyword(ident))
+            Some(if is_label { Token::Label(ident) } else { keyword(ident) })
         })
     }
 }

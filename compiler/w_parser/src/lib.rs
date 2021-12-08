@@ -156,20 +156,27 @@ where
         };
 
         let ident = match t {
-            Some(Token::Ident(s)) => {
-                t = self.next();
-                s
-            }
-            Some(Token::Colon) => {
-                self.error(Message::MissingIdentifier, self.lex.span());
-                "unknown".to_owned()
-            }
-            _ => {
-                t = self.next();
-                self.error(Message::MalformedIdentifier, self.lex.span());
-                "unknown".to_owned()
-            }
-        };
+			Some(Token::Colon) => {
+				self.error(Message::MissingIdentifier, self.lex.span());
+            "<unknown>".to_owned()
+			}
+			tt => {
+				t = self.next();
+				match tt {
+					Some(Token::Ident(s)) => {
+						s
+					}
+					Some(Token::Label(s)) => {
+						self.error(Message::LabelIsNotIdentifier, self.lex.span());
+						format!("${}", s)
+					}
+					_ => {
+						self.error(Message::MalformedIdentifier, self.lex.span());
+						"<unknown>".to_owned()
+					}
+				}
+			}
+		};
 
         let t = match t {
             Some(Token::Colon) => self.parse_type()?,

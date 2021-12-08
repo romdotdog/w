@@ -96,7 +96,7 @@ macro_rules! test {
 }
 
 test!(literals);
-test!(operations);
+test!(operations, LabelIsNotIdentifier);
 test!(types, TooMuchIndirection);
 test!(controlflow, MissingSemicolon);
 test!(
