@@ -8,14 +8,14 @@ where
     H: Handler<LexerInput = I>,
     I: Iterator<Item = char>,
 {
-    fn parse_let(&mut self) -> Option<Atom> {
+    pub(crate) fn parse_let(&mut self) -> Option<Atom> {
         let start = self.lex.span();
         let pair = self.ident_type_pair(false)?;
 
         let rhs = match self.next() {
             Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => Some(Box::new(self.atom()?)),
             t => {
-                self.token_buffer = t;
+                self.backtrack(t);
                 None
             }
         };
@@ -37,14 +37,14 @@ where
             t1 => {
                 match t1 {
                     Some(Token::UnOp(UnOp::LNot)) => op = UnOp::Reinterpret,
-                    t => self.token_buffer = t,
+                    t => self.backtrack(t),
                 }
 
                 match self.next() {
                     Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => {}
                     t => {
                         self.error(Message::MissingClosingAngleBracket, self.lex.span());
-                        self.token_buffer = t;
+                        self.backtrack(t);
                         return None;
                     }
                 }
@@ -58,53 +58,49 @@ where
         })
     }
 
-    fn parse_if(&mut self) -> Option<Atom> {
-        let start = self.lex.span();
-        let cond = Box::new(self.atom()?);
-        let body = Box::new(self.atom()?);
-        let mut else_body = None;
-        match self.next() {
-            Some(Token::Else) => {
-                else_body = Some(Box::new(self.atom()?));
-            }
-            t => self.token_buffer = t,
-        }
-
-        Some(Atom {
-            t: Type::auto(),
-            v: AtomVariant::If(cond, body, else_body),
-            span: start.to(self.lex.span()),
-        })
-    }
-
-    fn parse_loop(&mut self) -> Option<Atom> {
-        let start = self.lex.span();
-        let initial = match self.next() {
-            Some(Token::Let) => Some(Box::new(self.parse_let()?)),
-            _ => None,
-        };
-
-        let loop_body = Box::new(self.atom()?);
-
-        Some(Atom {
-            t: Type::auto(),
-            v: AtomVariant::Loop(initial, loop_body),
-            span: start.to(self.lex.span()),
-        })
-    }
-
     fn parse_br(&mut self) -> Option<Atom> {
         let start = self.lex.span();
 
+        let mut t = self.next();
+        let ret = if t == Some(Token::Arrow) {
+            None
+        } else {
+            t = self.next();
+            Some(Box::new(self.atom()?))
+        };
+
+        let label = if t == Some(Token::Arrow) {
+            t = self.next();
+            match t {
+                Some(Token::Label(x)) => {
+                    t = self.next();
+                    x
+                }
+                Some(Token::Ident(x)) => {
+                    self.error(Message::IdentifierIsNotLabel, self.lex.span());
+                    t = self.next();
+                    format!("${}", x)
+                }
+                _ => {
+                    self.error(Message::MissingLabel, self.lex.span());
+                    "<unknown>".to_owned()
+                }
+            }
+        } else {
+            self.error(Message::MissingLabel, self.lex.span());
+            "<unknown>".to_owned()
+        };
+
+        let cond = if t == Some(Token::If) {
+            Some(Box::new(self.atom()?))
+        } else {
+            self.backtrack(t);
+            None
+        };
+
         Some(Atom {
             t: Type::auto(),
-            v: AtomVariant::Br(match self.next() {
-                Some(Token::If) => Some(Box::new(self.atom()?)),
-                t => {
-                    self.token_buffer = t;
-                    None
-                }
-            }),
+            v: AtomVariant::Br(ret, label, cond),
             span: start.to(self.lex.span()),
         })
     }
@@ -131,12 +127,11 @@ where
         })
     }
 
-    pub fn primaryatom(&mut self) -> Option<Atom> {
+    pub(crate) fn primaryatom(&mut self) -> Option<Atom> {
         match self.next() {
             Some(Token::Let) => self.parse_let(),
             Some(Token::BinOp(BinOp::Regular(BinOpVariant::Lt))) => self.parse_cast(),
-            Some(Token::If) => self.parse_if(),
-            Some(Token::Loop) => self.parse_loop(),
+
             Some(Token::Br) => self.parse_br(),
             Some(Token::Return) => self.parse_ret(),
 

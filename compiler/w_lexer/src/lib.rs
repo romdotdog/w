@@ -247,13 +247,14 @@ where
                     }
 
                     ('+', Some('+')) => {
-                        // Please don't
                         op!(@unary Inc)
                     }
 
                     ('-', Some('-')) => {
                         op!(@unary Dec)
                     }
+
+                    ('-', Some('>')) => Token::Arrow,
 
                     ('+', _) => {
                         self.backtrack(c2);
@@ -429,12 +430,15 @@ where
         let c = self.skip_comments()?;
 
         self.try_tk_bip(c).or_else(|| {
-			let start = self.p;
+            let start = self.p;
             let mut end = start + 1;
 
-			let is_label = c == '$'; 
-            let mut ident = if is_label { String::new() } else { c.to_string() };
-            
+            let is_label = c == '$';
+            let mut ident = if is_label {
+                String::new()
+            } else {
+                c.to_string()
+            };
 
             while let Some(c2) = self.nextc() {
                 if c2.is_whitespace() {
@@ -453,14 +457,14 @@ where
             self.start = start;
             self.end = end;
             Some(if is_label {
-				if ident.len() == 0 {
-					Token::Ident("$".to_owned())
-				} else {
-					Token::Label(ident)
-				}
-			} else {
-				keyword(ident)
-			})
+                if ident.is_empty() {
+                    Token::Ident("$".to_owned())
+                } else {
+                    Token::Label(ident)
+                }
+            } else {
+                keyword(ident)
+            })
         })
     }
 }

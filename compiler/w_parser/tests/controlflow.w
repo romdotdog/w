@@ -3,9 +3,15 @@ fn main() {
 	if 0 "bad" else "good";
 
 	// i will be in the inner scope
-	loop let i = 0 {
-		br if ++i < 10;
-		br;
+	$hi: loop let i = 0 {
+		br -> $hi if ++i < 10;
+		br -> $hi;
+	};
+
+	loop let i = 0 {};
+
+	$hi2: {
+		br -> $hi2;
 	};
 
 	// error: need semicolon after 1

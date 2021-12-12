@@ -30,7 +30,7 @@ pub enum AtomVariant {
     Integer(i64),
     Float(f64),
     Ident(String),
-	Label(String),
+    Label(String),
 
     Paren(BAtom),
     BinOp(BAtom, BinOp, BAtom),
@@ -41,12 +41,14 @@ pub enum AtomVariant {
     Access(BAtom, String),
     Index(BAtom, BAtom),
 
-    Block(Vec<Atom>, Option<BAtom>),
+    Block(Option<String>, Vec<Atom>, Option<BAtom>),
+    Loop(Option<String>, Option<BAtom>, BAtom),
+
     Let(IdentPair, Option<BAtom>),
     If(BAtom, BAtom, Option<BAtom>),
-    Loop(Option<BAtom>, BAtom),
+
     Return(BAtom),
-    Br(Option<BAtom>),
+    Br(Option<BAtom>, String, Option<BAtom>),
 }
 
 pub struct IdentPair {

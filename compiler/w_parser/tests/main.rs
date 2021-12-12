@@ -2,11 +2,13 @@
 use std::{cell::RefCell, cmp::max, fs, str::Chars};
 
 use w_errors::Message;
+use w_lexer::Span;
 use w_parser::{Handler, Parser};
+use w_utils::{LineCol, LineColResult};
 
 struct ErrorHandler<'a> {
-    src: Chars<'a>,
-    errors: RefCell<Vec<Message>>,
+    src: &'a LineCol,
+    errors: RefCell<Vec<(Message, Span)>>,
     expected_errors: &'static [Message],
 }
 
@@ -17,15 +19,19 @@ impl ErrorHandler<'_> {
         let got_len = errors.len();
         for i in 0..max(expected_len, got_len) {
             match errors.get(i) {
-                Some(got) => match self.expected_errors.get(i) {
-                    Some(expected) => {
-                        if got != expected {
-                            panic!("expected {}, got {}", expected, got);
+                Some((got, span)) => {
+                    let LineColResult { line, col, .. } = self.src.line_col(span.start);
+
+                    match self.expected_errors.get(i) {
+                        Some(expected) => {
+                            if got != expected {
+                                panic!("{}:{}: expected '{}', got '{}'", line, col, expected, got,);
+                            }
                         }
+                        None => panic!("{}:{}: got extra error '{}'", line, col, got,),
                     }
-                    None => panic!("got extra error: {}", got),
-                },
-                None => panic!("missing error {}", self.expected_errors[i]),
+                }
+                None => panic!("missing error '{}'", self.expected_errors[i]),
             }
         }
     }
@@ -35,8 +41,8 @@ impl<'a> Handler for ErrorHandler<'a> {
     type SourceRef = ();
     type LexerInput = Chars<'a>;
 
-    fn error(&self, _src_ref: &Self::SourceRef, msg: Message, _span: w_lexer::Span) {
-        self.errors.borrow_mut().push(msg);
+    fn error(&self, _src_ref: &Self::SourceRef, msg: Message, span: Span) {
+        self.errors.borrow_mut().push((msg, span));
     }
 
     fn load_source(&self, _name: String) -> Option<Self::SourceRef> {
@@ -44,7 +50,7 @@ impl<'a> Handler for ErrorHandler<'a> {
     }
 
     fn get_source(&self, _src_ref: &Self::SourceRef) -> Self::LexerInput {
-        self.src.clone()
+        self.src.src.chars()
     }
 }
 
@@ -54,9 +60,9 @@ macro_rules! test {
         fn $f() {
 			let filename = concat!("tests/", stringify!($f), ".w");
             //let fixture = concat!("tests/", stringify!($f), ".fixture.w");
-			let src = fs::read_to_string(filename).unwrap();
+			let src = LineCol::new(fs::read_to_string(filename).unwrap());
 			let handler = ErrorHandler {
-				src: src.chars(),
+				src: &src,
 				errors: RefCell::new(Vec::new()),
 				expected_errors: &[$(Message::$e), *]
 			};
@@ -98,19 +104,7 @@ macro_rules! test {
 test!(literals);
 test!(operations, LabelIsNotIdentifier);
 test!(types, TooMuchIndirection);
-test!(controlflow, MissingSemicolon);
-test!(
-    errors,
-    MissingSemicolon,
-    MissingClosingParen,
-    MissingType,
-    MissingClosingAngleBracket,
-    InvalidTopLevel,
-    MalformedIdentifier,
-    MalformedType,
-    MissingIdentifier,
-    MissingClosingBracket
-);
+test!(controlflow, LoopBodyBlock, MissingSemicolon);
 test!(
     postfix,
     MissingIdentifier,

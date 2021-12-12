@@ -1,12 +1,12 @@
-use std::cmp::Ordering;
 use w_errors::Message;
-use w_lexer::{AmbiguousOp, BinOp, Lexer, Span, Token, UnOp};
+use w_lexer::{AmbiguousOp, BinOp, Lexer, Span, Token};
 
 mod handler;
 mod primaryatom;
+mod simpleatom;
 
 pub use handler::Handler;
-use w_ast::{Atom, AtomVariant, IdentPair, IncDec, Indir, Program, Type, WFn};
+use w_ast::{Atom, AtomVariant, IdentPair, Indir, Program, Type, WFn};
 
 pub struct Parser<'a, H, I>
 where
@@ -39,74 +39,16 @@ where
         self.token_buffer.take().or_else(|| self.lex.next())
     }
 
-    pub fn error(&self, msg: Message, span: Span) {
+    pub(crate) fn error(&self, msg: Message, span: Span) {
         self.session.error(&self.src_ref, msg, span);
     }
 
-    pub fn block(&mut self) -> Option<Atom> {
-        let mut r = Vec::new();
-        let start = self.lex.span();
-
-        let mut last = None;
-
-        loop {
-            if let Some(t) = last.take() {
-                r.push(t);
-            }
-
-            match self.next() {
-                Some(Token::RightBracket) => {
-                    last = None;
-                    break;
-                }
-                None => {}
-                t => {
-                    self.token_buffer = t;
-
-                    let a = self.atom();
-                    match a {
-                        Some(_) => last = a,
-                        None => {
-                            // panic!!
-                            loop {
-                                let t = self.next();
-                                match t {
-                                    Some(Token::RightBracket) | Some(Token::Semicolon) => {
-                                        self.token_buffer = t;
-                                        break;
-                                    }
-                                    None => break,
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            let err_span = self.lex.span();
-
-            match self.next() {
-                Some(Token::RightBracket) => break,
-                Some(Token::Semicolon) => {}
-                None => {
-                    self.error(Message::MissingClosingBracket, err_span);
-                    break;
-                }
-                t => {
-                    // try to continue
-                    self.error(Message::MissingSemicolon, err_span);
-                    self.token_buffer = t;
-                }
-            }
-        }
-
-        let span = start.to(self.lex.span());
-        Some(Atom {
-            t: last.as_ref().map_or_else(Type::void, |a| a.t),
-            v: AtomVariant::Block(r, last.map(Box::new)),
-            span,
-        })
+    pub(crate) fn backtrack(&mut self, t: Option<Token>) {
+        assert!(
+            self.token_buffer.is_none(),
+            "double backtrack is not allowed"
+        );
+        self.token_buffer = t;
     }
 
     fn parse_type(&mut self) -> Option<Type> {
@@ -115,19 +57,16 @@ where
         loop {
             match self.next() {
                 Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => {
-                    match len.partial_cmp(&5).unwrap() {
-                        Ordering::Less => {
-                            indir = indir.add(match self.next() {
-                                Some(Token::Mut) => true,
-                                t => {
-                                    self.token_buffer = t;
-                                    false
-                                }
-                            });
-                        }
-                        Ordering::Equal | Ordering::Greater => {
-                            self.error(Message::TooMuchIndirection, self.lex.span());
-                        }
+                    if len < 5 {
+                        indir = indir.add(match self.next() {
+                            Some(Token::Mut) => true,
+                            t => {
+                                self.backtrack(t);
+                                false
+                            }
+                        });
+                    } else {
+                        self.error(Message::TooMuchIndirection, self.lex.span());
                     }
                     len += 1;
                 }
@@ -156,32 +95,30 @@ where
         };
 
         let ident = match t {
-			Some(Token::Colon) => {
-				self.error(Message::MissingIdentifier, self.lex.span());
-            "<unknown>".to_owned()
-			}
-			tt => {
-				t = self.next();
-				match tt {
-					Some(Token::Ident(s)) => {
-						s
-					}
-					Some(Token::Label(s)) => {
-						self.error(Message::LabelIsNotIdentifier, self.lex.span());
-						format!("${}", s)
-					}
-					_ => {
-						self.error(Message::MalformedIdentifier, self.lex.span());
-						"<unknown>".to_owned()
-					}
-				}
-			}
-		};
+            Some(Token::Colon) => {
+                self.error(Message::MissingIdentifier, self.lex.span());
+                "<unknown>".to_owned()
+            }
+            tt => {
+                t = self.next();
+                match tt {
+                    Some(Token::Ident(s)) => s,
+                    Some(Token::Label(s)) => {
+                        self.error(Message::LabelIsNotIdentifier, self.lex.span());
+                        format!("${}", s)
+                    }
+                    _ => {
+                        self.error(Message::MalformedIdentifier, self.lex.span());
+                        "<unknown>".to_owned()
+                    }
+                }
+            }
+        };
 
         let t = match t {
             Some(Token::Colon) => self.parse_type()?,
             t => {
-                self.token_buffer = t;
+                self.backtrack(t);
 
                 if require_type {
                     self.error(Message::MissingType, self.lex.span());
@@ -195,160 +132,6 @@ where
         Some(IdentPair { mutable, ident, t })
     }
 
-    fn postfixatom(&mut self, mut lhs: Atom) -> Option<Atom> {
-        loop {
-            match self.next() {
-                Some(Token::UnOp(UnOp::Dec)) => {
-                    lhs = Atom {
-                        span: lhs.span.to(self.lex.span()),
-                        v: AtomVariant::PostIncDec(Box::new(lhs), IncDec::Dec),
-                        t: Type::auto(),
-                    }
-                }
-
-                Some(Token::UnOp(UnOp::Inc)) => {
-                    lhs = Atom {
-                        span: lhs.span.to(self.lex.span()),
-                        v: AtomVariant::PostIncDec(Box::new(lhs), IncDec::Inc),
-                        t: Type::auto(),
-                    }
-                }
-
-                Some(Token::Period) => {
-                    let period_span = self.lex.span();
-                    match self.next() {
-                        Some(Token::Ident(s)) => {
-                            lhs = Atom {
-                                span: lhs.span.to(self.lex.span()),
-                                v: AtomVariant::Access(Box::new(lhs), s),
-                                t: Type::auto(),
-                            }
-                        }
-                        t => {
-                            self.token_buffer = t;
-                            self.error(Message::MissingIdentifier, period_span.move_by(1));
-                            return None;
-                        }
-                    }
-                }
-
-                Some(Token::LeftSqBracket) => {
-                    let atom = self.atom()?;
-
-                    match self.next() {
-                        Some(Token::RightSqBracket) => {
-                            lhs = Atom {
-                                span: lhs.span.to(self.lex.span()),
-                                v: AtomVariant::Index(Box::new(lhs), Box::new(atom)),
-                                t: Type::auto(),
-                            }
-                        }
-                        t => {
-                            self.token_buffer = t;
-                            self.error(Message::MissingClosingSqBracket, self.lex.span());
-                            return None;
-                        }
-                    }
-                }
-
-                Some(Token::LeftParen) => {
-                    let mut args = Vec::new();
-
-                    match self.next() {
-                        Some(Token::RightParen) => {}
-                        t => {
-                            self.token_buffer = t;
-                            // TODO: remove
-
-                            loop {
-                                args.push(self.atom()?);
-
-                                match self.next() {
-                                    Some(Token::Comma) => {}
-                                    Some(Token::RightParen) => break,
-                                    t => {
-                                        self.token_buffer = t;
-                                        self.error(Message::MissingClosingParen, self.lex.span());
-                                        return None;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    lhs = Atom {
-                        span: lhs.span.to(self.lex.span()),
-                        v: AtomVariant::Call(Box::new(lhs), args),
-                        t: Type::auto(),
-                    }
-                }
-
-                t => {
-                    self.token_buffer = t;
-                    break;
-                }
-            }
-        }
-
-        Some(lhs)
-    }
-
-    fn simpleatom(&mut self, t: Option<Token>) -> Option<Atom> {
-        let lhs = match t {
-            Some(Token::LeftParen) => {
-                let start = self.lex.span();
-                let e = self.atom()?;
-
-                match self.next() {
-                    Some(Token::RightParen) => {}
-                    t => {
-                        self.token_buffer = t;
-                        self.error(Message::MissingClosingParen, self.lex.span());
-                        return None;
-                    }
-                }
-
-                Atom {
-                    t: e.t,
-                    v: AtomVariant::Paren(Box::new(e)),
-                    span: start.to(self.lex.span()),
-                }
-            }
-            Some(Token::Float(f)) => Atom {
-                v: AtomVariant::Float(f),
-                span: self.lex.span(),
-                t: Type::auto(),
-            },
-            Some(Token::Integer(i)) => Atom {
-                v: AtomVariant::Integer(i),
-                span: self.lex.span(),
-                t: Type::auto(),
-            },
-            Some(Token::Ident(s)) => Atom {
-                v: AtomVariant::Ident(s),
-                span: self.lex.span(),
-                t: Type::auto(),
-            },
-            Some(Token::String(s)) => Atom {
-                v: AtomVariant::String(s),
-                span: self.lex.span(),
-                t: Type::auto(),
-            },
-            Some(Token::Char(s)) => Atom {
-                v: AtomVariant::Char(s),
-                span: self.lex.span(),
-                t: Type::auto(),
-            },
-            Some(Token::LeftBracket) => self.block()?,
-            _ => {
-                self.error(Message::UnexpectedToken, self.lex.span());
-                return None;
-            }
-        };
-
-        self.postfixatom(lhs)
-    }
-
     fn subatom(&mut self, mut lhs: Atom, min_prec: u8) -> Option<Atom> {
         // https://en.wikipedia.org/wiki/Operator-precedence_parser
         let mut l = self.next();
@@ -357,7 +140,7 @@ where
                 Some(Token::BinOp(t)) => t,
                 Some(Token::AmbiguousOp(ref t)) => BinOp::Regular(t.binary()),
                 _ => {
-                    self.token_buffer = l;
+                    self.backtrack(l);
                     break;
                 }
             };
@@ -387,7 +170,7 @@ where
                     };
 
                     if cond {
-                        self.token_buffer = l;
+                        self.backtrack(l);
                         rhs = self.subatom(rhs, next_prec)?;
                         l = self.next();
                     } else {
@@ -401,7 +184,7 @@ where
                     t: Type::auto(),
                 };
             } else {
-                self.token_buffer = l;
+                self.backtrack(l);
                 break;
             }
         }
@@ -417,7 +200,7 @@ where
         let name = match self.next() {
             Some(Token::Ident(s)) => s,
             t => {
-                self.token_buffer = t;
+                self.backtrack(t);
                 return None;
             }
         };
@@ -425,7 +208,7 @@ where
         match self.next() {
             Some(Token::LeftParen) => {}
             t => {
-                self.token_buffer = t;
+                self.backtrack(t);
                 return None;
             }
         }
@@ -435,7 +218,7 @@ where
         match self.next() {
             Some(Token::RightParen) => {}
             t => {
-                self.token_buffer = t;
+                self.backtrack(t);
                 // TODO: remove
 
                 loop {
@@ -444,7 +227,7 @@ where
                         Some(Token::Comma) => {}
                         Some(Token::RightParen) => break,
                         t => {
-                            self.token_buffer = t;
+                            self.backtrack(t);
                             self.error(Message::MissingClosingParen, self.lex.span());
                             return None;
                         }
@@ -456,7 +239,7 @@ where
         let t = match self.next() {
             Some(Token::Colon) => self.parse_type()?,
             t => {
-                self.token_buffer = t;
+                self.backtrack(t);
                 Type::void()
             }
         };
@@ -476,7 +259,7 @@ where
             let t = self.next();
             match t {
                 None | Some(Token::Fn) => {
-                    self.token_buffer = t;
+                    self.backtrack(t);
                     break;
                 }
                 _ => {}

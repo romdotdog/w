@@ -26,7 +26,7 @@ impl SourceReader {
     }
 
     fn next_code_point(&mut self) -> Option<u32> {
-        let bytes = self.src.src.as_bytes();
+        let bytes = self.src.src().as_bytes();
 
         macro_rules! next {
             () => {{

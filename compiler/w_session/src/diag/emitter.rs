@@ -1,3 +1,5 @@
+use w_utils::LineColResult;
+
 use super::Diagnostic;
 
 pub trait Emitter {
@@ -11,6 +13,7 @@ impl Emitter for DefaultEmitter {
     fn emit_errors(self, errors: Vec<Diagnostic>) {
         for error in errors {
             let src = &error.source;
+            let content = src.src();
             let start_pos = error.span.start;
             let end_pos = error.span.end;
 
@@ -22,8 +25,13 @@ impl Emitter for DefaultEmitter {
                 error.msg
             );
 
-            let (line, column, (start_of_line, end_of_line)) = src.line_col(start_pos);
-            let spaces = src.src[start_of_line..start_pos]
+            let LineColResult {
+                line,
+                col,
+                start_of_line,
+                end_of_line,
+            } = src.line_col(start_pos);
+            let spaces = content[start_of_line..start_pos]
                 .chars()
                 .map(|c| if c.is_whitespace() { c } else { ' ' })
                 .collect::<String>();
@@ -32,9 +40,9 @@ impl Emitter for DefaultEmitter {
                 "\x1b[1m{}:{}:{}: \x1b[91merror:\x1b[0m {}\n{}\n{}\x1b[91m\x1b[1m{}\x1b[0m",
                 src.name,
                 line,
-                column,
+                col,
                 error.msg,
-                src.src[start_of_line..end_of_line].trim_end(),
+                content[start_of_line..end_of_line].trim_end(),
                 spaces,
                 "^".repeat(end_pos - start_pos),
             );
