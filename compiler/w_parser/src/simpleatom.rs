@@ -27,22 +27,15 @@ where
                 None => {}
                 t => {
                     self.backtrack(t);
-
-                    let a = self.atom();
-                    match a {
-                        Some(_) => last = a,
+                    match self.atom() {
+                        Some(a) => last = Some(a),
                         None => {
                             // panic!!
                             loop {
                                 let t = self.next();
                                 match t {
-                                    Some(Token::RightBracket) => {
-                                        break 'm;
-                                    }
-                                    Some(Token::Semicolon) => {
-                                        continue 'm;
-                                    }
-                                    None => break 'm,
+                                    Some(Token::Semicolon) => continue 'm,
+                                    Some(Token::RightBracket) | None => break 'm,
                                     _ => {}
                                 }
                             }
