@@ -105,6 +105,7 @@ test!(literals);
 test!(operations, LabelIsNotIdentifier);
 test!(types, TooMuchIndirection);
 test!(controlflow, LoopBodyBlock, MissingSemicolon);
+test!(structs);
 test!(
     postfix,
     MissingIdentifier,

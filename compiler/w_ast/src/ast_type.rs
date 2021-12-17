@@ -1,6 +1,6 @@
-use crate::Indir;
+use crate::{IdentPair, Indir};
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Type {
     pub v: TypeVariant,
     pub indir: Indir,
@@ -27,7 +27,7 @@ impl Type {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum TypeVariant {
     Auto,
     Void,
@@ -37,6 +37,9 @@ pub enum TypeVariant {
     U64,
     F32,
     F64,
+	Struct(Vec<IdentPair>),
+	Union(Vec<IdentPair>),
+	Unresolved(String)
 }
 
 impl From<String> for TypeVariant {
@@ -49,7 +52,7 @@ impl From<String> for TypeVariant {
             "f32" => TypeVariant::F32,
             "f64" => TypeVariant::F64,
             "void" => TypeVariant::Void,
-            _ => todo!(),
+            _ => TypeVariant::Unresolved(s),
         }
     }
 }

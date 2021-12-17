@@ -63,7 +63,7 @@ where
 
         let span = start.to(self.lex.span());
         Atom {
-            t: last.as_ref().map_or_else(Type::void, |a| a.t),
+            t: Type::auto(),
             v: AtomVariant::Block(label, r, last.map(Box::new)),
             span,
         }
@@ -223,7 +223,7 @@ where
                 }
 
                 Atom {
-                    t: e.t,
+                    t: Type::auto(),
                     v: AtomVariant::Paren(Box::new(e)),
                     span: start.to(self.lex.span()),
                 }

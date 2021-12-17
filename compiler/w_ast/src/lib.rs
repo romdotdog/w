@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use w_lexer::{BinOp, Span, UnOp};
 
 mod ast_type;
@@ -8,6 +9,8 @@ pub use indir::Indir;
 
 pub struct Program {
     pub fns: Vec<WFn>,
+	pub structs: HashMap<String, Vec<IdentPair>>,
+	pub unions: HashMap<String, Vec<IdentPair>>,
 }
 
 pub struct WFn {
@@ -51,6 +54,7 @@ pub enum AtomVariant {
     Br(Option<BAtom>, String, Option<BAtom>),
 }
 
+#[derive(Clone)]
 pub struct IdentPair {
     pub mutable: bool,
     pub ident: String,

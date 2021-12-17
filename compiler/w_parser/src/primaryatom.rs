@@ -110,7 +110,7 @@ where
         let e = self.atom()?;
 
         Some(Atom {
-            t: e.t,
+            t: Type::auto(),
             v: AtomVariant::Return(Box::new(e)),
             span: start.to(self.lex.span()),
         })
@@ -121,7 +121,7 @@ where
         let e = self.primaryatom()?;
 
         Some(Atom {
-            t: e.t,
+            t: Type::auto(),
             v: AtomVariant::UnOp(u, Box::new(e)),
             span: start.to(self.lex.span()),
         })
