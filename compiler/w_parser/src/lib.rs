@@ -52,32 +52,32 @@ where
         self.token_buffer = t;
     }
 
-	fn type_body(&mut self, allow_no_trailing_semi: bool) -> Option<Vec<IdentPair>> {
-		if let Some(Token::LeftBracket) = self.next() {
-			let mut v = Vec::new();
+    fn type_body(&mut self, allow_no_trailing_semi: bool) -> Option<Vec<IdentPair>> {
+        if let Some(Token::LeftBracket) = self.next() {
+            let mut v = Vec::new();
 
-			loop {
-				match self.next() {
-					Some(Token::RightBracket) => break,
-					t => self.backtrack(t),
-				}
+            loop {
+                match self.next() {
+                    Some(Token::RightBracket) => break,
+                    t => self.backtrack(t),
+                }
 
-				// TODO: add panic behavior
-				v.push(self.ident_type_pair(true)?);
+                // TODO: add panic behavior
+                v.push(self.ident_type_pair(true)?);
 
-				match self.next() {
-					Some(Token::Semicolon) => {}
-					Some(Token::RightBracket) if allow_no_trailing_semi => break,
-					_ => self.error(Message::MissingSemicolon, self.lex.span())
-				}
-			}
+                match self.next() {
+                    Some(Token::Semicolon) => {}
+                    Some(Token::RightBracket) if allow_no_trailing_semi => break,
+                    _ => self.error(Message::MissingSemicolon, self.lex.span()),
+                }
+            }
 
-			Some(v)
-		} else {
-			self.error(Message::MissingOpeningBracket, self.lex.span());
-			None
-		}
-	}
+            Some(v)
+        } else {
+            self.error(Message::MissingOpeningBracket, self.lex.span());
+            None
+        }
+    }
 
     fn parse_type(&mut self) -> Option<Type> {
         let mut indir = Indir::none();
@@ -101,12 +101,18 @@ where
                 Some(Token::Ident(s)) => {
                     return Some(Type::with_indir(s.into(), indir));
                 }
-				Some(Token::Struct) => {
-					return Some(Type::with_indir(TypeVariant::Struct(self.type_body(true)?), indir));
-				}
-				Some(Token::Union) => {
-					return Some(Type::with_indir(TypeVariant::Union(self.type_body(true)?), indir));
-				}
+                Some(Token::Struct) => {
+                    return Some(Type::with_indir(
+                        TypeVariant::Struct(self.type_body(true)?),
+                        indir,
+                    ));
+                }
+                Some(Token::Union) => {
+                    return Some(Type::with_indir(
+                        TypeVariant::Union(self.type_body(true)?),
+                        indir,
+                    ));
+                }
                 _ => {
                     self.error(Message::MalformedType, self.lex.span());
                     return None;
@@ -303,45 +309,49 @@ where
 
     pub fn parse(mut self) -> Program {
         let mut fns = Vec::new();
-		let mut structs = HashMap::new();
-		let mut unions = HashMap::new();
+        let mut structs = HashMap::new();
+        let mut unions = HashMap::new();
         while let Some(t) = self.next() {
-			match t {
-				Token::Fn => match self.function() {
+            match t {
+                Token::Fn => match self.function() {
                     Some(f) => fns.push(f),
                     None => self.panic_top_level(),
-                }
-				Token::Struct | Token::Union => {
-					let name = match self.next() {
-						Some(Token::Ident(s)) => s,
-						Some(Token::LeftBracket) => {
-							self.backtrack(Some(Token::LeftBracket));
-							self.error(Message::MissingIdentifier, self.lex.span());
-							"<unknown>".to_owned()
-						}
-						_ => {
-							self.error(Message::MalformedIdentifier, self.lex.span());
-							"<unknown>".to_owned()
-						}
-					};
+                },
+                Token::Struct | Token::Union => {
+                    let name = match self.next() {
+                        Some(Token::Ident(s)) => s,
+                        Some(Token::LeftBracket) => {
+                            self.backtrack(Some(Token::LeftBracket));
+                            self.error(Message::MissingIdentifier, self.lex.span());
+                            "<unknown>".to_owned()
+                        }
+                        _ => {
+                            self.error(Message::MalformedIdentifier, self.lex.span());
+                            "<unknown>".to_owned()
+                        }
+                    };
 
-					match self.type_body(false) {
-						Some(b) if t == Token::Struct => {
-							structs.insert(name, b);
-						}
-						Some(b) => { 
-							unions.insert(name, b); 
-						}
-						None => self.panic_top_level()
-					}
-				}
-				_ => {
-					self.error(Message::InvalidTopLevel, self.lex.span());
-					self.panic_top_level();
-				}
-			}
+                    match self.type_body(false) {
+                        Some(b) if t == Token::Struct => {
+                            structs.insert(name, b);
+                        }
+                        Some(b) => {
+                            unions.insert(name, b);
+                        }
+                        None => self.panic_top_level(),
+                    }
+                }
+                _ => {
+                    self.error(Message::InvalidTopLevel, self.lex.span());
+                    self.panic_top_level();
+                }
+            }
         }
 
-        Program { fns, structs, unions }
+        Program {
+            fns,
+            structs,
+            unions,
+        }
     }
 }

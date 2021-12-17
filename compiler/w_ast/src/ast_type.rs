@@ -37,9 +37,9 @@ pub enum TypeVariant {
     U64,
     F32,
     F64,
-	Struct(Vec<IdentPair>),
-	Union(Vec<IdentPair>),
-	Unresolved(String)
+    Struct(Vec<IdentPair>),
+    Union(Vec<IdentPair>),
+    Unresolved(String),
 }
 
 impl From<String> for TypeVariant {

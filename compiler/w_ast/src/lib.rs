@@ -9,8 +9,8 @@ pub use indir::Indir;
 
 pub struct Program {
     pub fns: Vec<WFn>,
-	pub structs: HashMap<String, Vec<IdentPair>>,
-	pub unions: HashMap<String, Vec<IdentPair>>,
+    pub structs: HashMap<String, Vec<IdentPair>>,
+    pub unions: HashMap<String, Vec<IdentPair>>,
 }
 
 pub struct WFn {

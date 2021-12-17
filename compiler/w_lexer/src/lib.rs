@@ -409,8 +409,8 @@ fn keyword(s: String) -> Token {
         "mut" => Token::Mut,
         "loop" => Token::Loop,
         "br" => Token::Br,
-		"struct" => Token::Struct,
-		"union" => Token::Union,
+        "struct" => Token::Struct,
+        "union" => Token::Union,
         _ => Token::Ident(s),
     }
 }

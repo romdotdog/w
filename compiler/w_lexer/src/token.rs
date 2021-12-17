@@ -5,8 +5,8 @@ pub enum Token {
     If,
     Loop,
     Let,
-	Struct,
-	Union,
+    Struct,
+    Union,
 
     Else,
     Mut,
