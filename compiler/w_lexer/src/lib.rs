@@ -125,15 +125,11 @@ where
                             t => self.backtrack(t),
                         }
                     } else {
-                        // TODO: Figure out the semantics of this
                         res.push(match header_char {
                             't' => '\t',
                             'r' => '\r',
                             'n' => '\n',
-                            _ => {
-                                // is not an escape
-                                header_char
-                            }
+                            _ => header_char, // is not an escape
                         });
                     }
                 }
@@ -148,17 +144,37 @@ where
         res
     }
 
+    fn parse_ident(&mut self, ident: &mut String) {
+        while let Some(c2) = self.nextc() {
+            if c2.is_whitespace() {
+                break;
+            }
+
+            if let Some(t) = self.try_tk_aip(c2) {
+                self.token_buffer = Some(t);
+                break;
+            }
+
+            ident.push(c2);
+        }
+    }
+
     fn parse_char(&mut self) -> Token {
         let c2 = self.nextc();
         match self.nextc() {
             Some('\'') => Token::Char(c2.unwrap()),
-
-            // Errors are idents
-            Some(t) => Token::Ident(String::from_iter(&['\'', c2.unwrap(), t])),
-            None => match c2 {
-                Some(t) => Token::Ident(String::from_iter(&['\'', t])),
-                None => Token::Ident("\'".to_owned()),
-            },
+            t => {
+                // Errors are idents
+                let mut ident = match t {
+                    Some(t) => String::from_iter(&['\'', c2.unwrap(), t]),
+                    None => match c2 {
+                        Some(t) => String::from_iter(&['\'', t]),
+                        None => "\'".to_string(),
+                    },
+                };
+                self.parse_ident(&mut ident);
+                Token::Ident(ident)
+            }
         }
     }
 
@@ -279,55 +295,44 @@ where
     fn try_bip(&mut self, c: char) -> Option<Token> {
         Some(match c {
             '.' | '0'..='9' => {
-                #[derive(PartialEq)]
-                enum Floatable {
-                    Maybe,
-                    True,
-                    False,
-                }
-
-                let mut float = if c == '.' {
-                    Floatable::True
-                } else {
-                    Floatable::Maybe
-                };
-
+                let mut num = c.to_string();
                 let mut radix = 10_u8;
+
                 if c == '0' {
                     let t = self.nextc();
                     match t {
                         Some(header_char) => {
                             if let Some(radix_) = char_to_radix(header_char) {
-                                float = Floatable::False;
                                 radix = radix_;
                             } else {
                                 self.backtrack(t);
                             }
                         }
-                        _ => self.backtrack(t),
+                        None => return Some(Token::Integer(0)),
                     }
                 }
 
-                let mut num = c.to_string();
                 self.skip_digits(&mut num, radix.into());
 
-                match self.nextc() {
-                    Some('.') if c != '.' => {
-                        if float == Floatable::False {
-                            panic!("floats in different radix are not supported");
+                let seen_period = if c == '.' {
+                    true
+                } else if radix == 10_u8 {
+                    match self.nextc() {
+                        Some('.') => {
+                            num.push('.');
+                            self.skip_digits(&mut num, 10);
+                            true
                         }
-
-                        float = Floatable::True;
-
-                        num.push('.');
-                        self.skip_digits(&mut num, 10);
+                        t => {
+                            self.backtrack(t);
+                            false
+                        }
                     }
-                    t => {
-                        self.backtrack(t);
-                    }
-                }
+                } else {
+                    false
+                };
 
-                if float == Floatable::True {
+                if seen_period {
                     Token::Float(num.parse::<f64>().unwrap())
                 } else {
                     let num = u64::from_str_radix(&num, radix.into()).unwrap();
@@ -442,22 +447,10 @@ where
                 c.to_string()
             };
 
-            while let Some(c2) = self.nextc() {
-                if c2.is_whitespace() {
-                    break;
-                }
-
-                end = self.p;
-                if let Some(t) = self.try_tk_aip(c2) {
-                    self.token_buffer = Some(t);
-                    break;
-                }
-
-                ident.push(c2);
-            }
+            self.parse_ident(&mut ident);
 
             self.start = start;
-            self.end = end;
+            self.end = self.p;
             Some(if is_label {
                 if ident.is_empty() {
                     Token::Ident("$".to_owned())
