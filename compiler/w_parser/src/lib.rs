@@ -165,22 +165,20 @@ where
                     }
                     len += 1;
                 }
-                // TODO: deduplicate struct and union
-                Some(Token::Struct) => {
+                Some(ref ch @ (Token::Union | Token::Struct)) => {
+                    let is_struct = ch == &Token::Struct;
                     self.next();
                     let body = self.type_body(true)?;
                     let end = body.1.end;
                     return Some(Spanned(
-                        Type::with_indir(TypeVariant::Struct(body), indir),
-                        Span::new(start, end),
-                    ));
-                }
-                Some(Token::Union) => {
-                    self.next();
-                    let body = self.type_body(true)?;
-                    let end = body.1.end;
-                    return Some(Spanned(
-                        Type::with_indir(TypeVariant::Union(body), indir),
+                        Type::with_indir(
+                            if is_struct {
+                                TypeVariant::Struct(body)
+                            } else {
+                                TypeVariant::Union(body)
+                            },
+                            indir,
+                        ),
                         Span::new(start, end),
                     ));
                 }
@@ -438,8 +436,8 @@ where
                     Some(f) => fns.push(f),
                     None => self.panic_top_level(false),
                 },
-                // TODO: deduplicate struct and union
-                Some(Token::Struct) => {
+                Some(ref ch @ (Token::Struct | Token::Union)) => {
+                    let is_struct = ch == &Token::Struct;
                     let start = self.start;
                     let struct_pos = self.end;
                     self.next();
@@ -473,53 +471,16 @@ where
                         },
                     };
 
-                    match self.type_body(false) {
-                        Some(fields) => {
-                            let end = fields.1.end;
+                    if let Some(fields) = self.type_body(false) {
+                        let end = fields.1.end;
+                        if is_struct {
                             structs.push(Spanned(WStruct { name, fields }, Span::new(start, end)));
-                        }
-                        None => self.panic_top_level(true),
-                    }
-                }
-                Some(Token::Union) => {
-                    let start = self.start;
-                    let struct_pos = self.end;
-                    self.next();
-                    let name = match self.tk {
-                        Some(Token::LeftBracket) => {
-                            // union  {
-                            //      ^
-
-                            let pos = struct_pos + 1;
-                            let span = Span::new(pos, pos + 1);
-                            self.error(Message::MissingIdentifier, span);
-                            Spanned("<unknown>".to_owned(), span)
-                        }
-                        _ => match self.take() {
-                            Some(Token::Ident(s)) => {
-                                // union ident {
-                                //       ^^^^^
-                                let span = self.span();
-                                self.next(); // fill
-                                Spanned(s, span)
-                            }
-                            _ => {
-                                // union ! {
-                                //       ^
-                                let span = self.span();
-                                self.next(); // fill
-                                self.error(Message::MalformedIdentifier, span);
-                                Spanned("<unknown>".to_owned(), span)
-                            }
-                        },
-                    };
-
-                    match self.type_body(false) {
-                        Some(fields) => {
-                            let end = fields.1.end;
+                        } else {
                             unions.push(Spanned(WUnion { name, fields }, Span::new(start, end)));
                         }
-                        None => self.panic_top_level(true),
+                    } else {
+                        self.panic_top_level(true);
+                        continue;
                     }
                 }
                 Some(_) => {

@@ -1,10 +1,6 @@
 /*
-    TODO:
-    * Refactor
-
-    Terminology:
-        BIP - Below Ident Priority
-        AIP - Above Ident Priority
+    BIP - Below Ident Priority
+    AIP - Above Ident Priority
 */
 
 mod span;
@@ -171,7 +167,6 @@ where
     }
 
     fn try_aip(&mut self, c: char) -> Option<Token> {
-        // TODO: Refactor for code size
         macro_rules! op {
             (@ambiguous $t: ident) => {{
                 let amb = AmbiguousOp::$t;
