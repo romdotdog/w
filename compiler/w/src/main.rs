@@ -13,7 +13,7 @@ USAGE:
 w [OPTIONS] INPUT
 
 DESCRIPTION:
-w is a compiler toolchain that emits optimized WebAssembly with a contemporary C-like syntax.
+w is a compiler toolchain that emits optimized WebAssembly with a contemporary Rust-like syntax, and C-like semantics.
 to learn more please visit https://github.com/romdotdog/w
 
 OPTIONS:
