@@ -16,7 +16,7 @@ where
         let mut r = Vec::new();
         let mut last = None;
 
-        'm: loop {
+        let end = 'm: loop {
             if let Some(t) = last.take() {
                 r.push(t);
             }
@@ -24,8 +24,10 @@ where
             match self.tk {
                 Some(Token::RightBracket) => {
                     last = None;
+
+                    let _end = self.end;
                     self.next();
-                    break;
+                    break _end;
                 }
                 None => {}
                 _ => {
@@ -40,8 +42,9 @@ where
                                         continue 'm;
                                     }
                                     Some(Token::RightBracket) | None => {
+                                        let _end = self.end;
                                         self.next();
-                                        break 'm;
+                                        break 'm _end;
                                     }
                                     _ => self.next(),
                                 }
@@ -53,13 +56,15 @@ where
 
             match self.tk {
                 Some(Token::RightBracket) => {
+                    let _end = self.end;
                     self.next();
-                    break;
+                    break _end;
                 }
                 Some(Token::Semicolon) => self.next(),
                 None => {
-                    self.error(Message::MissingClosingBracket, Span::new(start, self.end));
-                    break;
+                    let _end = self.end;
+                    self.error(Message::MissingClosingBracket, Span::new(start, _end));
+                    break _end;
                 }
                 _ => {
                     // try to continue
@@ -67,11 +72,11 @@ where
                     self.error(Message::MissingSemicolon, self.span());
                 }
             }
-        }
+        };
 
         Spanned(
             Atom::Block(label, r, last.map(Box::new)),
-            Span::new(start, self.end),
+            Span::new(start, end),
         )
     }
 
@@ -94,17 +99,18 @@ where
             Box::new(a)
         };
 
+        let end = loop_body.1.end;
         Some(Spanned(
             Atom::Loop(label, initial, loop_body),
-            Span::new(start, self.end),
+            Span::new(start, end),
         ))
     }
 
     fn postfixatom(&mut self, mut lhs: Spanned<Atom>) -> Option<Spanned<Atom>> {
+        let start = lhs.1.start;
         loop {
             match self.tk {
                 Some(Token::UnOp(UnOp::Dec)) => {
-                    let start = lhs.1.start;
                     lhs = Spanned(
                         Atom::PostIncDec(Box::new(lhs), IncDec::Dec),
                         Span::new(start, self.end),
@@ -113,7 +119,6 @@ where
                 }
 
                 Some(Token::UnOp(UnOp::Inc)) => {
-                    let start = lhs.1.start;
                     lhs = Spanned(
                         Atom::PostIncDec(Box::new(lhs), IncDec::Inc),
                         Span::new(start, self.end),
@@ -125,7 +130,6 @@ where
                     self.next();
                     match self.take() {
                         Some(Token::Ident(s)) => {
-                            let start = lhs.1.start;
                             lhs = Spanned(
                                 Atom::Access(Box::new(lhs), Spanned(s, self.span())),
                                 Span::new(start, self.end),
@@ -147,7 +151,6 @@ where
 
                     match self.tk {
                         Some(Token::RightSqBracket) => {
-                            let start = lhs.1.start;
                             lhs = Spanned(
                                 Atom::Index(Box::new(lhs), Box::new(atom)),
                                 Span::new(start, self.end),
@@ -167,26 +170,23 @@ where
                     let mut args = Vec::new();
 
                     match self.tk {
-                        Some(Token::RightParen) => self.next(),
+                        Some(Token::RightParen) => break,
                         _ => loop {
                             args.push(self.atom()?);
 
                             match self.tk {
                                 Some(Token::Comma) => self.next(),
-                                Some(Token::RightParen) => {
-                                    self.next();
-                                    break;
-                                }
+                                Some(Token::RightParen) => break,
                                 _ => {
                                     self.error(Message::MissingClosingParen, self.span());
                                     return None;
                                 }
                             }
                         },
-                    }
+                    };
 
-                    let start = lhs.1.start;
                     lhs = Spanned(Atom::Call(Box::new(lhs), args), Span::new(start, self.end));
+                    self.next(); // skip paren
                 }
 
                 _ => break,
@@ -203,17 +203,21 @@ where
 
         let cond = Box::new(self.atom()?);
         let body = Box::new(self.atom()?);
+
+        let mut end = body.1.end;
         let else_body = match self.tk {
             Some(Token::Else) => {
                 self.next();
-                Some(Box::new(self.atom()?))
+                let a = self.atom()?;
+                end = a.1.end;
+                Some(Box::new(a))
             }
             _ => None,
         };
 
         Some(Spanned(
             Atom::If(cond, body, else_body),
-            Span::new(start, self.end),
+            Span::new(start, end),
         ))
     }
 

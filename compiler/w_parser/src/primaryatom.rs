@@ -14,15 +14,18 @@ where
         self.next();
 
         let pair = self.ident_type_pair(false)?;
+        let mut end = pair.1.end;
         let rhs = match self.tk {
             Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
                 self.next();
-                Some(Box::new(self.atom()?))
+                let atom = self.atom()?;
+                end = atom.1.end;
+                Some(Box::new(atom))
             }
             _ => None,
         };
 
-        Some(Spanned(Atom::Let(pair, rhs), Span::new(start, self.end)))
+        Some(Spanned(Atom::Let(pair, rhs), Span::new(start, end)))
     }
 
     fn parse_cast(&mut self) -> Option<Spanned<Atom>> {
@@ -54,9 +57,11 @@ where
             }
         };
 
+        let atom = self.primaryatom()?;
+        let end = atom.1.end;
         Some(Spanned(
-            Atom::Cast(t, Box::new(self.primaryatom()?), is_reinterpret),
-            Span::new(start, self.end),
+            Atom::Cast(t, Box::new(atom), is_reinterpret),
+            Span::new(start, end),
         ))
     }
 
@@ -101,18 +106,18 @@ where
             }
         };
 
+        let mut end = label.1.end;
         let cond = match self.tk {
             Some(Token::If) => {
                 self.next();
-                Some(Box::new(self.atom()?))
+                let atom = self.atom()?;
+                end = atom.1.end;
+                Some(Box::new(atom))
             }
             _ => None,
         };
 
-        Some(Spanned(
-            Atom::Br(ret, label, cond),
-            Span::new(start, self.end),
-        ))
+        Some(Spanned(Atom::Br(ret, label, cond), Span::new(start, end)))
     }
 
     fn parse_ret(&mut self) -> Option<Spanned<Atom>> {
@@ -121,24 +126,18 @@ where
         debug_assert_eq!(self.tk, Some(Token::Return));
         self.next();
 
-        let e = self.atom()?;
-
-        Some(Spanned(
-            Atom::Return(Box::new(e)),
-            Span::new(start, self.end),
-        ))
+        let a = self.atom()?;
+        let end = a.1.end;
+        Some(Spanned(Atom::Return(Box::new(a)), Span::new(start, end)))
     }
 
     fn unop(&mut self, u: UnOp) -> Option<Spanned<Atom>> {
         let start = self.start;
         self.next();
 
-        let e = self.primaryatom()?;
-
-        Some(Spanned(
-            Atom::UnOp(u, Box::new(e)),
-            Span::new(start, self.end),
-        ))
+        let a = self.primaryatom()?;
+        let end = a.1.end;
+        Some(Spanned(Atom::UnOp(u, Box::new(a)), Span::new(start, end)))
     }
 
     pub(crate) fn primaryatom(&mut self) -> Option<Spanned<Atom>> {

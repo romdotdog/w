@@ -152,13 +152,14 @@ where
                             asterisk_overflow_start = Some(self.start);
                         }
 
+                        let end = self.end;
                         self.next();
 
                         match self.tk {
                             Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => {}
                             _ => self.error(
                                 Message::TooMuchIndirection,
-                                Span::new(asterisk_overflow_start.unwrap(), self.end),
+                                Span::new(asterisk_overflow_start.unwrap(), end),
                             ),
                         }
                     }
@@ -185,10 +186,11 @@ where
                 }
                 _ => match self.take() {
                     Some(Token::Ident(s)) => {
+                        let end = self.end;
                         self.next();
                         return Some(Spanned(
                             Type::with_indir(s.into(), indir),
-                            Span::new(start, self.end),
+                            Span::new(start, end),
                         ));
                     }
                     t => {
