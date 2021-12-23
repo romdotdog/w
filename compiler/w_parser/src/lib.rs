@@ -261,7 +261,6 @@ where
                     //          ^
                     let pos = ident.1.end + 1;
                     self.error(Message::MissingType, Span::new(pos, pos + 1));
-                    return None;
                 }
                 None
             }
@@ -332,8 +331,14 @@ where
                 self.next(); // fill
                 Spanned(s, span)
             }
-            tk => {
+            tk @ Some(Token::LeftParen) => {
+                // TODO: span
                 self.error(Message::MissingIdentifier, self.span());
+                self.fill(tk);
+                return None;
+            }
+            tk => {
+                self.error(Message::MalformedIdentifier, self.span());
                 self.fill(tk);
                 return None;
             }
@@ -445,7 +450,6 @@ where
 
                             let pos = struct_pos + 1;
                             let span = Span::new(pos, pos + 1);
-                            self.next();
                             self.error(Message::MissingIdentifier, span);
                             Spanned("<unknown>".to_owned(), span)
                         }
@@ -488,7 +492,6 @@ where
 
                             let pos = struct_pos + 1;
                             let span = Span::new(pos, pos + 1);
-                            self.next();
                             self.error(Message::MissingIdentifier, span);
                             Spanned("<unknown>".to_owned(), span)
                         }
