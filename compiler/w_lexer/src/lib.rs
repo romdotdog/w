@@ -12,6 +12,7 @@ mod token;
 
 use std::iter::FromIterator;
 
+use phf::{phf_map, phf_set};
 pub use span::Span;
 pub use token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
 
@@ -20,15 +21,10 @@ where
     I: Iterator<Item = char>,
 {
     stream: I,
-
     buffer: Option<char>,
-    token_buffer: Option<(Token, Span)>,
-
     skip_first: bool,
-    p: usize,
-
-    start: usize,
-    end: usize,
+    done: bool,
+    pos: usize,
 }
 
 impl<I> Lexer<I>
@@ -38,20 +34,11 @@ where
     pub fn new(stream: I) -> Self {
         Lexer {
             stream,
-
             buffer: None,
-            token_buffer: None,
-
             skip_first: false,
-            p: 0,
-
-            start: 0,
-            end: 0,
+            done: false,
+            pos: 0,
         }
-    }
-
-    pub fn span(&self) -> Span {
-        Span::new(self.start, self.end)
     }
 
     fn try_take_equals(&mut self) -> bool {
@@ -145,13 +132,18 @@ where
     }
 
     fn parse_ident(&mut self, ident: &mut String) {
+        const START_OF_TOKEN: phf::Set<char> = phf_set! {
+            ':', ';', ',', '.', '{', '}', '(', ')', '[', ']', '*', '/', '%',
+            '^', '&', '|', '~', '\'', '"', '>', '<', '=', '!', '+', '-'
+        };
+
         while let Some(c2) = self.nextc() {
             if c2.is_whitespace() {
                 break;
             }
 
-            if let Some(t) = self.try_tk_aip(c2) {
-                self.token_buffer = Some(t);
+            if START_OF_TOKEN.contains(&c2) {
+                self.backtrack(Some(c2));
                 break;
             }
 
@@ -213,7 +205,6 @@ where
             ':' => Token::Colon,
             ';' => Token::Semicolon,
             ',' => Token::Comma,
-            '.' => Token::Period,
             '{' => Token::LeftBracket,
             '}' => Token::RightBracket,
             '(' => Token::LeftParen,
@@ -262,30 +253,20 @@ where
                         op!(@unary LNot)
                     }
 
-                    ('+', Some('+')) => {
-                        op!(@unary Inc)
-                    }
-
-                    ('-', Some('-')) => {
-                        op!(@unary Dec)
-                    }
-
-                    ('-', Some('>')) => Token::Arrow,
-
+                    ('+', Some('+')) => op!(@unary Inc),
                     ('+', _) => {
                         self.backtrack(c2);
                         op!(@ambiguous Plus)
                     }
 
+                    ('-', Some('-')) => op!(@unary Dec),
+                    ('-', Some('>')) => Token::Arrow,
                     ('-', _) => {
                         self.backtrack(c2);
                         op!(@ambiguous Minus)
                     }
 
-                    (_, _) => {
-                        self.backtrack(c2);
-                        return None;
-                    }
+                    (_, _) => panic!(),
                 }
             }
             _ => return None,
@@ -295,7 +276,20 @@ where
     fn try_bip(&mut self, c: char) -> Option<Token> {
         Some(match c {
             '.' | '0'..='9' => {
-                let mut num = c.to_string();
+                let mut num = if c == '.' {
+                    match self.nextc() {
+                        Some(n @ '0'..='9') => {
+                            format!("0.{}", n)
+                        }
+                        ch => {
+                            self.backtrack(ch);
+                            return Some(Token::Period);
+                        }
+                    }
+                } else {
+                    c.to_string()
+                };
+
                 let mut radix = 10_u8;
 
                 if c == '0' {
@@ -332,6 +326,18 @@ where
                     false
                 };
 
+                match self.nextc() {
+                    Some('E' | 'e') if radix == 10_u8 => {
+                        match self.nextc() {
+                            Some(ch @ ('+' | '-')) => num.push(ch),
+                            ch @ Some(_) => self.backtrack(ch),
+                            None => todo!(),
+                        }
+                        self.skip_digits(&mut num, 10);
+                    }
+                    ch => self.backtrack(ch),
+                }
+
                 if seen_period {
                     Token::Float(num.parse::<f64>().unwrap())
                 } else {
@@ -343,29 +349,20 @@ where
         })
     }
 
-    fn try_tk_aip(&mut self, c: char) -> Option<(Token, Span)> {
-        let start = self.p;
-        let r = self.try_aip(c);
-        let end = self.p + 1;
-        r.map(|t| (t, Span::new(start, end)))
-    }
-
     fn try_tk_bip(&mut self, c: char) -> Option<Token> {
-        self.start = self.p;
-        let r = self.try_bip(c);
-        self.end = self.p + 1;
-        r
+        let t = self.try_bip(c)?;
+        Some(t)
     }
 
     fn nextc(&mut self) -> Option<char> {
-        self.p += self.skip_first as usize;
+        self.pos += self.skip_first as usize;
         self.skip_first = true;
         self.buffer.take().or_else(|| self.stream.next())
     }
 
     fn backtrack(&mut self, t: Option<char>) {
         self.buffer = t;
-        self.p -= 1;
+        self.pos -= 1;
     }
 
     /// returns the first non-comment character
@@ -404,19 +401,23 @@ where
     }
 }
 
+const KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
+    "fn" => Token::Fn,
+    "return" => Token::Return,
+    "if" => Token::If,
+    "else" => Token::Else,
+    "let" => Token::Let,
+    "mut" => Token::Mut,
+    "loop" => Token::Loop,
+    "br" => Token::Br,
+    "struct" => Token::Struct,
+    "union" => Token::Union,
+};
+
 fn keyword(s: String) -> Token {
-    match s.as_str() {
-        "fn" => Token::Fn,
-        "return" => Token::Return,
-        "if" => Token::If,
-        "else" => Token::Else,
-        "let" => Token::Let,
-        "mut" => Token::Mut,
-        "loop" => Token::Loop,
-        "br" => Token::Br,
-        "struct" => Token::Struct,
-        "union" => Token::Union,
-        _ => Token::Ident(s),
+    match KEYWORDS.get(s.as_str()) {
+        Some(t) => t.clone(),
+        None => Token::Ident(s),
     }
 }
 
@@ -424,43 +425,43 @@ impl<I> Iterator for Lexer<I>
 where
     I: Iterator<Item = char>,
 {
-    type Item = Token;
+    type Item = (Token, usize, usize);
 
-    fn next(&mut self) -> Option<Token> {
-        if let Some((token, span)) = self.token_buffer.take() {
-            self.start = span.start;
-            self.end = span.end;
-
-            return Some(token);
+    fn next(&mut self) -> Option<(Token, usize, usize)> {
+        if self.done {
+            return None;
         }
 
-        let c = self.skip_comments()?;
+        let c = if let Some(c) = self.skip_comments() {
+            c
+        } else {
+            self.done = true;
+            return None;
+        };
 
-        self.try_tk_bip(c).or_else(|| {
-            let start = self.p;
-            let mut end = start + 1;
-
-            let is_label = c == '$';
-            let mut ident = if is_label {
-                String::new()
-            } else {
-                c.to_string()
-            };
-
-            self.parse_ident(&mut ident);
-
-            self.start = start;
-            self.end = self.p;
-            Some(if is_label {
-                if ident.is_empty() {
-                    Token::Ident("$".to_owned())
+        let start = self.pos;
+        self.try_tk_bip(c)
+            .or_else(|| {
+                let is_label = c == '$';
+                let mut ident = if is_label {
+                    String::new()
                 } else {
-                    Token::Label(ident)
-                }
-            } else {
-                keyword(ident)
+                    c.to_string()
+                };
+
+                self.parse_ident(&mut ident);
+
+                Some(if is_label {
+                    if ident.is_empty() {
+                        Token::Ident("$".to_owned())
+                    } else {
+                        Token::Label(ident)
+                    }
+                } else {
+                    keyword(ident)
+                })
             })
-        })
+            .map(|t| (t, start, self.pos + 1))
     }
 }
 

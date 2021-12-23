@@ -1,17 +1,19 @@
 use super::{Handler, Parser};
-use w_ast::{Atom, AtomVariant, IncDec, Type};
+use w_ast::{Atom, IncDec, Spanned};
 use w_errors::Message;
-use w_lexer::{Token, UnOp};
+use w_lexer::{Span, Token, UnOp};
 
 impl<'a, H, I> Parser<'a, H, I>
 where
     H: Handler<LexerInput = I>,
     I: Iterator<Item = char>,
 {
-    pub(crate) fn parse_block(&mut self, label: Option<String>) -> Atom {
-        let mut r = Vec::new();
-        let start = self.lex.span();
+    pub(crate) fn parse_block(&mut self, label: Option<Spanned<String>>) -> Spanned<Atom> {
+        let start = self.start;
+        debug_assert_eq!(self.tk, Some(Token::LeftBracket));
+        self.next();
 
+        let mut r = Vec::new();
         let mut last = None;
 
         'm: loop {
@@ -19,24 +21,29 @@ where
                 r.push(t);
             }
 
-            match self.next() {
+            match self.tk {
                 Some(Token::RightBracket) => {
                     last = None;
+                    self.next();
                     break;
                 }
                 None => {}
-                t => {
-                    self.backtrack(t);
+                _ => {
                     match self.atom() {
                         Some(a) => last = Some(a),
                         None => {
                             // panic!!
                             loop {
-                                let t = self.next();
-                                match t {
-                                    Some(Token::Semicolon) => continue 'm,
-                                    Some(Token::RightBracket) | None => break 'm,
-                                    _ => {}
+                                match self.tk {
+                                    Some(Token::Semicolon) => {
+                                        self.next();
+                                        continue 'm;
+                                    }
+                                    Some(Token::RightBracket) | None => {
+                                        self.next();
+                                        break 'm;
+                                    }
+                                    _ => self.next(),
                                 }
                             }
                         }
@@ -44,248 +51,246 @@ where
                 }
             }
 
-            let err_span = self.lex.span();
-
-            match self.next() {
-                Some(Token::RightBracket) => break,
-                Some(Token::Semicolon) => {}
-                None => {
-                    self.error(Message::MissingClosingBracket, err_span);
+            match self.tk {
+                Some(Token::RightBracket) => {
+                    self.next();
                     break;
                 }
-                t => {
+                Some(Token::Semicolon) => self.next(),
+                None => {
+                    self.error(Message::MissingClosingBracket, Span::new(start, self.end));
+                    break;
+                }
+                _ => {
                     // try to continue
-                    self.error(Message::MissingSemicolon, err_span);
-                    self.backtrack(t);
+                    println!("eoa at: {:?}", self.tk);
+                    self.error(Message::MissingSemicolon, self.span());
                 }
             }
         }
 
-        let span = start.to(self.lex.span());
-        Atom {
-            t: Type::auto(),
-            v: AtomVariant::Block(label, r, last.map(Box::new)),
-            span,
-        }
+        Spanned(
+            Atom::Block(label, r, last.map(Box::new)),
+            Span::new(start, self.end),
+        )
     }
 
-    pub(crate) fn parse_loop(&mut self, label: Option<String>) -> Option<Atom> {
-        let start = self.lex.span();
-        let initial = match self.next() {
+    pub(crate) fn parse_loop(&mut self, label: Option<Spanned<String>>) -> Option<Spanned<Atom>> {
+        let start = self.start;
+        debug_assert_eq!(self.tk, Some(Token::Loop));
+        self.next();
+
+        let initial = match self.tk {
             Some(Token::Let) => Some(Box::new(self.parse_let()?)),
             _ => None,
         };
 
         let loop_body = {
             let a = self.atom()?;
-            match a.v {
-                AtomVariant::Block(..) => {}
-                _ => self.error(Message::LoopBodyBlock, a.span),
+            match a.0 {
+                Atom::Block(..) => {}
+                _ => self.error(Message::LoopBodyBlock, a.1),
             }
             Box::new(a)
         };
 
-        Some(Atom {
-            t: Type::auto(),
-            v: AtomVariant::Loop(label, initial, loop_body),
-            span: start.to(self.lex.span()),
-        })
+        Some(Spanned(
+            Atom::Loop(label, initial, loop_body),
+            Span::new(start, self.end),
+        ))
     }
 
-    fn postfixatom(&mut self, mut lhs: Atom) -> Option<Atom> {
+    fn postfixatom(&mut self, mut lhs: Spanned<Atom>) -> Option<Spanned<Atom>> {
         loop {
-            match self.next() {
+            match self.tk {
                 Some(Token::UnOp(UnOp::Dec)) => {
-                    lhs = Atom {
-                        span: lhs.span.to(self.lex.span()),
-                        v: AtomVariant::PostIncDec(Box::new(lhs), IncDec::Dec),
-                        t: Type::auto(),
-                    }
+                    let start = lhs.1.start;
+                    lhs = Spanned(
+                        Atom::PostIncDec(Box::new(lhs), IncDec::Dec),
+                        Span::new(start, self.end),
+                    );
+                    self.next();
                 }
 
                 Some(Token::UnOp(UnOp::Inc)) => {
-                    lhs = Atom {
-                        span: lhs.span.to(self.lex.span()),
-                        v: AtomVariant::PostIncDec(Box::new(lhs), IncDec::Inc),
-                        t: Type::auto(),
-                    }
+                    let start = lhs.1.start;
+                    lhs = Spanned(
+                        Atom::PostIncDec(Box::new(lhs), IncDec::Inc),
+                        Span::new(start, self.end),
+                    );
+                    self.next();
                 }
 
                 Some(Token::Period) => {
-                    let period_span = self.lex.span();
-                    match self.next() {
+                    self.next();
+                    match self.take() {
                         Some(Token::Ident(s)) => {
-                            lhs = Atom {
-                                span: lhs.span.to(self.lex.span()),
-                                v: AtomVariant::Access(Box::new(lhs), s),
-                                t: Type::auto(),
-                            }
+                            let start = lhs.1.start;
+                            lhs = Spanned(
+                                Atom::Access(Box::new(lhs), Spanned(s, self.span())),
+                                Span::new(start, self.end),
+                            );
+                            self.next(); // fill
                         }
-                        t => {
-                            self.backtrack(t);
-                            self.error(Message::MissingIdentifier, period_span.move_by(1));
+                        tk => {
+                            // TODO: review
+                            self.fill(tk); // fill
+                            self.error(Message::MissingIdentifier, self.span());
                             return None;
                         }
                     }
                 }
 
                 Some(Token::LeftSqBracket) => {
+                    self.next();
                     let atom = self.atom()?;
 
-                    match self.next() {
+                    match self.tk {
                         Some(Token::RightSqBracket) => {
-                            lhs = Atom {
-                                span: lhs.span.to(self.lex.span()),
-                                v: AtomVariant::Index(Box::new(lhs), Box::new(atom)),
-                                t: Type::auto(),
-                            }
+                            let start = lhs.1.start;
+                            lhs = Spanned(
+                                Atom::Index(Box::new(lhs), Box::new(atom)),
+                                Span::new(start, self.end),
+                            );
+                            self.next();
                         }
-                        t => {
-                            self.backtrack(t);
-                            self.error(Message::MissingClosingSqBracket, self.lex.span());
+                        _ => {
+                            // TODO: review
+                            self.error(Message::MissingClosingSqBracket, self.span());
                             return None;
                         }
                     }
                 }
 
                 Some(Token::LeftParen) => {
+                    self.next();
                     let mut args = Vec::new();
 
-                    match self.next() {
-                        Some(Token::RightParen) => {}
-                        t => {
-                            self.backtrack(t);
-                            // TODO: remove
+                    match self.tk {
+                        Some(Token::RightParen) => self.next(),
+                        _ => loop {
+                            args.push(self.atom()?);
 
-                            loop {
-                                args.push(self.atom()?);
-
-                                match self.next() {
-                                    Some(Token::Comma) => {}
-                                    Some(Token::RightParen) => break,
-                                    t => {
-                                        self.backtrack(t);
-                                        self.error(Message::MissingClosingParen, self.lex.span());
-                                        return None;
-                                    }
+                            match self.tk {
+                                Some(Token::Comma) => self.next(),
+                                Some(Token::RightParen) => {
+                                    self.next();
+                                    break;
+                                }
+                                _ => {
+                                    self.error(Message::MissingClosingParen, self.span());
+                                    return None;
                                 }
                             }
-                        }
+                        },
                     }
 
-                    lhs = Atom {
-                        span: lhs.span.to(self.lex.span()),
-                        v: AtomVariant::Call(Box::new(lhs), args),
-                        t: Type::auto(),
-                    }
+                    let start = lhs.1.start;
+                    lhs = Spanned(Atom::Call(Box::new(lhs), args), Span::new(start, self.end));
                 }
 
-                t => {
-                    self.backtrack(t);
-                    break;
-                }
+                _ => break,
             }
         }
 
         Some(lhs)
     }
 
-    fn parse_if(&mut self) -> Option<Atom> {
-        let start = self.lex.span();
+    fn parse_if(&mut self) -> Option<Spanned<Atom>> {
+        let start = self.start;
+        debug_assert_eq!(self.tk, Some(Token::If));
+        self.next();
+
         let cond = Box::new(self.atom()?);
         let body = Box::new(self.atom()?);
-        let else_body = match self.next() {
-            Some(Token::Else) => Some(Box::new(self.atom()?)),
-            t => {
-                self.backtrack(t);
-                None
+        let else_body = match self.tk {
+            Some(Token::Else) => {
+                self.next();
+                Some(Box::new(self.atom()?))
             }
+            _ => None,
         };
 
-        Some(Atom {
-            t: Type::auto(),
-            v: AtomVariant::If(cond, body, else_body),
-            span: start.to(self.lex.span()),
-        })
+        Some(Spanned(
+            Atom::If(cond, body, else_body),
+            Span::new(start, self.end),
+        ))
     }
 
-    pub(crate) fn simpleatom(&mut self, t: Option<Token>) -> Option<Atom> {
-        let lhs = match t {
+    pub(crate) fn simpleatom(&mut self) -> Option<Spanned<Atom>> {
+        let lhs = match self.tk {
             Some(Token::LeftParen) => {
-                let start = self.lex.span();
+                let start = self.start;
+                self.next();
+
                 let e = self.atom()?;
 
-                let t = self.next();
-                if t != Some(Token::RightParen) {
-                    self.backtrack(t);
-                    self.error(Message::MissingClosingParen, self.lex.span());
-                    return None;
+                if self.tk != Some(Token::RightParen) {
+                    self.error(Message::MissingClosingParen, self.span());
                 }
 
-                Atom {
-                    t: Type::auto(),
-                    v: AtomVariant::Paren(Box::new(e)),
-                    span: start.to(self.lex.span()),
-                }
+                let span = Span::new(start, self.end);
+                self.next();
+                Spanned(Atom::Paren(Box::new(e)), span)
             }
-            Some(Token::Float(f)) => Atom {
-                v: AtomVariant::Float(f),
-                span: self.lex.span(),
-                t: Type::auto(),
-            },
-            Some(Token::Integer(i)) => Atom {
-                v: AtomVariant::Integer(i),
-                span: self.lex.span(),
-                t: Type::auto(),
-            },
-            Some(Token::Ident(s)) => {
-                let r = Atom {
-                    v: AtomVariant::Ident(s),
-                    span: self.lex.span(),
-                    t: Type::auto(),
-                };
-                match self.next() {
-                    Some(Token::Colon) => {
-                        self.error(Message::IdentifierIsNotLabel, self.lex.span());
-                    }
-                    t => self.backtrack(t),
-                };
-                r
-            }
-            Some(Token::String(s)) => Atom {
-                v: AtomVariant::String(s),
-                span: self.lex.span(),
-                t: Type::auto(),
-            },
-            Some(Token::Char(s)) => Atom {
-                v: AtomVariant::Char(s),
-                span: self.lex.span(),
-                t: Type::auto(),
-            },
             Some(Token::If) => self.parse_if()?,
             Some(Token::LeftBracket) => self.parse_block(None),
             Some(Token::Loop) => self.parse_loop(None)?,
-            Some(Token::Label(x)) => {
-                let t = match self.next() {
-                    Some(Token::Colon) => self.next(),
-                    t => {
-                        self.error(Message::MissingColon, self.lex.span());
-                        t
+            _ => {
+                match self.take() {
+                    Some(Token::Float(f)) => {
+                        let span = self.span();
+                        self.next(); // fill
+                        Spanned(Atom::Float(f), span)
                     }
-                };
+                    Some(Token::Integer(i)) => {
+                        let span = self.span();
+                        self.next(); // fill
+                        Spanned(Atom::Integer(i), span)
+                    }
+                    Some(Token::Ident(s)) => {
+                        let span = self.span();
+                        self.next(); // fill
+                        if let Some(Token::Colon) = self.tk {
+                            self.error(Message::IdentifierIsNotLabel, self.span());
+                            // TODO: not label behavior
+                        };
+                        Spanned(Atom::Ident(s), span)
+                    }
+                    Some(Token::String(s)) => {
+                        let span = self.span();
+                        self.next(); // fill
+                        Spanned(Atom::String(s), span)
+                    }
+                    Some(Token::Char(s)) => {
+                        let span = self.span();
+                        self.next(); // fill
+                        Spanned(Atom::Char(s), span)
+                    }
+                    Some(Token::Label(x)) => {
+                        let x = Spanned(x, self.span());
+                        self.next(); // fill
+                        match self.tk {
+                            Some(Token::Colon) => self.next(),
+                            _ => self.error(Message::MissingColon, self.span()),
+                        };
 
-                match t {
-                    Some(Token::LeftBracket) => self.parse_block(Some(x)),
-                    Some(Token::Loop) => self.parse_loop(Some(x))?,
-                    _ => {
-                        self.error(Message::CannotFollowLabel, self.lex.span());
+                        match self.tk {
+                            Some(Token::LeftBracket) => self.parse_block(Some(x)),
+                            Some(Token::Loop) => self.parse_loop(Some(x))?,
+                            _ => {
+                                // TODO: parse atom?
+                                self.error(Message::CannotFollowLabel, self.span());
+                                return None;
+                            }
+                        }
+                    }
+                    tk => {
+                        self.fill(tk); // fill
+                        self.error(Message::UnexpectedToken, self.span());
                         return None;
                     }
                 }
-            }
-            _ => {
-                self.error(Message::UnexpectedToken, self.lex.span());
-                return None;
             }
         };
 

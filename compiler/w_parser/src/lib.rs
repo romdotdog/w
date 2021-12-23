@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use w_errors::Message;
 use w_lexer::{AmbiguousOp, BinOp, Lexer, Span, Token};
 
@@ -7,7 +6,7 @@ mod primaryatom;
 mod simpleatom;
 
 pub use handler::Handler;
-use w_ast::{Atom, AtomVariant, IdentPair, Indir, Program, Type, TypeVariant, WFn};
+use w_ast::{Atom, IdentPair, Indir, Program, Spanned, Type, TypeVariant, WFn, WStruct, WUnion};
 
 pub struct Parser<'a, H, I>
 where
@@ -17,7 +16,10 @@ where
     session: &'a H,
     src_ref: H::SourceRef,
     lex: Lexer<I>,
-    token_buffer: Option<Token>,
+
+    start: usize,
+    end: usize,
+    tk: Option<Token>,
 }
 
 impl<'a, H, I> Parser<'a, H, I>
@@ -27,324 +29,477 @@ where
 {
     pub fn new(session: &'a H, src_ref: H::SourceRef) -> Self {
         let src = session.get_source(&src_ref);
+        let lex = Lexer::new(src);
 
-        Parser {
+        let mut parser = Parser {
             session,
             src_ref,
-            lex: Lexer::new(src),
-            token_buffer: None,
+            lex,
+
+            start: 0,
+            end: 0,
+            tk: None,
+        };
+
+        parser.next();
+        parser
+    }
+
+    fn next(&mut self) {
+        match self.lex.next() {
+            Some((tk, start, end)) => {
+                self.tk = Some(tk);
+                self.start = start;
+                self.end = end;
+            }
+            _ => {
+                self.tk = None;
+            }
         }
     }
 
-    fn next(&mut self) -> Option<Token> {
-        self.token_buffer.take().or_else(|| self.lex.next())
+    /// for owning enum fields
+    fn take(&mut self) -> Option<Token> {
+        // TODO: maybe turn into a function that
+        // accepts a closure?
+
+        self.tk.take()
+    }
+
+    fn fill(&mut self, value: Option<Token>) {
+        debug_assert!(self.tk.is_none());
+        self.tk = value;
     }
 
     pub(crate) fn error(&self, msg: Message, span: Span) {
         self.session.error(&self.src_ref, msg, span);
     }
 
-    pub(crate) fn backtrack(&mut self, t: Option<Token>) {
-        assert!(
-            self.token_buffer.is_none(),
-            "double backtrack is not allowed"
-        );
-        self.token_buffer = t;
+    fn span(&self) -> Span {
+        Span::new(self.start, self.end)
     }
 
-    fn type_body(&mut self, allow_no_trailing_semi: bool) -> Option<Vec<IdentPair>> {
-        if let Some(Token::LeftBracket) = self.next() {
+    fn type_body(
+        &mut self,
+        allow_no_trailing_semi: bool,
+    ) -> Option<Spanned<Vec<Spanned<IdentPair>>>> {
+        let start = self.start;
+        if let Some(Token::LeftBracket) = self.tk {
             let mut v = Vec::new();
+            self.next();
 
-            loop {
-                match self.next() {
-                    Some(Token::RightBracket) => break,
-                    t => self.backtrack(t),
+            let end = loop {
+                if let Some(Token::RightBracket) = self.tk {
+                    let end_ = self.end;
+                    self.next();
+                    break end_;
                 }
 
                 // TODO: add panic behavior
-                v.push(self.ident_type_pair(true)?);
+                let pair = self.ident_type_pair(true)?;
+                v.push(pair);
 
-                match self.next() {
-                    Some(Token::Semicolon) => {}
-                    Some(Token::RightBracket) if allow_no_trailing_semi => break,
-                    _ => self.error(Message::MissingSemicolon, self.lex.span()),
+                match self.tk {
+                    Some(Token::Semicolon) => self.next(),
+                    Some(Token::RightBracket) if allow_no_trailing_semi => {
+                        let end_ = self.end;
+                        self.next();
+                        break end_;
+                    }
+                    None => {
+                        self.error(Message::MissingClosingBracket, Span::new(start, self.end));
+                        return None;
+                    }
+                    _ => {
+                        // mut ident: type }
+                        //                ^
+                        // mut ident: type}
+                        //                ^
+                        let last_pos = v.last().unwrap().1.end + 1;
+                        self.error(Message::MissingSemicolon, Span::new(last_pos, last_pos + 1));
+                    }
                 }
-            }
+            };
 
-            Some(v)
+            Some(Spanned(v, Span::new(start, end)))
         } else {
-            self.error(Message::MissingOpeningBracket, self.lex.span());
+            self.error(Message::MissingOpeningBracket, self.span());
             None
         }
     }
 
-    fn parse_type(&mut self) -> Option<Type> {
+    fn parse_type(&mut self) -> Option<Spanned<Type>> {
+        let start = self.start;
+        let mut asterisk_overflow_start = None;
         let mut indir = Indir::none();
         let mut len = 0;
         loop {
-            match self.next() {
+            match self.tk {
                 Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => {
                     if len < 5 {
-                        indir = indir.add(match self.next() {
-                            Some(Token::Mut) => true,
-                            t => {
-                                self.backtrack(t);
-                                false
+                        self.next();
+                        indir = indir.add(match self.tk {
+                            Some(Token::Mut) => {
+                                self.next();
+                                true
                             }
+                            _ => false,
                         });
                     } else {
-                        self.error(Message::TooMuchIndirection, self.lex.span());
+                        // *******type
+                        //      ^^
+                        if asterisk_overflow_start.is_none() {
+                            asterisk_overflow_start = Some(self.start);
+                        }
+
+                        self.next();
+
+                        match self.tk {
+                            Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => {}
+                            _ => self.error(
+                                Message::TooMuchIndirection,
+                                Span::new(asterisk_overflow_start.unwrap(), self.end),
+                            ),
+                        }
                     }
                     len += 1;
                 }
-                Some(Token::Ident(s)) => {
-                    return Some(Type::with_indir(s.into(), indir));
-                }
+                // TODO: deduplicate struct and union
                 Some(Token::Struct) => {
-                    return Some(Type::with_indir(
-                        TypeVariant::Struct(self.type_body(true)?),
-                        indir,
+                    self.next();
+                    let body = self.type_body(true)?;
+                    let end = body.1.end;
+                    return Some(Spanned(
+                        Type::with_indir(TypeVariant::Struct(body), indir),
+                        Span::new(start, end),
                     ));
                 }
                 Some(Token::Union) => {
-                    return Some(Type::with_indir(
-                        TypeVariant::Union(self.type_body(true)?),
-                        indir,
+                    self.next();
+                    let body = self.type_body(true)?;
+                    let end = body.1.end;
+                    return Some(Spanned(
+                        Type::with_indir(TypeVariant::Union(body), indir),
+                        Span::new(start, end),
                     ));
                 }
-                _ => {
-                    self.error(Message::MalformedType, self.lex.span());
-                    return None;
-                }
+                _ => match self.take() {
+                    Some(Token::Ident(s)) => {
+                        self.next();
+                        return Some(Spanned(
+                            Type::with_indir(s.into(), indir),
+                            Span::new(start, self.end),
+                        ));
+                    }
+                    t => {
+                        self.fill(t);
+                        self.error(Message::MalformedType, self.span());
+                        return None;
+                    }
+                },
             }
         }
     }
 
-    fn ident_type_pair(&mut self, require_type: bool) -> Option<IdentPair> {
-        let mut t = self.next();
-        let mutable = match t {
+    fn ident_type_pair(&mut self, require_type: bool) -> Option<Spanned<IdentPair>> {
+        let start = self.start;
+
+        // mut ident: type
+        // ^^^
+        let mutable = match self.tk {
             Some(Token::Mut) => {
-                t = self.next();
-                true
+                let span = self.span();
+                self.next();
+                Some(span)
             }
-            t_ => {
-                t = t_;
-                false
-            }
+            _ => None,
         };
 
-        let ident = match t {
-            Some(Token::Colon) => {
-                self.error(Message::MissingIdentifier, self.lex.span());
-                "<unknown>".to_owned()
-            }
-            tt => {
-                t = self.next();
-                match tt {
-                    Some(Token::Ident(s)) => s,
-                    Some(Token::Label(s)) => {
-                        self.error(Message::LabelIsNotIdentifier, self.lex.span());
-                        format!("${}", s)
-                    }
-                    _ => {
-                        self.error(Message::MalformedIdentifier, self.lex.span());
-                        "<unknown>".to_owned()
-                    }
+        let ident = {
+            let span = self.span();
+            match self.tk {
+                Some(Token::Colon) => {
+                    // mut : type
+                    //     ^
+                    self.error(Message::MissingIdentifier, span);
+                    Spanned("<unknown>".to_owned(), span)
                 }
-            }
-        };
-
-        let t = match t {
-            Some(Token::Colon) => self.parse_type()?,
-            t => {
-                self.backtrack(t);
-
-                if require_type {
-                    self.error(Message::MissingType, self.lex.span());
-                    return None;
-                }
-
-                Type::auto()
-            }
-        };
-
-        Some(IdentPair { mutable, ident, t })
-    }
-
-    fn subatom(&mut self, mut lhs: Atom, min_prec: u8) -> Option<Atom> {
-        // https://en.wikipedia.org/wiki/Operator-precedence_parser
-        let mut l = self.next();
-        loop {
-            let t = match l {
-                Some(Token::BinOp(t)) => t,
-                Some(Token::AmbiguousOp(ref t)) => BinOp::Regular(t.binary()),
                 _ => {
-                    self.backtrack(l);
-                    break;
-                }
-            };
-
-            // from the article:
-            // binary operator whose precedence is >= min_precedence
-            let current_prec = t.prec();
-            if t.prec() >= min_prec {
-                let mut rhs = self.primaryatom()?;
-
-                l = self.next();
-                loop {
-                    // Wikipedia's pseudocode is wrong. if t1 is a right associative op
-                    // with equal precedence, then trying to match t2 with a higher
-                    // min_prec is impossible
-                    let (cond, next_prec) = if let Some(Token::BinOp(BinOp::Compound(v))) = l {
-                        let lookahead_prec = v.prec();
-                        (current_prec == lookahead_prec, current_prec + 1)
-                    } else {
-                        let lookahead_prec = match l {
-                            Some(Token::BinOp(t)) => t.prec(),
-                            Some(Token::AmbiguousOp(t)) => t.binary().prec(),
-                            _ => break,
-                        };
-
-                        (lookahead_prec > current_prec, current_prec)
+                    let res = match self.take() {
+                        Some(Token::Ident(s)) => Spanned(s, span),
+                        Some(Token::Label(s)) => {
+                            self.error(Message::LabelIsNotIdentifier, span);
+                            Spanned(format!("${}", s), span)
+                        }
+                        _ => {
+                            // mut }: type
+                            //     ^
+                            self.error(Message::MalformedIdentifier, span);
+                            Spanned("<unknown>".to_owned(), span)
+                        }
                     };
 
-                    if cond {
-                        self.backtrack(l);
-                        rhs = self.subatom(rhs, next_prec)?;
-                        l = self.next();
+                    self.next(); // fill and move to colon
+                    res
+                }
+            }
+        };
+
+        let mut end = ident.1.end;
+        let t = match self.tk {
+            Some(Token::Colon) => {
+                self.next();
+                let t = self.parse_type()?;
+                end = t.1.end;
+                Some(t)
+            }
+            _ => {
+                if require_type {
+                    // mut ident ...
+                    //          ^
+                    let pos = ident.1.end + 1;
+                    self.error(Message::MissingType, Span::new(pos, pos + 1));
+                    return None;
+                }
+                None
+            }
+        };
+
+        Some(Spanned(
+            IdentPair { mutable, ident, t },
+            Span::new(start, end),
+        ))
+    }
+
+    fn subatom(&mut self, mut lhs: Spanned<Atom>, min_prec: u8) -> Option<Spanned<Atom>> {
+        // https://en.wikipedia.org/wiki/Operator-precedence_parser
+
+        // while [t] is a
+        loop {
+            // binary operator
+            let t = match self.tk {
+                Some(Token::BinOp(t)) => t,
+                Some(Token::AmbiguousOp(ref t)) => BinOp::Regular(t.binary()),
+                _ => break,
+            };
+
+            // whose precedence is >= [min_prec]
+            let current_prec = t.prec();
+            if t.prec() >= min_prec {
+                self.next();
+                let mut rhs = self.primaryatom()?;
+                loop {
+                    let (right_associative, next_prec) = match self.tk {
+                        Some(Token::BinOp(BinOp::Compound(v))) => (true, v.prec()),
+                        Some(Token::BinOp(BinOp::Regular(v))) => (false, v.prec()),
+                        Some(Token::AmbiguousOp(v)) => (false, v.binary().prec()),
+                        _ => break,
+                    };
+
+                    if next_prec > current_prec {
+                        rhs = self.subatom(rhs, current_prec + 1)?;
+                    } else if right_associative && next_prec == current_prec {
+                        rhs = self.subatom(rhs, current_prec)?;
                     } else {
                         break;
                     }
                 }
 
-                lhs = Atom {
-                    span: lhs.span.to(rhs.span),
-                    v: AtomVariant::BinOp(Box::new(lhs), t, Box::new(rhs)),
-                    t: Type::auto(),
-                };
+                let span = Span::new(lhs.1.start, rhs.1.end);
+                lhs = Spanned(Atom::BinOp(Box::new(lhs), t, Box::new(rhs)), span);
             } else {
-                self.backtrack(l);
                 break;
             }
         }
         Some(lhs)
     }
 
-    pub fn atom(&mut self) -> Option<Atom> {
+    pub fn atom(&mut self) -> Option<Spanned<Atom>> {
         let lhs = self.primaryatom()?;
         self.subatom(lhs, 0)
     }
 
-    pub fn function(&mut self) -> Option<WFn> {
-        let name = match self.next() {
-            Some(Token::Ident(s)) => s,
-            t => {
-                self.backtrack(t);
+    pub fn function(&mut self) -> Option<Spanned<WFn>> {
+        let start = self.start;
+        debug_assert_eq!(self.tk, Some(Token::Fn));
+        self.next();
+
+        let name = match self.take() {
+            Some(Token::Ident(s)) => {
+                let span = self.span();
+                self.next(); // fill
+                Spanned(s, span)
+            }
+            tk => {
+                self.error(Message::MissingIdentifier, self.span());
+                self.fill(tk);
                 return None;
             }
         };
 
-        match self.next() {
-            Some(Token::LeftParen) => {}
-            t => {
-                self.backtrack(t);
+        match self.tk {
+            Some(Token::LeftParen) => self.next(),
+            _ => {
+                self.error(Message::MissingOpeningParen, self.span());
                 return None;
             }
         }
 
         let mut params = Vec::new();
 
-        match self.next() {
-            Some(Token::RightParen) => {}
-            t => {
-                self.backtrack(t);
-                // TODO: remove
-
-                loop {
-                    params.push(self.ident_type_pair(true)?);
-                    match self.next() {
-                        Some(Token::Comma) => {}
-                        Some(Token::RightParen) => break,
-                        t => {
-                            self.backtrack(t);
-                            self.error(Message::MissingClosingParen, self.lex.span());
-                            return None;
-                        }
+        match self.tk {
+            Some(Token::RightParen) => self.next(),
+            _ => loop {
+                params.push(self.ident_type_pair(true)?);
+                match self.tk {
+                    Some(Token::Comma) => self.next(),
+                    Some(Token::RightParen) => {
+                        self.next();
+                        break;
+                    }
+                    _ => {
+                        // fn ident(mut ident: type
+                        //                         ^
+                        // TODO: refactor
+                        let pos = params[params.len() - 1].1.end + 1;
+                        self.error(Message::MissingClosingParen, Span::new(pos, pos + 1));
+                        return None;
                     }
                 }
-            }
+            },
         }
 
-        let t = match self.next() {
-            Some(Token::Colon) => self.parse_type()?,
-            t => {
-                self.backtrack(t);
-                Type::void()
+        let t = match self.tk {
+            Some(Token::Colon) => {
+                self.next();
+                Some(self.parse_type()?)
             }
+            _ => None,
         };
 
         let atom = self.atom()?;
-
-        Some(WFn {
-            name,
-            params,
-            atom,
-            t,
-        })
+        let end = atom.1.end;
+        Some(Spanned(
+            WFn {
+                name,
+                params,
+                atom,
+                t,
+            },
+            Span::new(start, end),
+        ))
     }
 
     pub fn panic_top_level(&mut self) {
         loop {
-            let t = self.next();
-            match t {
-                None | Some(Token::Fn) => {
-                    self.backtrack(t);
-                    break;
-                }
-                _ => {}
+            match self.tk {
+                None | Some(Token::Fn) => break,
+                _ => self.next(),
             }
         }
     }
 
     pub fn parse(mut self) -> Program {
         let mut fns = Vec::new();
-        let mut structs = HashMap::new();
-        let mut unions = HashMap::new();
-        while let Some(t) = self.next() {
-            match t {
-                Token::Fn => match self.function() {
+        let mut structs = Vec::new();
+        let mut unions = Vec::new();
+        loop {
+            match self.tk {
+                Some(Token::Fn) => match self.function() {
                     Some(f) => fns.push(f),
                     None => self.panic_top_level(),
                 },
-                Token::Struct | Token::Union => {
-                    let name = match self.next() {
-                        Some(Token::Ident(s)) => s,
+                // TODO: deduplicate struct and union
+                Some(Token::Struct) => {
+                    let start = self.start;
+                    let struct_pos = self.end;
+                    self.next();
+                    let name = match self.tk {
                         Some(Token::LeftBracket) => {
-                            self.backtrack(Some(Token::LeftBracket));
-                            self.error(Message::MissingIdentifier, self.lex.span());
-                            "<unknown>".to_owned()
+                            // struct  {
+                            //       ^
+
+                            let pos = struct_pos + 1;
+                            let span = Span::new(pos, pos + 1);
+                            self.next();
+                            self.error(Message::MissingIdentifier, span);
+                            Spanned("<unknown>".to_owned(), span)
                         }
-                        _ => {
-                            self.error(Message::MalformedIdentifier, self.lex.span());
-                            "<unknown>".to_owned()
-                        }
+                        _ => match self.take() {
+                            Some(Token::Ident(s)) => {
+                                // struct ident {
+                                //        ^^^^^
+
+                                let span = self.span();
+                                self.next(); // fill
+                                Spanned(s, span)
+                            }
+                            _ => {
+                                // struct ! {
+                                //        ^
+                                let span = self.span();
+                                self.next(); // fill
+                                self.error(Message::MalformedIdentifier, span);
+                                Spanned("<unknown>".to_owned(), span)
+                            }
+                        },
                     };
 
                     match self.type_body(false) {
-                        Some(b) if t == Token::Struct => {
-                            structs.insert(name, b);
-                        }
-                        Some(b) => {
-                            unions.insert(name, b);
+                        Some(fields) => {
+                            let end = fields.1.end;
+                            structs.push(Spanned(WStruct { name, fields }, Span::new(start, end)));
                         }
                         None => self.panic_top_level(),
                     }
                 }
-                _ => {
-                    self.error(Message::InvalidTopLevel, self.lex.span());
+                Some(Token::Union) => {
+                    let start = self.start;
+                    let struct_pos = self.end;
+                    self.next();
+                    let name = match self.tk {
+                        Some(Token::LeftBracket) => {
+                            // union  {
+                            //      ^
+
+                            let pos = struct_pos + 1;
+                            let span = Span::new(pos, pos + 1);
+                            self.next();
+                            self.error(Message::MissingIdentifier, span);
+                            Spanned("<unknown>".to_owned(), span)
+                        }
+                        _ => match self.take() {
+                            Some(Token::Ident(s)) => {
+                                // union ident {
+                                //       ^^^^^
+                                let span = self.span();
+                                self.next(); // fill
+                                Spanned(s, span)
+                            }
+                            _ => {
+                                // union ! {
+                                //       ^
+                                let span = self.span();
+                                self.next(); // fill
+                                self.error(Message::MalformedIdentifier, span);
+                                Spanned("<unknown>".to_owned(), span)
+                            }
+                        },
+                    };
+
+                    match self.type_body(false) {
+                        Some(fields) => {
+                            let end = fields.1.end;
+                            unions.push(Spanned(WUnion { name, fields }, Span::new(start, end)));
+                        }
+                        None => self.panic_top_level(),
+                    }
+                }
+                Some(_) => {
+                    self.error(Message::InvalidTopLevel, self.span());
                     self.panic_top_level();
                 }
+                None => break,
             }
         }
 

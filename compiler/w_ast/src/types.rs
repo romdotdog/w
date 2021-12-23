@@ -1,4 +1,4 @@
-use crate::{IdentPair, Indir};
+use crate::{IdentPair, Indir, Spanned};
 
 #[derive(Clone)]
 pub struct Type {
@@ -21,15 +21,10 @@ impl Type {
     pub fn void() -> Self {
         Self::new(TypeVariant::Void)
     }
-
-    pub fn auto() -> Self {
-        Self::new(TypeVariant::Auto)
-    }
 }
 
 #[derive(Clone)]
 pub enum TypeVariant {
-    Auto,
     Void,
     I32,
     I64,
@@ -37,8 +32,8 @@ pub enum TypeVariant {
     U64,
     F32,
     F64,
-    Struct(Vec<IdentPair>),
-    Union(Vec<IdentPair>),
+    Struct(Spanned<Vec<Spanned<IdentPair>>>),
+    Union(Spanned<Vec<Spanned<IdentPair>>>),
     Unresolved(String),
 }
 

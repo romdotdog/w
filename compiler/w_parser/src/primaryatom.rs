@@ -1,134 +1,148 @@
 use super::{Handler, Parser};
-use w_ast::{Atom, AtomVariant, Type};
+use w_ast::{Atom, Spanned};
 use w_errors::Message;
-use w_lexer::{BinOp, BinOpVariant, Token, UnOp};
+use w_lexer::{BinOp, BinOpVariant, Span, Token, UnOp};
 
 impl<'a, H, I> Parser<'a, H, I>
 where
     H: Handler<LexerInput = I>,
     I: Iterator<Item = char>,
 {
-    pub(crate) fn parse_let(&mut self) -> Option<Atom> {
-        let start = self.lex.span();
+    pub(crate) fn parse_let(&mut self) -> Option<Spanned<Atom>> {
+        let start = self.start;
+        assert_eq!(self.tk, Some(Token::Let));
+        self.next();
+
         let pair = self.ident_type_pair(false)?;
-
-        let rhs = match self.next() {
-            Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => Some(Box::new(self.atom()?)),
-            t => {
-                self.backtrack(t);
-                None
+        let rhs = match self.tk {
+            Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
+                self.next();
+                Some(Box::new(self.atom()?))
             }
+            _ => None,
         };
 
-        Some(Atom {
-            t: Type::void(),
-            v: AtomVariant::Let(pair, rhs),
-            span: start.to(self.lex.span()),
-        })
+        Some(Spanned(Atom::Let(pair, rhs), Span::new(start, self.end)))
     }
 
-    fn parse_cast(&mut self) -> Option<Atom> {
-        let start = self.lex.span();
+    fn parse_cast(&mut self) -> Option<Spanned<Atom>> {
+        let start = self.start;
+        assert_eq!(
+            self.tk,
+            Some(Token::BinOp(BinOp::Regular(BinOpVariant::Lt)))
+        );
+        self.next();
+
         let t = self.parse_type()?;
-        let mut op = UnOp::Cast;
-
-        match self.next() {
-            Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => {}
-            t1 => {
-                match t1 {
-                    Some(Token::UnOp(UnOp::LNot)) => op = UnOp::Reinterpret,
-                    t => self.backtrack(t),
-                }
-
-                match self.next() {
-                    Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => {}
-                    t => {
-                        self.error(Message::MissingClosingAngleBracket, self.lex.span());
-                        self.backtrack(t);
-                        return None;
-                    }
-                }
+        let is_reinterpret = match self.tk {
+            Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => {
+                self.next();
+                false
             }
-        }
+            Some(Token::UnOp(UnOp::LNot)) => {
+                self.next();
+                match self.tk {
+                    Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => self.next(),
+                    _ => self.error(Message::MissingClosingAngleBracket, self.span()),
+                }
 
-        Some(Atom {
-            v: AtomVariant::UnOp(op, Box::new(self.primaryatom()?)),
-            span: start.to(self.lex.span()),
-            t,
-        })
+                true
+            }
+            _ => {
+                self.error(Message::MissingClosingAngleBracket, self.span());
+                false
+            }
+        };
+
+        Some(Spanned(
+            Atom::Cast(t, Box::new(self.primaryatom()?), is_reinterpret),
+            Span::new(start, self.end),
+        ))
     }
 
-    fn parse_br(&mut self) -> Option<Atom> {
-        let start = self.lex.span();
+    fn parse_br(&mut self) -> Option<Spanned<Atom>> {
+        let start = self.start;
+        assert_eq!(self.tk, Some(Token::Br));
+        self.next();
 
-        let mut t = self.next();
-        let ret = if t == Some(Token::Arrow) {
-            None
-        } else {
-            t = self.next();
-            Some(Box::new(self.atom()?))
+        // TODO: refactor double arrow check
+        let ret = match self.tk {
+            Some(Token::Arrow) => None,
+            _ => Some(Box::new(self.atom()?)),
         };
 
-        let label = if t == Some(Token::Arrow) {
-            t = self.next();
-            match t {
-                Some(Token::Label(x)) => {
-                    t = self.next();
-                    x
-                }
-                Some(Token::Ident(x)) => {
-                    self.error(Message::IdentifierIsNotLabel, self.lex.span());
-                    t = self.next();
-                    format!("${}", x)
-                }
-                _ => {
-                    self.error(Message::MissingLabel, self.lex.span());
-                    "<unknown>".to_owned()
-                }
+        match self.tk {
+            Some(Token::Arrow) => self.next(),
+            _ => {
+                // TODO: fix error
+                self.error(Message::MissingLabel, self.span());
             }
-        } else {
-            self.error(Message::MissingLabel, self.lex.span());
-            "<unknown>".to_owned()
         };
 
-        let cond = if t == Some(Token::If) {
-            Some(Box::new(self.atom()?))
-        } else {
-            self.backtrack(t);
-            None
+        let label = match self.take() {
+            Some(Token::Label(x)) => {
+                let span = self.span();
+                self.next(); // fill
+                Spanned(x, span)
+            }
+            Some(Token::Ident(x)) => {
+                let span = self.span();
+                self.error(Message::IdentifierIsNotLabel, span);
+                self.next(); // fill
+                Spanned(format!("${}", x), span)
+            }
+            tk => {
+                // br -> if ...
+                //      ^
+                self.fill(tk);
+                let span = self.span();
+                self.error(Message::MissingLabel, span);
+                Spanned("<unknown>".to_owned(), span)
+            }
         };
 
-        Some(Atom {
-            t: Type::auto(),
-            v: AtomVariant::Br(ret, label, cond),
-            span: start.to(self.lex.span()),
-        })
+        let cond = match self.tk {
+            Some(Token::If) => {
+                self.next();
+                Some(Box::new(self.atom()?))
+            }
+            _ => None,
+        };
+
+        Some(Spanned(
+            Atom::Br(ret, label, cond),
+            Span::new(start, self.end),
+        ))
     }
 
-    fn parse_ret(&mut self) -> Option<Atom> {
-        let start = self.lex.span();
+    fn parse_ret(&mut self) -> Option<Spanned<Atom>> {
+        // TODO: return without atom
+        let start = self.start;
+        debug_assert_eq!(self.tk, Some(Token::Return));
+        self.next();
+
         let e = self.atom()?;
 
-        Some(Atom {
-            t: Type::auto(),
-            v: AtomVariant::Return(Box::new(e)),
-            span: start.to(self.lex.span()),
-        })
+        Some(Spanned(
+            Atom::Return(Box::new(e)),
+            Span::new(start, self.end),
+        ))
     }
 
-    fn unop(&mut self, u: UnOp) -> Option<Atom> {
-        let start = self.lex.span();
+    fn unop(&mut self, u: UnOp) -> Option<Spanned<Atom>> {
+        let start = self.start;
+        self.next();
+
         let e = self.primaryatom()?;
 
-        Some(Atom {
-            t: Type::auto(),
-            v: AtomVariant::UnOp(u, Box::new(e)),
-            span: start.to(self.lex.span()),
-        })
+        Some(Spanned(
+            Atom::UnOp(u, Box::new(e)),
+            Span::new(start, self.end),
+        ))
     }
 
-    pub(crate) fn primaryatom(&mut self) -> Option<Atom> {
-        match self.next() {
+    pub(crate) fn primaryatom(&mut self) -> Option<Spanned<Atom>> {
+        match self.tk {
             Some(Token::Let) => self.parse_let(),
             Some(Token::BinOp(BinOp::Regular(BinOpVariant::Lt))) => self.parse_cast(),
 
@@ -139,7 +153,7 @@ where
             Some(Token::AmbiguousOp(o)) => self.unop(o.unary()),
             Some(Token::UnOp(u)) => self.unop(u),
 
-            t => self.simpleatom(t),
+            _ => self.simpleatom(),
         }
     }
 }

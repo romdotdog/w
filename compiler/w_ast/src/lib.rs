@@ -1,67 +1,74 @@
-use std::collections::HashMap;
 use w_lexer::{BinOp, Span, UnOp};
 
-mod ast_type;
-pub use ast_type::{Type, TypeVariant};
+mod types;
+pub use types::{Type, TypeVariant};
 
 mod indir;
 pub use indir::Indir;
 
 pub struct Program {
-    pub fns: Vec<WFn>,
-    pub structs: HashMap<String, Vec<IdentPair>>,
-    pub unions: HashMap<String, Vec<IdentPair>>,
+    pub fns: Vec<Spanned<WFn>>,
+    pub structs: Vec<Spanned<WStruct>>,
+    pub unions: Vec<Spanned<WUnion>>,
 }
+
+type BAtom = Box<Spanned<Atom>>;
 
 pub struct WFn {
-    pub name: String,
-    pub params: Vec<IdentPair>,
-    pub atom: Atom,
-    pub t: Type,
+    pub name: Spanned<String>,
+    pub params: Vec<Spanned<IdentPair>>,
+    pub atom: Spanned<Atom>,
+    pub t: Option<Spanned<Type>>,
 }
 
-type BAtom = Box<Atom>;
+pub struct WStruct {
+    pub name: Spanned<String>,
+    pub fields: Spanned<Vec<Spanned<IdentPair>>>,
+}
+
+pub struct WUnion {
+    pub name: Spanned<String>,
+    pub fields: Spanned<Vec<Spanned<IdentPair>>>,
+}
 
 pub enum IncDec {
     Inc,
     Dec,
 }
 
-pub enum AtomVariant {
+pub enum Atom {
     String(String),
+    Ident(String),
     Char(char),
     Integer(i64),
     Float(f64),
-    Ident(String),
 
     Paren(BAtom),
     BinOp(BAtom, BinOp, BAtom),
     UnOp(UnOp, BAtom),
+    Cast(Spanned<Type>, BAtom, bool),
     PostIncDec(BAtom, IncDec),
 
-    Call(BAtom, Vec<Atom>),
-    Access(BAtom, String),
+    Call(BAtom, Vec<Spanned<Atom>>),
+    Access(BAtom, Spanned<String>),
     Index(BAtom, BAtom),
 
-    Block(Option<String>, Vec<Atom>, Option<BAtom>),
-    Loop(Option<String>, Option<BAtom>, BAtom),
+    Block(Option<Spanned<String>>, Vec<Spanned<Atom>>, Option<BAtom>),
+    Loop(Option<Spanned<String>>, Option<BAtom>, BAtom),
 
-    Let(IdentPair, Option<BAtom>),
+    Let(Spanned<IdentPair>, Option<BAtom>),
     If(BAtom, BAtom, Option<BAtom>),
 
     Return(BAtom),
-    Br(Option<BAtom>, String, Option<BAtom>),
+    Br(Option<BAtom>, Spanned<String>, Option<BAtom>),
 }
 
 #[derive(Clone)]
 pub struct IdentPair {
-    pub mutable: bool,
-    pub ident: String,
-    pub t: Type,
+    pub mutable: Option<Span>,
+    pub ident: Spanned<String>,
+    pub t: Option<Spanned<Type>>,
 }
 
-pub struct Atom {
-    pub v: AtomVariant,
-    pub span: Span,
-    pub t: Type,
-}
+#[derive(Clone, Copy)]
+pub struct Spanned<T>(pub T, pub Span);

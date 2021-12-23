@@ -7,3 +7,4 @@ edition = "2018"
 doctest = false
 
 [dependencies]
+phf = { version = "0.10", features = ["macros"] }
