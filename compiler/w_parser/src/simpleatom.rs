@@ -25,9 +25,9 @@ where
                 Some(Token::RightBracket) => {
                     last = None;
 
-                    let _end = self.end;
+                    let end_ = self.end;
                     self.next();
-                    break _end;
+                    break end_;
                 }
                 None => {}
                 _ => {
@@ -42,9 +42,9 @@ where
                                         continue 'm;
                                     }
                                     Some(Token::RightBracket) | None => {
-                                        let _end = self.end;
+                                        let end_ = self.end;
                                         self.next();
-                                        break 'm _end;
+                                        break 'm end_;
                                     }
                                     _ => self.next(),
                                 }
@@ -56,15 +56,15 @@ where
 
             match self.tk {
                 Some(Token::RightBracket) => {
-                    let _end = self.end;
+                    let end_ = self.end;
                     self.next();
-                    break _end;
+                    break end_;
                 }
                 Some(Token::Semicolon) => self.next(),
                 None => {
-                    let _end = self.end;
-                    self.error(Message::MissingClosingBracket, Span::new(start, _end));
-                    break _end;
+                    let end_ = self.end;
+                    self.error(Message::MissingClosingBracket, Span::new(start, end_));
+                    break end_;
                 }
                 _ => {
                     // try to continue
