@@ -390,10 +390,32 @@ where
         ))
     }
 
-    pub fn panic_top_level(&mut self) {
+    pub fn skip_bracket(&mut self) {
+        debug_assert_ne!(self.tk, Some(Token::LeftBracket));
         loop {
             match self.tk {
-                None | Some(Token::Fn) => break,
+                Some(Token::RightBracket) => break,
+                Some(Token::LeftBracket) => {
+                    self.next();
+                    self.skip_bracket();
+                }
+                _ => self.next(),
+            }
+        }
+    }
+
+    pub fn panic_top_level(&mut self, in_bracket: bool) {
+        if in_bracket {
+            self.skip_bracket();
+        }
+
+        loop {
+            match self.tk {
+                None | Some(Token::Fn | Token::Struct | Token::Union) => break,
+                Some(Token::LeftBracket) => {
+                    self.next();
+                    self.skip_bracket();
+                }
                 _ => self.next(),
             }
         }
@@ -407,7 +429,7 @@ where
             match self.tk {
                 Some(Token::Fn) => match self.function() {
                     Some(f) => fns.push(f),
-                    None => self.panic_top_level(),
+                    None => self.panic_top_level(false),
                 },
                 // TODO: deduplicate struct and union
                 Some(Token::Struct) => {
@@ -450,7 +472,7 @@ where
                             let end = fields.1.end;
                             structs.push(Spanned(WStruct { name, fields }, Span::new(start, end)));
                         }
-                        None => self.panic_top_level(),
+                        None => self.panic_top_level(true),
                     }
                 }
                 Some(Token::Union) => {
@@ -492,12 +514,12 @@ where
                             let end = fields.1.end;
                             unions.push(Spanned(WUnion { name, fields }, Span::new(start, end)));
                         }
-                        None => self.panic_top_level(),
+                        None => self.panic_top_level(true),
                     }
                 }
                 Some(_) => {
                     self.error(Message::InvalidTopLevel, self.span());
-                    self.panic_top_level();
+                    self.panic_top_level(false);
                 }
                 None => break,
             }
