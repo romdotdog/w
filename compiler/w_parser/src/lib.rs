@@ -332,12 +332,18 @@ where
                 Spanned(s, span)
             }
             tk @ Some(Token::LeftParen) => {
-                // TODO: span
-                self.error(Message::MissingIdentifier, self.span());
+                // fn  (...
+                //    ^
+                self.error(
+                    Message::MissingIdentifier,
+                    Span::new(self.start - 1, self.end - 1),
+                );
                 self.fill(tk);
                 return None;
             }
             tk => {
+                // fn !(...
+                //    ^
                 self.error(Message::MalformedIdentifier, self.span());
                 self.fill(tk);
                 return None;
