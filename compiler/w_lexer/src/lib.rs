@@ -7,7 +7,7 @@ mod token;
 
 use std::iter::FromIterator;
 
-use phf::{phf_map, phf_set};
+use phf::phf_map;
 pub use token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
 
 pub struct Lexer<I>
@@ -126,17 +126,27 @@ where
     }
 
     fn parse_ident(&mut self, ident: &mut String) {
-        const START_OF_TOKEN: phf::Set<char> = phf_set! {
-            ':', ';', ',', '.', '{', '}', '(', ')', '[', ']', '*', '/', '%',
-            '^', '&', '|', '~', '\'', '"', '>', '<', '=', '!', '+', '-'
-        };
+        fn start_of_token(c: char) -> bool {
+            matches!(
+                c,
+                ':' | ';' | ',' | '.' | 
+				// sep
+				'{'| '}' | '(' | ')' | '[' | ']' | 
+				// sep
+                '*' | '/' | '%' | '^' | '&' | '|' | '~' |
+				// sep
+				'>'  | '<' | '=' | '!' | '+' | '-' |
+				// sep
+            	'\'' | '"'
+            )
+        }
 
         while let Some(c2) = self.nextc() {
             if c2.is_whitespace() {
                 break;
             }
 
-            if START_OF_TOKEN.contains(&c2) {
+            if start_of_token(c2) {
                 self.backtrack(Some(c2));
                 break;
             }
