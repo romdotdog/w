@@ -6,8 +6,6 @@
 mod token;
 
 use std::iter::FromIterator;
-
-use phf::phf_map;
 pub use token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
 
 pub struct Lexer<I>
@@ -404,23 +402,19 @@ where
     }
 }
 
-const KEYWORDS: phf::Map<&'static str, Token> = phf_map! {
-    "fn" => Token::Fn,
-    "return" => Token::Return,
-    "if" => Token::If,
-    "else" => Token::Else,
-    "let" => Token::Let,
-    "mut" => Token::Mut,
-    "loop" => Token::Loop,
-    "br" => Token::Br,
-    "struct" => Token::Struct,
-    "union" => Token::Union,
-};
-
 fn keyword(s: String) -> Token {
-    match KEYWORDS.get(s.as_str()) {
-        Some(t) => t.clone(),
-        None => Token::Ident(s),
+    match s.as_str() {
+        "fn" => Token::Fn,
+		"return" => Token::Return,
+		"if" => Token::If,
+		"else" => Token::Else,
+		"let" => Token::Let,
+		"mut" => Token::Mut,
+		"loop" => Token::Loop,
+		"br" => Token::Br,
+		"struct" => Token::Struct,
+		"union" => Token::Union,
+        _ => Token::Ident(s),
     }
 }
 
