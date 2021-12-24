@@ -29,14 +29,14 @@ impl<'a> Handler for Session<'a> {
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let src = std::fs::read_to_string("D:/w/benches/log10/log10.w").unwrap();
+    let src = std::fs::read_to_string("math/math.w").unwrap();
 
     let count = Lexer::new(src.chars()).count();
     c.bench_function(format!("lexer {} tk", count).as_str(), |b| {
         b.iter(|| for _t in Lexer::new(black_box(&src).chars()) {});
     });
 
-    c.bench_function(format!("parser {} tk log10", count).as_str(), |b| {
+    c.bench_function(format!("parser {} tk", count).as_str(), |b| {
         b.iter(|| {
             let handler = Session {
                 src: black_box(&src),

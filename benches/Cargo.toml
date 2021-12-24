@@ -4,8 +4,8 @@ version = "0.0.0"
 edition = "2018"
 
 [[bench]]
-name = "log10"
-path = "log10/bench.rs"
+name = "math"
+path = "math/bench.rs"
 harness = false
 
 [lib]
