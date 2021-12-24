@@ -68,7 +68,6 @@ where
                 }
                 _ => {
                     // try to continue
-                    println!("eoa at: {:?}", self.tk);
                     self.error(Message::MissingSemicolon, self.span());
                 }
             }
