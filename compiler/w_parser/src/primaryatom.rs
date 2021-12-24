@@ -121,14 +121,20 @@ where
     }
 
     fn parse_ret(&mut self) -> Option<Spanned<Atom>> {
-        // TODO: return without atom
         let start = self.start;
+        let mut end = self.end;
         debug_assert_eq!(self.tk, Some(Token::Return));
         self.next();
 
-        let a = self.atom()?;
-        let end = a.1.end;
-        Some(Spanned(Atom::Return(Box::new(a)), Span::new(start, end)))
+        let a = if self.can_begin_atom() {
+            let a_ = self.atom()?;
+            end = a_.1.end;
+            Some(Box::new(a_))
+        } else {
+            None
+        };
+
+        Some(Spanned(Atom::Return(a), Span::new(start, end)))
     }
 
     fn unop(&mut self, u: UnOp) -> Option<Spanned<Atom>> {

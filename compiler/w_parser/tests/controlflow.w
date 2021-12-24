@@ -1,6 +1,9 @@
 fn main() {
 	if 1 "good";
 	if 0 "bad" else "good";
+	
+	return;
+	return 1;
 
 	// i will be in the inner scope
 	$hi: loop let i = 0 {

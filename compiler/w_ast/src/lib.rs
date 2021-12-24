@@ -62,7 +62,7 @@ pub enum Atom {
     Let(Spanned<IdentPair>, Option<BAtom>),
     If(BAtom, BAtom, Option<BAtom>),
 
-    Return(BAtom),
+    Return(Option<BAtom>),
     Br(Option<BAtom>, Spanned<String>, Option<BAtom>),
 }
 

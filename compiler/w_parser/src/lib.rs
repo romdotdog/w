@@ -1,5 +1,5 @@
 use w_errors::Message;
-use w_lexer::{AmbiguousOp, BinOp, Lexer, Token};
+use w_lexer::{AmbiguousOp, BinOp, Lexer, Token, BinOpVariant};
 
 mod handler;
 mod primaryatom;
@@ -59,6 +59,39 @@ where
             }
         }
     }
+
+    /// returns true if the current token can begin
+    /// an atom
+    pub fn can_begin_atom(&self) -> bool {
+		match self.tk {
+			Some(
+				// keywords
+				Token::Let  |
+				Token::Loop |
+				Token::Br |
+				Token::Return |
+				Token::If |
+
+				// unary ops
+				Token::BinOp(BinOp::Regular(BinOpVariant::Lt)) | // cast
+				Token::AmbiguousOp(_) |
+				Token::UnOp(_) |
+				
+				// symbols
+				Token::LeftParen |
+				Token::LeftBracket |
+				
+				// literals
+				Token::Float(_) |
+				Token::Integer(_) |
+				Token::Ident(_) |
+				Token::String(_) |
+				Token::Char(_) |
+				Token::Label(_)
+			) => true,
+			_ => false
+		}
+	}
 
     /// for owning enum fields
     fn take(&mut self) -> Option<Token> {
