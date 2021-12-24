@@ -63,34 +63,31 @@ where
     /// returns true if the current token can begin
     /// an atom
     pub fn can_begin_atom(&self) -> bool {
-		match self.tk {
-			Some(
-				// keywords
-				Token::Let  |
-				Token::Loop |
-				Token::Br |
-				Token::Return |
-				Token::If |
+		matches!(self.tk, Some(
+			// keywords
+			Token::Let  |
+			Token::Loop |
+			Token::Br |
+			Token::Return |
+			Token::If |
 
-				// unary ops
-				Token::BinOp(BinOp::Regular(BinOpVariant::Lt)) | // cast
-				Token::AmbiguousOp(_) |
-				Token::UnOp(_) |
-				
-				// symbols
-				Token::LeftParen |
-				Token::LeftBracket |
-				
-				// literals
-				Token::Float(_) |
-				Token::Integer(_) |
-				Token::Ident(_) |
-				Token::String(_) |
-				Token::Char(_) |
-				Token::Label(_)
-			) => true,
-			_ => false
-		}
+			// unary ops
+			Token::BinOp(BinOp::Regular(BinOpVariant::Lt)) | // cast
+			Token::AmbiguousOp(_) |
+			Token::UnOp(_) |
+			
+			// symbols
+			Token::LeftParen |
+			Token::LeftBracket |
+			
+			// literals
+			Token::Float(_) |
+			Token::Integer(_) |
+			Token::Ident(_) |
+			Token::String(_) |
+			Token::Char(_) |
+			Token::Label(_)
+		))
 	}
 
     /// for owning enum fields
