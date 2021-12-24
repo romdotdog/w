@@ -1,7 +1,7 @@
 use super::{Handler, Parser};
-use w_ast::{Atom, IncDec, Spanned};
+use w_ast::{Atom, IncDec, Span, Spanned};
 use w_errors::Message;
-use w_lexer::{Span, Token, UnOp};
+use w_lexer::{Token, UnOp};
 
 impl<'a, H, I> Parser<'a, H, I>
 where

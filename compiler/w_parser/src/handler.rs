@@ -1,5 +1,5 @@
+use w_ast::Span;
 use w_errors::Message;
-use w_lexer::Span;
 
 pub trait Handler {
     /// the parser will carry this so that the source will stay valid

@@ -1,10 +1,13 @@
-use w_lexer::{BinOp, Span, UnOp};
+use w_lexer::{BinOp, UnOp};
 
 mod types;
 pub use types::{Type, TypeVariant};
 
 mod indir;
 pub use indir::Indir;
+
+mod span;
+pub use span::Span;
 
 pub struct Program {
     pub fns: Vec<Spanned<WFn>>,

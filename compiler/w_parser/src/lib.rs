@@ -1,12 +1,14 @@
 use w_errors::Message;
-use w_lexer::{AmbiguousOp, BinOp, Lexer, Span, Token};
+use w_lexer::{AmbiguousOp, BinOp, Lexer, Token};
 
 mod handler;
 mod primaryatom;
 mod simpleatom;
 
 pub use handler::Handler;
-use w_ast::{Atom, IdentPair, Indir, Program, Spanned, Type, TypeVariant, WFn, WStruct, WUnion};
+use w_ast::{
+    Atom, IdentPair, Indir, Program, Span, Spanned, Type, TypeVariant, WFn, WStruct, WUnion,
+};
 
 pub struct Parser<'a, H, I>
 where

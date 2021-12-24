@@ -3,13 +3,11 @@
     AIP - Above Ident Priority
 */
 
-mod span;
 mod token;
 
 use std::iter::FromIterator;
 
 use phf::{phf_map, phf_set};
-pub use span::Span;
 pub use token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
 
 pub struct Lexer<I>

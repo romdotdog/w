@@ -230,6 +230,7 @@ dependencies = [
 name = "w_session"
 version = "0.0.0"
 dependencies = [
+ "w_ast",
  "w_errors",
  "w_lexer",
  "w_parser",

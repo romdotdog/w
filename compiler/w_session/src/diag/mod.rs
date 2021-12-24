@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
+use w_ast::Span;
 use w_errors::Message;
-use w_lexer::Span;
 
 use crate::source_map::source::Source;
 

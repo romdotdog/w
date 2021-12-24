@@ -14,8 +14,8 @@ use source_map::{
     source::{Source, SourceReader},
     SourceMap,
 };
+use w_ast::Span;
 use w_errors::Message;
-use w_lexer::Span;
 use w_parser::Parser;
 
 pub struct Session<L: Loader, E: Emitter> {

@@ -2,8 +2,8 @@ use similar::{ChangeTag, TextDiff};
 use std::fmt::Write;
 use std::{cell::RefCell, fs, str::Chars};
 
+use w_ast::Span;
 use w_errors::Message;
-use w_lexer::Span;
 use w_parser::{Handler, Parser};
 use w_utils::{LineCol, LineColResult};
 
