@@ -1,2 +1,12 @@
 [workspace]
 members = ["compiler/w", "benches"]
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+# debug = true
+# opt-level = 'z'
+
+[profile.bench]
+codegen-units = 1
+debug = true
