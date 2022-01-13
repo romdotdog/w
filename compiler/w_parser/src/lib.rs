@@ -158,7 +158,10 @@ where
                                             digit = i + 1;
                                             self.next(); // fill
                                         }
-                                        t => self.fill(t), // fill
+                                        t => {
+                                            self.error(Message::MissingInteger, self.span());
+                                            self.fill(t); // fill
+                                        },
                                     }
                                     match self.tk {
                                         Some(Token::Comma) => {
