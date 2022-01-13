@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry};
 
 use w_errors::Message;
 use w_lexer::{AmbiguousOp, BinOp, BinOpVariant, Lexer, Token};
@@ -138,13 +138,16 @@ where
                         self.next();
                         continue;
                     }
-                    _ => match self.take() {
-                        // take
+                    _ => match self.take() { // take
                         Some(Token::Ident(s)) => {
+                            let sident = self.span();
                             self.next(); // fill
                             match self.tk {
                                 Some(Token::Comma) => {
-                                    h.insert(s, digit);
+                                    match h.entry(s) {
+                                        Entry::Vacant(e) => { e.insert(digit); },
+                                        Entry::Occupied(_) => self.error(Message::DuplicateEnumField, sident),
+                                    }
                                     digit += 1;
                                     self.next();
                                     continue;
@@ -154,7 +157,10 @@ where
                                     match self.take() {
                                         // take
                                         Some(Token::Integer(i)) => {
-                                            h.insert(s, i);
+                                            match h.entry(s) {
+                                                Entry::Vacant(e) => { e.insert(i); },
+                                                Entry::Occupied(_) => self.error(Message::DuplicateEnumField, sident),
+                                            }
                                             digit = i + 1;
                                             self.next(); // fill
                                         }
@@ -522,7 +528,7 @@ where
         let members = self.enum_body()?;
         let end = members.1.end;
 
-        Some(Spanned(WEnum { name, members }, Span::new(start, end)))
+        Some(Spanned(WEnum { name, fields: members }, Span::new(start, end)))
     }
 
     pub fn expect_ident(&mut self, token_after: &Option<Token>) -> Spanned<String> {

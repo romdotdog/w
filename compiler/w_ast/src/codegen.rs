@@ -72,7 +72,7 @@ impl Display for WUnion {
 impl Display for WEnum {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         writeln!(f, "enum {} {{", self.name)?;
-        let mut v: Vec<_> = self.members.0.iter().collect();
+        let mut v: Vec<_> = self.fields.0.iter().collect();
         v.sort_by_key(|k| k.1);
         let mut d = 0;
         for (s, &v) in v {

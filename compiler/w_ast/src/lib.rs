@@ -40,7 +40,7 @@ pub struct WUnion {
 
 pub struct WEnum {
     pub name: Spanned<String>,
-    pub members: Spanned<HashMap<String, i64>>,
+    pub fields: Spanned<HashMap<String, i64>>,
 }
 
 pub enum IncDec {
