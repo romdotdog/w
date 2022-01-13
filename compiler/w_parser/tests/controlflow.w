@@ -17,6 +17,14 @@ fn main() {
 		br -> $hi2;
 	};
 
+	let foo = {
+		bar + 1
+	};
+
+	let bar = $l: {
+		br bar + 1 -> $l
+	};
+
 	// error: need semicolon after 1
 	loop return 1 {};
 	
