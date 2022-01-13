@@ -159,7 +159,7 @@ where
                                         Some(Token::Integer(i)) => {
                                             match h.entry(s) {
                                                 Entry::Vacant(e) => { e.insert(i); },
-                                                Entry::Occupied(_) => self.error(Message::DuplicateEnumField, sident),
+                                                Entry::Occupied(_) => self.error(Message::DuplicateEnumField, Span::new(sident.start, self.end)),
                                             }
                                             digit = i + 1;
                                             self.next(); // fill
@@ -525,10 +525,10 @@ where
         self.next();
 
         let name = self.expect_ident(&Some(Token::LeftBracket));
-        let members = self.enum_body()?;
-        let end = members.1.end;
+        let fields = self.enum_body()?;
+        let end = fields.1.end;
 
-        Some(Spanned(WEnum { name, fields: members }, Span::new(start, end)))
+        Some(Spanned(WEnum { name, fields }, Span::new(start, end)))
     }
 
     pub fn expect_ident(&mut self, token_after: &Option<Token>) -> Spanned<String> {
