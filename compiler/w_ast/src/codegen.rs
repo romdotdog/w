@@ -218,7 +218,9 @@ impl Display for Atom {
                 if let Some(ret) = ret {
                     write!(f, " {}", ret)?;
                 }
-                write!(f, " -> ${}", label)?;
+                if let Some(label) = label {
+                    write!(f, " -> ${}", label)?;
+                }
                 if let Some(cond) = cond {
                     write!(f, " if {}", cond)?;
                 }

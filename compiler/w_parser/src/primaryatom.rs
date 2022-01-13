@@ -68,45 +68,49 @@ where
     fn parse_br(&mut self) -> Option<Spanned<Atom>> {
         let start = self.start;
         assert_eq!(self.tk, Some(Token::Br));
+        let mut end = self.end;
         self.next();
 
         // TODO: refactor double arrow check
         let ret = match self.tk {
-            Some(Token::Arrow) => None,
-            _ => Some(Box::new(self.atom()?)),
-        };
-
-        match self.tk {
-            Some(Token::Arrow) => self.next(),
+            Some(Token::Arrow | Token::If) => None,
             _ => {
-                // TODO: fix error
-                self.error(Message::MissingLabel, self.span());
+                let a = self.atom()?;
+                end = a.1.end;
+                Some(Box::new(a))
             }
         };
 
-        let label = match self.take() {
-            Some(Token::Label(x)) => {
-                let span = self.span();
-                self.next(); // fill
-                Spanned(x, span)
+        let label = match self.tk {
+            Some(Token::Arrow) => {
+                self.next();
+                Some(match self.take() {
+                    Some(Token::Label(x)) => {
+                        end = self.end;
+                        let span = self.span();
+                        self.next(); // fill
+                        Spanned(x, span)
+                    }
+                    Some(Token::Ident(x)) => {
+                        end = self.end;
+                        let span = self.span();
+                        self.error(Message::IdentifierIsNotLabel, span);
+                        self.next(); // fill
+                        Spanned(format!("${}", x), span)
+                    }
+                    tk => {
+                        // br -> if ...
+                        //      ^
+                        self.fill(tk);
+                        let span = self.span();
+                        self.error(Message::MissingLabel, span);
+                        Spanned("<unknown>".to_owned(), span)
+                    }
+                })
             }
-            Some(Token::Ident(x)) => {
-                let span = self.span();
-                self.error(Message::IdentifierIsNotLabel, span);
-                self.next(); // fill
-                Spanned(format!("${}", x), span)
-            }
-            tk => {
-                // br -> if ...
-                //      ^
-                self.fill(tk);
-                let span = self.span();
-                self.error(Message::MissingLabel, span);
-                Spanned("<unknown>".to_owned(), span)
-            }
+            _ => None,
         };
 
-        let mut end = label.1.end;
         let cond = match self.tk {
             Some(Token::If) => {
                 self.next();

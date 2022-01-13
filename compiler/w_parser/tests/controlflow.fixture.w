@@ -15,8 +15,8 @@ fn main() {
 	let foo = {
 		bar + 1
 	};
-	let bar = $l: {
-		br bar + 1 -> $l
+	let bar = {
+		br bar + 1
 	};
 	loop return 1;
 	{

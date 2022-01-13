@@ -21,8 +21,8 @@ fn main() {
 		bar + 1
 	};
 
-	let bar = $l: {
-		br bar + 1 -> $l
+	let bar = {
+		br bar + 1
 	};
 
 	// error: need semicolon after 1

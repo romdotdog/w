@@ -72,7 +72,7 @@ pub enum Atom {
     If(BAtom, BAtom, Option<BAtom>),
 
     Return(Option<BAtom>),
-    Br(Option<BAtom>, Spanned<String>, Option<BAtom>),
+    Br(Option<BAtom>, Option<Spanned<String>>, Option<BAtom>),
 }
 
 #[derive(Clone)]
