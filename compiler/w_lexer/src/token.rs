@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Fn,
@@ -109,8 +111,6 @@ pub enum UnOp {
 
     Inc,
     Dec,
-    Reinterpret,
-    Cast,
 
     /// shorthand for -1 - x
     BNot,
@@ -151,4 +151,38 @@ ambiguous! {
     Plus => (Add, Plus),
     Ampersand => (And, AddrOf),
     Asterisk => (Mul, Deref)
+}
+
+impl Display for BinOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BinOp::Compound(BinOpVariant::Id) => write!(f, "="),
+            BinOp::Compound(v) => write!(f, "{}=", v),
+            BinOp::Regular(v) => write!(f, "{}", v),
+        }
+    }
+}
+
+impl Display for BinOpVariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BinOpVariant::Id => panic!(),
+            BinOpVariant::Lt => write!(f, "<"),
+            BinOpVariant::Le => write!(f, "<="),
+            BinOpVariant::Gt => write!(f, ">"),
+            BinOpVariant::Ge => write!(f, ">="),
+            BinOpVariant::EqC => write!(f, "=="),
+            BinOpVariant::Neq => write!(f, "!="),
+            BinOpVariant::Add => write!(f, "+"),
+            BinOpVariant::Sub => write!(f, "-"),
+            BinOpVariant::Mul => write!(f, "*"),
+            BinOpVariant::Div => write!(f, "/"),
+            BinOpVariant::Mod => write!(f, "%"),
+            BinOpVariant::Xor => write!(f, "^"),
+            BinOpVariant::And => write!(f, "&"),
+            BinOpVariant::Or => write!(f, "|"),
+            BinOpVariant::Rsh => write!(f, ">>"),
+            BinOpVariant::Lsh => write!(f, "<<"),
+        }
+    }
 }

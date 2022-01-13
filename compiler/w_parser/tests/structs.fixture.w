@@ -1,3 +1,17 @@
+enum <unknown> {
+}enum <unknown> {
+}struct <unknown> {
+}struct <unknown> {
+}struct Foo {
+	mut foo: i32;
+	bar: i32;
+}union <unknown> {
+}union <unknown> {
+}union Foo {
+	foo: i32;
+	mut bar: i32;
+}
+
 // "missing identifier here" - 1:7+1
 // "invalid identifier here" - 2:8+1
 // "missing identifier here" - 9:6+1

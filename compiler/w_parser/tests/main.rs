@@ -63,9 +63,9 @@ macro_rules! test {
             };
 
             let parser = Parser::new(&handler, ());
-            parser.parse();
+            let prog = parser.parse();
 
-            let t = handler.serialize_errors();
+            let t = format!("{}\n\n{}", prog, handler.serialize_errors());
             if let Ok(fixture_src) = fs::read_to_string(fixture) {
                 let mut failed = false;
                 let diff = TextDiff::from_lines(&fixture_src, &t);

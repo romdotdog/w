@@ -10,6 +10,8 @@ pub use indir::Indir;
 mod span;
 pub use span::Span;
 
+mod codegen;
+
 pub struct Program {
     pub fns: Vec<Spanned<WFn>>,
     pub structs: Vec<Spanned<WStruct>>,
