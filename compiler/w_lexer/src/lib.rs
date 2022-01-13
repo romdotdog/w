@@ -414,6 +414,7 @@ fn keyword(s: String) -> Token {
 		"br" => Token::Br,
 		"struct" => Token::Struct,
 		"union" => Token::Union,
+		"enum" => Token::Enum,
         _ => Token::Ident(s),
     }
 }

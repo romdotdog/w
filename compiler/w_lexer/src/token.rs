@@ -7,6 +7,7 @@ pub enum Token {
     Let,
     Struct,
     Union,
+    Enum,
 
     Else,
     Mut,

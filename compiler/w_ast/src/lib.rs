@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use w_lexer::{BinOp, UnOp};
 
 mod types;
@@ -13,6 +14,7 @@ pub struct Program {
     pub fns: Vec<Spanned<WFn>>,
     pub structs: Vec<Spanned<WStruct>>,
     pub unions: Vec<Spanned<WUnion>>,
+    pub enums: Vec<Spanned<WEnum>>,
 }
 
 type BAtom = Box<Spanned<Atom>>;
@@ -32,6 +34,11 @@ pub struct WStruct {
 pub struct WUnion {
     pub name: Spanned<String>,
     pub fields: Spanned<Vec<Spanned<IdentPair>>>,
+}
+
+pub struct WEnum {
+    pub name: Spanned<String>,
+    pub members: Spanned<HashMap<String, i64>>,
 }
 
 pub enum IncDec {
