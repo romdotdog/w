@@ -128,14 +128,14 @@ where
             matches!(
                 c,
                 ':' | ';' | ',' | '.' | 
-				// sep
-				'{'| '}' | '(' | ')' | '[' | ']' | 
-				// sep
+                // sep
+                '{'| '}' | '(' | ')' | '[' | ']' | 
+                // sep
                 '*' | '/' | '%' | '^' | '&' | '|' | '~' |
-				// sep
-				'>'  | '<' | '=' | '!' | '+' | '-' |
-				// sep
-            	'\'' | '"'
+                // sep
+                '>'  | '<' | '=' | '!' | '+' | '-' |
+                // sep
+                '\'' | '"'
             )
         }
 
@@ -405,16 +405,16 @@ where
 fn keyword(s: String) -> Token {
     match s.as_str() {
         "fn" => Token::Fn,
-		"return" => Token::Return,
-		"if" => Token::If,
-		"else" => Token::Else,
-		"let" => Token::Let,
-		"mut" => Token::Mut,
-		"loop" => Token::Loop,
-		"br" => Token::Br,
-		"struct" => Token::Struct,
-		"union" => Token::Union,
-		"enum" => Token::Enum,
+        "return" => Token::Return,
+        "if" => Token::If,
+        "else" => Token::Else,
+        "let" => Token::Let,
+        "mut" => Token::Mut,
+        "loop" => Token::Loop,
+        "br" => Token::Br,
+        "struct" => Token::Struct,
+        "union" => Token::Union,
+        "enum" => Token::Enum,
         _ => Token::Ident(s),
     }
 }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use w_errors::Message;
-use w_lexer::{AmbiguousOp, BinOp, Lexer, Token, BinOpVariant};
+use w_lexer::{AmbiguousOp, BinOp, BinOpVariant, Lexer, Token};
 
 mod handler;
 mod primaryatom;
@@ -9,7 +9,7 @@ mod simpleatom;
 
 pub use handler::Handler;
 use w_ast::{
-    Atom, IdentPair, Indir, Program, Span, Spanned, Type, TypeVariant, WFn, WStruct, WUnion, WEnum,
+    Atom, IdentPair, Indir, Program, Span, Spanned, Type, TypeVariant, WEnum, WFn, WStruct, WUnion,
 };
 
 pub struct Parser<'a, H, I>
@@ -65,32 +65,35 @@ where
     /// returns true if the current token can begin
     /// an atom
     pub fn can_begin_atom(&self) -> bool {
-		matches!(self.tk, Some(
-			// keywords
-			Token::Let  |
-			Token::Loop |
-			Token::Br |
-			Token::Return |
-			Token::If |
+        matches!(
+            self.tk,
+            Some(
+                // keywords
+                Token::Let  |
+                Token::Loop |
+                Token::Br |
+                Token::Return |
+                Token::If |
 
-			// unary ops
-			Token::BinOp(BinOp::Regular(BinOpVariant::Lt)) | // cast
-			Token::AmbiguousOp(_) |
-			Token::UnOp(_) |
-			
-			// symbols
-			Token::LeftParen |
-			Token::LeftBracket |
-			
-			// literals
-			Token::Float(_) |
-			Token::Integer(_) |
-			Token::Ident(_) |
-			Token::String(_) |
-			Token::Char(_) |
-			Token::Label(_)
-		))
-	}
+                // unary ops
+                Token::BinOp(BinOp::Regular(BinOpVariant::Lt)) | // cast
+                Token::AmbiguousOp(_) |
+                Token::UnOp(_) |
+                
+                // symbols
+                Token::LeftParen |
+                Token::LeftBracket |
+                
+                // literals
+                Token::Float(_) |
+                Token::Integer(_) |
+                Token::Ident(_) |
+                Token::String(_) |
+                Token::Char(_) |
+                Token::Label(_)
+            )
+        )
+    }
 
     /// for owning enum fields
     fn take(&mut self) -> Option<Token> {
@@ -113,70 +116,75 @@ where
         Span::new(self.start, self.end)
     }
 
-	fn enum_body(&mut self) -> Option<Spanned<HashMap<String, i64>>> {
-		let mut digit = 0;
-		let start = self.start;
+    fn enum_body(&mut self) -> Option<Spanned<HashMap<String, i64>>> {
+        let mut digit = 0;
+        let start = self.start;
         if let Some(Token::LeftBracket) = self.tk {
-			let mut h = HashMap::new();
-			self.next();
+            let mut h = HashMap::new();
+            self.next();
 
-			let end = loop {
-				match self.tk {
-					Some(Token::RightBracket) => {
-						let end_ = self.end;
-						self.next();
-						break end_;
-					}
-					Some(Token::Comma) => {
-						self.error(Message::MissingIdentifier, Span::new(self.start - 1, self.start));
-						self.next();
-						continue;
-					}
-					_ => match self.take() { // take
-						Some(Token::Ident(s)) => {
-							self.next(); // fill
-							match self.tk {
-								Some(Token::Comma) => {
-									h.insert(s, digit);
-									digit += 1;
-									self.next();
-									continue;
-								}
-								Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
-									self.next();
-									match self.take() { // take
-										Some(Token::Integer(i)) => {
-											digit = i + 1;
-											h.insert(s, i);
-											self.next(); // fill
-										}
-										t => self.fill(t) // fill
-									}
-									match self.tk {
-										Some(Token::Comma) => {
-											self.next();
-											continue;
-										}
-										_ => return None
-									}
-								}
-								_ => return None
-							}
-						}
-						t => {
-							self.fill(t); // fill
-							return None
-						}
-					}
-				}
-			};
+            let end = loop {
+                match self.tk {
+                    Some(Token::RightBracket) => {
+                        let end_ = self.end;
+                        self.next();
+                        break end_;
+                    }
+                    Some(Token::Comma) => {
+                        self.error(
+                            Message::MissingIdentifier,
+                            Span::new(self.start - 1, self.start),
+                        );
+                        self.next();
+                        continue;
+                    }
+                    _ => match self.take() {
+                        // take
+                        Some(Token::Ident(s)) => {
+                            self.next(); // fill
+                            match self.tk {
+                                Some(Token::Comma) => {
+                                    h.insert(s, digit);
+                                    digit += 1;
+                                    self.next();
+                                    continue;
+                                }
+                                Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
+                                    self.next();
+                                    match self.take() {
+                                        // take
+                                        Some(Token::Integer(i)) => {
+                                            digit = i + 1;
+                                            h.insert(s, i);
+                                            self.next(); // fill
+                                        }
+                                        t => self.fill(t), // fill
+                                    }
+                                    match self.tk {
+                                        Some(Token::Comma) => {
+                                            self.next();
+                                            continue;
+                                        }
+                                        _ => return None,
+                                    }
+                                }
+                                _ => return None,
+                            }
+                        }
+                        t => {
+                            self.fill(t); // fill
+                            return None;
+                        }
+                    },
+                }
+            };
 
-			Some(Spanned(h, Span::new(start, end)))
-		} else {
-			self.error(Message::MissingOpeningBracket, self.span());
-			None
-		}
-	}
+            Some(Spanned(h, Span::new(start, end)))
+        } else {
+            self.error(Message::MissingOpeningBracket, self.span());
+            None
+        }
+    }
 
     fn type_body(
         &mut self,
@@ -502,100 +510,101 @@ where
         }
     }
 
-	pub fn parse_enum(&mut self) -> Option<Spanned<WEnum>> {
-		let start = self.start;
-		debug_assert_eq!(self.tk, Some(Token::Enum));
-		self.next();
+    pub fn parse_enum(&mut self) -> Option<Spanned<WEnum>> {
+        let start = self.start;
+        debug_assert_eq!(self.tk, Some(Token::Enum));
+        self.next();
 
-		let name = self.expect_ident(&Some(Token::LeftBracket));
-		let members = self.enum_body()?;
-		let end = members.1.end;
+        let name = self.expect_ident(&Some(Token::LeftBracket));
+        let members = self.enum_body()?;
+        let end = members.1.end;
 
-		Some(Spanned(
-			WEnum {
-				name, members
-			},
-			Span::new(start, end)
-		))
-	}
+        Some(Spanned(WEnum { name, members }, Span::new(start, end)))
+    }
 
-	pub fn expect_ident(&mut self, token_after: &Option<Token>) -> Spanned<String> {
-		if &self.tk == token_after {
-			// struct  {
-			//        ^
-			let pos = self.start;
-			let span = Span::new(pos - 1, pos);
-			self.error(Message::MissingIdentifier, span);
-			Spanned("<unknown>".to_owned(), span)
-		} else {
-			match self.take() { // take
-				Some(Token::Ident(s)) => {
-					// struct ident {
-					//        ^^^^^
+    pub fn expect_ident(&mut self, token_after: &Option<Token>) -> Spanned<String> {
+        if &self.tk == token_after {
+            // struct  {
+            //        ^
+            let pos = self.start;
+            let span = Span::new(pos - 1, pos);
+            self.error(Message::MissingIdentifier, span);
+            Spanned("<unknown>".to_owned(), span)
+        } else {
+            match self.take() {
+                // take
+                Some(Token::Ident(s)) => {
+                    // struct ident {
+                    //        ^^^^^
 
-					let span = self.span();
-					self.next(); // fill
-					Spanned(s, span)
-				}
-				Some(Token::Label(s)) => {
-					// struct $label {
-					//        ^^^^^^
-					let span = self.span();
-					self.next(); // fill
-					self.error(Message::LabelIsNotIdentifier, span);
+                    let span = self.span();
+                    self.next(); // fill
+                    Spanned(s, span)
+                }
+                Some(Token::Label(s)) => {
+                    // struct $label {
+                    //        ^^^^^^
+                    let span = self.span();
+                    self.next(); // fill
+                    self.error(Message::LabelIsNotIdentifier, span);
                     Spanned(format!("${}", s), span)
-				}
-				_ => {
-					// struct ! {
-					//        ^
-					let span = self.span();
-					self.next(); // fill
-					self.error(Message::MalformedIdentifier, span);
-					Spanned("<unknown>".to_owned(), span)
-				}
-			}
-		}
-	}
+                }
+                _ => {
+                    // struct ! {
+                    //        ^
+                    let span = self.span();
+                    self.next(); // fill
+                    self.error(Message::MalformedIdentifier, span);
+                    Spanned("<unknown>".to_owned(), span)
+                }
+            }
+        }
+    }
 
-	pub fn struct_or_union(&mut self, is_struct: bool, structs: &mut Vec<Spanned<WStruct>>, unions: &mut Vec<Spanned<WUnion>>) {
-		let start = self.start;
-		debug_assert!(matches!(self.tk, Some(Token::Struct | Token::Union)));
-		self.next();
+    pub fn struct_or_union(
+        &mut self,
+        is_struct: bool,
+        structs: &mut Vec<Spanned<WStruct>>,
+        unions: &mut Vec<Spanned<WUnion>>,
+    ) {
+        let start = self.start;
+        debug_assert!(matches!(self.tk, Some(Token::Struct | Token::Union)));
+        self.next();
 
-		let name = self.expect_ident(&Some(Token::LeftBracket));
-		if let Some(fields) = self.type_body(false) {
-			let end = fields.1.end;
-			if is_struct {
-				structs.push(Spanned(WStruct { name, fields }, Span::new(start, end)));
-			} else {
-				unions.push(Spanned(WUnion { name, fields }, Span::new(start, end)));
-			}
-		} else {
-			self.panic_top_level(true);
-		}
-	}
+        let name = self.expect_ident(&Some(Token::LeftBracket));
+        if let Some(fields) = self.type_body(false) {
+            let end = fields.1.end;
+            if is_struct {
+                structs.push(Spanned(WStruct { name, fields }, Span::new(start, end)));
+            } else {
+                unions.push(Spanned(WUnion { name, fields }, Span::new(start, end)));
+            }
+        } else {
+            self.panic_top_level(true);
+        }
+    }
 
     pub fn parse(mut self) -> Program {
         let mut fns = Vec::new();
         let mut structs = Vec::new();
         let mut unions = Vec::new();
-		let mut enums = Vec::new();
+        let mut enums = Vec::new();
         loop {
             match self.tk {
                 Some(Token::Fn) => match self.function() {
                     Some(f) => fns.push(f),
                     None => self.panic_top_level(false),
                 },
-				Some(Token::Struct) => {
-					self.struct_or_union(true, &mut structs, &mut unions);
-				}
+                Some(Token::Struct) => {
+                    self.struct_or_union(true, &mut structs, &mut unions);
+                }
                 Some(Token::Union) => {
                     self.struct_or_union(false, &mut structs, &mut unions);
                 }
-				Some(Token::Enum) => match self.parse_enum() {
-					Some(f) => enums.push(f),
-					None => self.panic_top_level(true),
-				}
+                Some(Token::Enum) => match self.parse_enum() {
+                    Some(f) => enums.push(f),
+                    None => self.panic_top_level(true),
+                },
                 Some(_) => {
                     self.error(Message::InvalidTopLevel, self.span());
                     self.panic_top_level(false);
@@ -608,7 +617,7 @@ where
             fns,
             structs,
             unions,
-			enums
+            enums,
         }
     }
 }
