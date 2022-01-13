@@ -1,13 +1,27 @@
 enum <unknown> {
-}enum <unknown> {
-}struct <unknown> {
-}struct <unknown> {
-}struct Foo {
+}
+
+enum <unknown> {
+}
+
+struct <unknown> {
+}
+
+struct <unknown> {
+}
+
+struct Foo {
 	mut foo: i32;
 	bar: i32;
-}union <unknown> {
-}union <unknown> {
-}union Foo {
+}
+
+union <unknown> {
+}
+
+union <unknown> {
+}
+
+union Foo {
 	foo: i32;
 	mut bar: i32;
 }

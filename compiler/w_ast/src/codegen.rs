@@ -14,16 +14,16 @@ impl<T: Display> Display for Spanned<T> {
 impl Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         for wenum in &self.enums {
-            write!(f, "{}", wenum)?;
+            write!(f, "{}\n\n", wenum)?;
         }
         for wstruct in &self.structs {
-            write!(f, "{}", wstruct)?;
+            write!(f, "{}\n\n", wstruct)?;
         }
         for wunion in &self.unions {
-            write!(f, "{}", wunion)?;
+            write!(f, "{}\n\n", wunion)?;
         }
         for wfn in &self.fns {
-            write!(f, "{}", wfn)?;
+            write!(f, "{}\n\n", wfn)?;
         }
         Ok(())
     }

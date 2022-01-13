@@ -154,8 +154,8 @@ where
                                     match self.take() {
                                         // take
                                         Some(Token::Integer(i)) => {
-                                            digit = i + 1;
                                             h.insert(s, i);
+                                            digit = i + 1;
                                             self.next(); // fill
                                         }
                                         t => self.fill(t), // fill
