@@ -12,11 +12,17 @@ fn main() {
 	$hi2: {
 		br -> $hi2;
 	};
+	let foo = {
+		bar + 1
+	};
+	let bar = $l: {
+		br bar + 1 -> $l
+	};
 	loop return 1;
 	{
 	};
 	return 2 + 2;
 }
 
-// "loop body may only be a block" - 21:7+8
-// "missing a semicolon or closing brace" - 21:16+1
+// "loop body may only be a block" - 29:7+8
+// "missing a semicolon or closing brace" - 29:16+1
