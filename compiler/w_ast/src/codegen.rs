@@ -77,10 +77,10 @@ impl Display for WEnum {
         let mut d = 0;
         for (s, &v) in v {
             if d == v {
-                write!(f, "\t{},", s)?;
+                writeln!(f, "\t{},", s)?;
                 d += 1;
             } else {
-                write!(f, "\t{} = {},", s, v)?;
+                writeln!(f, "\t{} = {},", s, v)?;
                 d = v + 1;
             }
         }

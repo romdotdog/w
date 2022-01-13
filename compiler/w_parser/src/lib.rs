@@ -143,11 +143,22 @@ where
                             let sident = self.span();
                             self.next(); // fill
                             match self.tk {
+                                Some(Token::RightBracket) => {
+                                    match h.entry(s) {
+                                        Entry::Vacant(e) => { e.insert(digit); },
+                                        Entry::Occupied(_) => self.error(Message::DuplicateEnumField, sident),
+                                    }
+
+                                    let end_ = self.end;
+                                    self.next();
+                                    break end_;
+                                }
                                 Some(Token::Comma) => {
                                     match h.entry(s) {
                                         Entry::Vacant(e) => { e.insert(digit); },
                                         Entry::Occupied(_) => self.error(Message::DuplicateEnumField, sident),
                                     }
+
                                     digit += 1;
                                     self.next();
                                     continue;
@@ -170,14 +181,25 @@ where
                                         },
                                     }
                                     match self.tk {
+                                        Some(Token::RightBracket) => {
+                                            let end_ = self.end;
+                                            self.next();
+                                            break end_;
+                                        }
                                         Some(Token::Comma) => {
                                             self.next();
                                             continue;
                                         }
-                                        _ => return None,
+                                        _ => {
+                                            self.error(Message::UnexpectedToken, self.span());
+                                            return None
+                                        },
                                     }
                                 }
-                                _ => return None,
+                                _ => {
+                                    self.error(Message::UnexpectedToken, self.span());
+                                    return None
+                                },
                             }
                         }
                         t => {

@@ -4,6 +4,12 @@ enum <unknown> {
 enum <unknown> {
 }
 
+enum Foo {
+	Foo = 1,
+	Bar,
+	Baz = 5,
+}
+
 struct <unknown> {
 }
 
