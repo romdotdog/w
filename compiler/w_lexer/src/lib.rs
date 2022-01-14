@@ -14,7 +14,6 @@ where
 {
     stream: I,
     buffer: Option<char>,
-    skip_first: bool,
     done: bool,
     pos: usize,
 }
@@ -27,7 +26,6 @@ where
         Lexer {
             stream,
             buffer: None,
-            skip_first: false,
             done: false,
             pos: 0,
         }
@@ -356,8 +354,7 @@ where
     }
 
     fn nextc(&mut self) -> Option<char> {
-        self.pos += self.skip_first as usize;
-        self.skip_first = true;
+        self.pos += 1;
         self.buffer.take().or_else(|| self.stream.next())
     }
 
@@ -459,7 +456,7 @@ where
                     keyword(ident)
                 })
             })
-            .map(|t| (t, start, self.pos + 1))
+            .map(|t| (t, start - 1, self.pos))
     }
 }
 
