@@ -30,7 +30,7 @@ impl LineCol {
     /// # Panics
     /// if i >= size of source
     pub fn line_col(&self, i: usize) -> LineColResult {
-        assert!(i < self.src_size);
+        assert!(i <= self.src_size);
 
         // binary search
         let mut lo = 0;

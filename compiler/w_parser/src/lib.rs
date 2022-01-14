@@ -353,7 +353,7 @@ where
             _ => None,
         };
 
-        let ident = self.expect_ident(&Some(Token::Colon));
+        let ident = self.expect_ident(Some(Token::Colon));
         let mut end = ident.1.end;
         let t = match self.tk {
             Some(Token::Colon) => {
@@ -432,44 +432,23 @@ where
         debug_assert_eq!(self.tk, Some(Token::Fn));
         self.next();
 
-        let name = match self.take() {
-            Some(Token::Ident(s)) => {
-                let span = self.span();
-                self.next(); // fill
-                Spanned(s, span)
-            }
-            tk @ Some(Token::LeftParen) => {
-                // fn  (...
-                //    ^
-                self.error(
-                    Message::MissingIdentifier,
-                    Span::new(self.start - 1, self.end - 1),
-                );
-                self.fill(tk);
-                return None;
-            }
-            tk => {
-                // fn !(...
-                //    ^
-                self.error(Message::MalformedIdentifier, self.span());
-                self.fill(tk);
-                return None;
-            }
-        };
-
-        match self.tk {
-            Some(Token::LeftParen) => self.next(),
+        let name = self.expect_ident(Some(Token::LeftParen));
+        let paren_end = match self.tk {
+            Some(Token::LeftParen) => {
+				self.next();
+				self.end
+			},
             _ => {
                 self.error(Message::MissingOpeningParen, self.span());
                 return None;
             }
-        }
+        };
 
         let mut params = Vec::new();
 
         match self.tk {
             Some(Token::RightParen) => self.next(),
-            _ => loop {
+            Some(Token::Ident(_) | Token::Mut) => loop {
                 params.push(self.ident_type_pair(true)?);
                 match self.tk {
                     Some(Token::Comma) => self.next(),
@@ -477,16 +456,22 @@ where
                         self.next();
                         break;
                     }
-                    _ => {
-                        // fn ident(mut ident: type
-                        //                         ^
-                        // TODO: refactor
-                        let pos = params[params.len() - 1].1.end + 1;
-                        self.error(Message::MissingClosingParen, Span::new(pos, pos + 1));
-                        return None;
-                    }
+					_ => {
+						// fn ident(mut ident: type
+						//                         ^
+						// TODO: refactor
+						let pos = params[params.len() - 1].1.end;
+						self.error(Message::MissingClosingParen, Span::new(pos, pos + 1));
+						return None;
+					}
                 }
             },
+			_ => {
+				// fn ident(
+				//          ^
+				self.error(Message::MissingClosingParen, Span::new(paren_end, paren_end + 1));
+				return None;
+			}
         }
 
         let t = match self.tk {
@@ -546,15 +531,15 @@ where
         debug_assert_eq!(self.tk, Some(Token::Enum));
         self.next();
 
-        let name = self.expect_ident(&Some(Token::LeftBracket));
+        let name = self.expect_ident(Some(Token::LeftBracket));
         let fields = self.enum_body()?;
         let end = fields.1.end;
 
         Some(Spanned(WEnum { name, fields }, Span::new(start, end)))
     }
 
-    pub fn expect_ident(&mut self, token_after: &Option<Token>) -> Spanned<String> {
-        if &self.tk == token_after {
+    pub fn expect_ident(&mut self, token_after: Option<Token>) -> Spanned<String> {
+		if self.tk == token_after {
             // struct  {
             //        ^
             let pos = self.start;
@@ -602,7 +587,7 @@ where
         debug_assert!(matches!(self.tk, Some(Token::Struct | Token::Union)));
         self.next();
 
-        let name = self.expect_ident(&Some(Token::LeftBracket));
+        let name = self.expect_ident(Some(Token::LeftBracket));
         if let Some(fields) = self.type_body(false) {
             let end = fields.1.end;
             if is_struct {
