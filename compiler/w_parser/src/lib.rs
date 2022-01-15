@@ -103,6 +103,14 @@ where
         )
     }
 
+	fn span(&self) -> Span {
+        Span::new(self.start, self.end)
+    }
+
+    pub(crate) fn error(&self, msg: Message, span: Span) {
+        self.session.error(&self.src_ref, msg, span);
+    }
+
     /// for owning enum fields
     fn take<T, F>(&mut self, f: F) -> T
 	where 
@@ -121,12 +129,38 @@ where
         }
     }
 
-    pub(crate) fn error(&self, msg: Message, span: Span) {
-        self.session.error(&self.src_ref, msg, span);
-    }
-
-    fn span(&self) -> Span {
-        Span::new(self.start, self.end)
+	pub fn expect_ident(&mut self, token_after: &Option<Token>) -> Spanned<String> {
+		if &self.tk == token_after {
+            // struct  {
+            //        ^
+            let pos = self.start;
+            let span = Span::new(pos - 1, pos);
+            self.error(Message::MissingIdentifier, span);
+            Spanned("<unknown>".to_owned(), span)
+        } else {
+            self.take(|this, t| Next(match t {
+                // take
+                Some(Token::Ident(s)) => {
+                    // struct ident {
+                    //        ^^^^^
+                    Spanned(s, this.span())
+                }
+                Some(Token::Label(s)) => {
+                    // struct $label {
+                    //        ^^^^^^
+                    let span = this.span();
+                    this.error(Message::LabelIsNotIdentifier, span);
+                    Spanned(format!("${}", s), span)
+                }
+                _ => {
+                    // struct ! {
+                    //        ^
+                    let span = this.span();
+                    this.error(Message::MalformedIdentifier, span);
+                    Spanned("<unknown>".to_owned(), span)
+                }
+            }))
+        }
     }
 
     fn parse_type(&mut self) -> Option<Spanned<Type>> {
@@ -288,39 +322,5 @@ where
     pub fn atom(&mut self) -> Option<Spanned<Atom>> {
         let lhs = self.primaryatom()?;
         self.subatom(lhs, 0)
-    }
-
-    pub fn expect_ident(&mut self, token_after: &Option<Token>) -> Spanned<String> {
-		if &self.tk == token_after {
-            // struct  {
-            //        ^
-            let pos = self.start;
-            let span = Span::new(pos - 1, pos);
-            self.error(Message::MissingIdentifier, span);
-            Spanned("<unknown>".to_owned(), span)
-        } else {
-            self.take(|this, t| Next(match t {
-                // take
-                Some(Token::Ident(s)) => {
-                    // struct ident {
-                    //        ^^^^^
-                    Spanned(s, this.span())
-                }
-                Some(Token::Label(s)) => {
-                    // struct $label {
-                    //        ^^^^^^
-                    let span = this.span();
-                    this.error(Message::LabelIsNotIdentifier, span);
-                    Spanned(format!("${}", s), span)
-                }
-                _ => {
-                    // struct ! {
-                    //        ^
-                    let span = this.span();
-                    this.error(Message::MalformedIdentifier, span);
-                    Spanned("<unknown>".to_owned(), span)
-                }
-            }))
-        }
     }
 }
