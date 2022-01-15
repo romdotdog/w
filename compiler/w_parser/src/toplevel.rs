@@ -1,4 +1,4 @@
-use super::{Handler, Parser};
+use super::{Fill, Handler, Next, Parser};
 use std::collections::{hash_map::Entry, HashMap};
 use w_ast::{IdentPair, Program, Span, Spanned, WEnum, WFn, WStruct, WUnion};
 use w_errors::Message;
@@ -14,96 +14,90 @@ where
     fn enum_body(&mut self) -> Option<Spanned<HashMap<String, i64>>> {
         let mut digit = 0;
         let start = self.start;
-        if let Some(Token::LeftBracket) = self.tk {
-            let mut h = HashMap::new();
-            self.next();
+        let mut h = HashMap::new();
+        self.next();
 
-            let end = loop {
-                match self.tk {
-                    Some(Token::RightBracket) => {
-                        let end_ = self.end;
-                        self.next();
-                        break end_;
-                    }
-                    Some(Token::Comma) => {
-                        self.error(
-                            Message::MissingIdentifier,
-                            Span::new(self.start - 1, self.start),
-                        );
-                        self.next();
-                        continue;
-                    }
-                    _ => match self.take() {
+        let end = loop {
+            match self.tk {
+                Some(Token::RightBracket) => {
+                    let end_ = self.end;
+                    self.next();
+                    break end_;
+                }
+                Some(Token::Comma) => {
+                    self.error(
+                        Message::MissingIdentifier,
+                        Span::new(self.start - 1, self.start),
+                    );
+                    self.next();
+                    continue;
+                }
+                _ => {
+                    let (sident, s) = self.take(|this, t| match t {
                         // take
-                        Some(Token::Ident(s)) => {
-                            let sident = self.span();
-                            self.next(); // fill
-                            match self.tk {
-                                Some(Token::RightBracket) => {
+                        Some(Token::Ident(s)) => Next(Some((this.span(), s))),
+                        t => Fill(None, t),
+                    })?;
+
+                    match self.tk {
+                        Some(Token::RightBracket) => {
+                            match h.entry(s) {
+                                Entry::Vacant(e) => {
+                                    e.insert(digit);
+                                }
+                                Entry::Occupied(_) => {
+                                    self.error(Message::DuplicateEnumField, sident);
+                                }
+                            }
+
+                            let end_ = self.end;
+                            self.next();
+                            break end_;
+                        }
+                        Some(Token::Comma) => {
+                            match h.entry(s) {
+                                Entry::Vacant(e) => {
+                                    e.insert(digit);
+                                }
+                                Entry::Occupied(_) => {
+                                    self.error(Message::DuplicateEnumField, sident);
+                                }
+                            }
+
+                            digit += 1;
+                            self.next();
+                            continue;
+                        }
+                        Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
+                            self.next();
+                            digit = self.take(|this, t| match t {
+                                // take
+                                Some(Token::Integer(i)) => {
                                     match h.entry(s) {
                                         Entry::Vacant(e) => {
-                                            e.insert(digit);
+                                            e.insert(i);
                                         }
-                                        Entry::Occupied(_) => {
-                                            self.error(Message::DuplicateEnumField, sident);
-                                        }
+                                        Entry::Occupied(_) => this.error(
+                                            Message::DuplicateEnumField,
+                                            Span::new(sident.start, this.end),
+                                        ),
                                     }
-
+                                    Next(i + 1)
+                                }
+                                t => {
+                                    this.error(Message::MissingInteger, this.span());
+                                    Fill(digit + 1, t)
+                                }
+                            });
+                            match self.tk {
+                                Some(Token::RightBracket) => {
                                     let end_ = self.end;
                                     self.next();
                                     break end_;
                                 }
                                 Some(Token::Comma) => {
-                                    match h.entry(s) {
-                                        Entry::Vacant(e) => {
-                                            e.insert(digit);
-                                        }
-                                        Entry::Occupied(_) => {
-                                            self.error(Message::DuplicateEnumField, sident);
-                                        }
-                                    }
-
-                                    digit += 1;
                                     self.next();
                                     continue;
-                                }
-                                Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
-                                    self.next();
-                                    match self.take() {
-                                        // take
-                                        Some(Token::Integer(i)) => {
-                                            match h.entry(s) {
-                                                Entry::Vacant(e) => {
-                                                    e.insert(i);
-                                                }
-                                                Entry::Occupied(_) => self.error(
-                                                    Message::DuplicateEnumField,
-                                                    Span::new(sident.start, self.end),
-                                                ),
-                                            }
-                                            digit = i + 1;
-                                            self.next(); // fill
-                                        }
-                                        t => {
-                                            self.error(Message::MissingInteger, self.span());
-                                            self.fill(t); // fill
-                                        }
-                                    }
-                                    match self.tk {
-                                        Some(Token::RightBracket) => {
-                                            let end_ = self.end;
-                                            self.next();
-                                            break end_;
-                                        }
-                                        Some(Token::Comma) => {
-                                            self.next();
-                                            continue;
-                                        }
-                                        _ => {
-                                            self.error(Message::UnexpectedToken, self.span());
-                                            return None;
-                                        }
-                                    }
                                 }
                                 _ => {
                                     self.error(Message::UnexpectedToken, self.span());
@@ -111,19 +105,16 @@ where
                                 }
                             }
                         }
-                        t => {
-                            self.fill(t); // fill
+                        _ => {
+                            self.error(Message::UnexpectedToken, self.span());
                             return None;
                         }
-                    },
+                    }
                 }
-            };
+            }
+        };
 
-            Some(Spanned(h, Span::new(start, end)))
-        } else {
-            self.error(Message::MissingOpeningBracket, self.span());
-            None
-        }
+        Some(Spanned(h, Span::new(start, end)))
     }
 
     pub fn parse_enum(&mut self) -> Option<Spanned<WEnum>> {
@@ -132,10 +123,14 @@ where
         self.next();
 
         let name = self.expect_ident(&Some(Token::LeftBracket));
-        let fields = self.enum_body()?;
-        let end = fields.1.end;
-
-        Some(Spanned(WEnum { name, fields }, Span::new(start, end)))
+        if let Some(Token::LeftBracket) = self.tk {
+            let fields = self.enum_body()?;
+            let end = fields.1.end;
+            Some(Spanned(WEnum { name, fields }, Span::new(start, end)))
+        } else {
+            self.error(Message::MissingOpeningBracket, self.span());
+            None
+        }
     }
 
     // structs

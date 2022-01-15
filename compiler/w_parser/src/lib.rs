@@ -24,6 +24,16 @@ where
     tk: Option<Token>,
 }
 
+enum Take<T> {
+	Next(T),
+	Fill(T, Option<Token>),
+	// self.next() already called
+	// dangerous if used improperly
+	NoFill(T)
+}
+
+use Take::{Fill, Next, NoFill};
+
 impl<'a, H, I> Parser<'a, H, I>
 where
     H: Handler<LexerInput = I>,
@@ -94,16 +104,21 @@ where
     }
 
     /// for owning enum fields
-    fn take(&mut self) -> Option<Token> {
-        // TODO: maybe turn into a function that
-        // accepts a closure?
-
-        self.tk.take()
-    }
-
-    fn fill(&mut self, value: Option<Token>) {
-        debug_assert!(self.tk.is_none());
-        self.tk = value;
+    fn take<T, F>(&mut self, f: F) -> T
+	where 
+		F: FnOnce(&mut Self, Option<Token>) -> Take<T> {
+		let t = self.tk.take();
+        match f(self, t) {
+            Take::Next(t) => {
+				self.next();
+				t
+			},
+            Take::Fill(t, tk) => {
+				self.tk = tk;
+				t
+			},
+			Take::NoFill(t) => t
+        }
     }
 
     pub(crate) fn error(&self, msg: Message, span: Span) {
@@ -168,21 +183,21 @@ where
                         Span::new(start, end),
                     ));
                 }
-                _ => match self.take() {
-                    Some(Token::Ident(s)) => {
-                        let end = self.end;
-                        self.next();
-                        return Some(Spanned(
-                            Type::with_indir(s.into(), indir),
-                            Span::new(start, end),
-                        ));
-                    }
-                    t => {
-                        self.fill(t);
-                        self.error(Message::MalformedType, self.span());
-                        return None;
-                    }
-                },
+                _ => return self.take(|this, t| {
+					match t {
+						Some(Token::Ident(s)) => {
+							let end = this.end;
+							Next(Some(Spanned(
+								Type::with_indir(s.into(), indir),
+								Span::new(start, end),
+							)))
+						}
+						t => {
+							this.error(Message::MalformedType, this.span());
+							Fill(None, t)
+						}
+					}
+				}),
             }
         }
     }
@@ -284,33 +299,28 @@ where
             self.error(Message::MissingIdentifier, span);
             Spanned("<unknown>".to_owned(), span)
         } else {
-            match self.take() {
+            self.take(|this, t| Next(match t {
                 // take
                 Some(Token::Ident(s)) => {
                     // struct ident {
                     //        ^^^^^
-
-                    let span = self.span();
-                    self.next(); // fill
-                    Spanned(s, span)
+                    Spanned(s, this.span())
                 }
                 Some(Token::Label(s)) => {
                     // struct $label {
                     //        ^^^^^^
-                    let span = self.span();
-                    self.next(); // fill
-                    self.error(Message::LabelIsNotIdentifier, span);
+                    let span = this.span();
+                    this.error(Message::LabelIsNotIdentifier, span);
                     Spanned(format!("${}", s), span)
                 }
                 _ => {
                     // struct ! {
                     //        ^
-                    let span = self.span();
-                    self.next(); // fill
-                    self.error(Message::MalformedIdentifier, span);
+                    let span = this.span();
+                    this.error(Message::MalformedIdentifier, span);
                     Spanned("<unknown>".to_owned(), span)
                 }
-            }
+            }))
         }
     }
 }

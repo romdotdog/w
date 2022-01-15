@@ -1,4 +1,4 @@
-use super::{Handler, Parser};
+use super::{Fill, Handler, Next, NoFill, Parser};
 use w_ast::{Atom, IncDec, Span, Spanned};
 use w_errors::Message;
 use w_lexer::{Token, UnOp};
@@ -127,21 +127,17 @@ where
 
                 Some(Token::Period) => {
                     self.next();
-                    match self.take() {
-                        Some(Token::Ident(s)) => {
-                            lhs = Spanned(
-                                Atom::Access(Box::new(lhs), Spanned(s, self.span())),
-                                Span::new(start, self.end),
-                            );
-                            self.next(); // fill
-                        }
+                    lhs = self.take(|this, t| match t {
+                        Some(Token::Ident(s)) => Next(Some(Spanned(
+                            Atom::Access(Box::new(lhs), Spanned(s, this.span())),
+                            Span::new(start, this.end),
+                        ))),
                         tk => {
                             // TODO: review
-                            self.fill(tk); // fill
-                            self.error(Message::MissingIdentifier, self.span());
-                            return None;
+                            this.error(Message::MissingIdentifier, this.span());
+                            Fill(None, tk)
                         }
-                    }
+                    })?;
                 }
 
                 Some(Token::LeftSqBracket) => {
@@ -240,60 +236,43 @@ where
             Some(Token::LeftBracket) => self.parse_block(None),
             Some(Token::Loop) => self.parse_loop(None)?,
             _ => {
-                match self.take() {
-                    Some(Token::Float(f)) => {
-                        let span = self.span();
-                        self.next(); // fill
-                        Spanned(Atom::Float(f), span)
-                    }
-                    Some(Token::Integer(i)) => {
-                        let span = self.span();
-                        self.next(); // fill
-                        Spanned(Atom::Integer(i), span)
-                    }
+                self.take(|this, t| match t {
+                    Some(Token::Float(f)) => Next(Some(Spanned(Atom::Float(f), this.span()))),
+                    Some(Token::Integer(i)) => Next(Some(Spanned(Atom::Integer(i), this.span()))),
+                    Some(Token::String(s)) => Next(Some(Spanned(Atom::String(s), this.span()))),
+                    Some(Token::Char(s)) => Next(Some(Spanned(Atom::Char(s), this.span()))),
                     Some(Token::Ident(s)) => {
-                        let span = self.span();
-                        self.next(); // fill
-                        if let Some(Token::Colon) = self.tk {
-                            self.error(Message::IdentifierIsNotLabel, self.span());
+                        let span = this.span();
+                        this.next(); // fill
+                        if let Some(Token::Colon) = this.tk {
+                            this.error(Message::IdentifierIsNotLabel, this.span());
                             // TODO: not label behavior
                         };
-                        Spanned(Atom::Ident(s), span)
-                    }
-                    Some(Token::String(s)) => {
-                        let span = self.span();
-                        self.next(); // fill
-                        Spanned(Atom::String(s), span)
-                    }
-                    Some(Token::Char(s)) => {
-                        let span = self.span();
-                        self.next(); // fill
-                        Spanned(Atom::Char(s), span)
+                        NoFill(Some(Spanned(Atom::Ident(s), span)))
                     }
                     Some(Token::Label(x)) => {
-                        let x = Spanned(x, self.span());
-                        self.next(); // fill
-                        match self.tk {
-                            Some(Token::Colon) => self.next(),
-                            _ => self.error(Message::MissingColon, self.span()),
+                        let x = Spanned(x, this.span());
+                        this.next(); // fill
+                        match this.tk {
+                            Some(Token::Colon) => this.next(),
+                            _ => this.error(Message::MissingColon, this.span()),
                         };
 
-                        match self.tk {
-                            Some(Token::LeftBracket) => self.parse_block(Some(x)),
-                            Some(Token::Loop) => self.parse_loop(Some(x))?,
+                        NoFill(match this.tk {
+                            Some(Token::LeftBracket) => Some(this.parse_block(Some(x))),
+                            Some(Token::Loop) => this.parse_loop(Some(x)),
                             _ => {
                                 // TODO: parse atom?
-                                self.error(Message::CannotFollowLabel, self.span());
-                                return None;
+                                this.error(Message::CannotFollowLabel, this.span());
+                                None
                             }
-                        }
+                        })
                     }
                     tk => {
-                        self.fill(tk); // fill
-                        self.error(Message::UnexpectedToken, self.span());
-                        return None;
+                        this.error(Message::UnexpectedToken, this.span());
+                        Fill(None, tk)
                     }
-                }
+                })?
             }
         };
 

@@ -1,4 +1,4 @@
-use super::{Handler, Parser};
+use super::{Fill, Handler, Next, Parser};
 use w_ast::{Atom, Span, Spanned};
 use w_errors::Message;
 use w_lexer::{BinOp, BinOpVariant, Token, UnOp};
@@ -84,29 +84,26 @@ where
         let label = match self.tk {
             Some(Token::Arrow) => {
                 self.next();
-                Some(match self.take() {
+                Some(self.take(|this, t| match t {
                     Some(Token::Label(x)) => {
-                        end = self.end;
-                        let span = self.span();
-                        self.next(); // fill
-                        Spanned(x, span)
+                        end = this.end;
+                        let span = this.span();
+                        Next(Spanned(x, span))
                     }
                     Some(Token::Ident(x)) => {
-                        end = self.end;
-                        let span = self.span();
-                        self.error(Message::IdentifierIsNotLabel, span);
-                        self.next(); // fill
-                        Spanned(format!("${}", x), span)
+                        end = this.end;
+                        let span = this.span();
+                        this.error(Message::IdentifierIsNotLabel, span);
+                        Next(Spanned(format!("${}", x), span))
                     }
                     tk => {
                         // br -> if ...
                         //      ^
-                        self.fill(tk);
-                        let span = self.span();
-                        self.error(Message::MissingLabel, span);
-                        Spanned("<unknown>".to_owned(), span)
+                        let span = this.span();
+                        this.error(Message::MissingLabel, span);
+                        Fill(Spanned("<unknown>".to_owned(), span), tk)
                     }
-                })
+                }))
             }
             _ => None,
         };
