@@ -1,7 +1,6 @@
-use w_lexer::{AmbiguousOp, BinOp, BinOpVariant, Lexer, Token};
 use w_ast::{Atom, IdentPair, Indir, Span, Spanned, Type, TypeVariant};
 use w_errors::Message;
-
+use w_lexer::{AmbiguousOp, BinOp, BinOpVariant, Lexer, Token};
 
 mod handler;
 mod primaryatom;
@@ -25,11 +24,11 @@ where
 }
 
 enum Take<T> {
-	Next(T),
-	Fill(T, Option<Token>),
-	// self.next() already called
-	// dangerous if used improperly
-	NoFill(T)
+    Next(T),
+    Fill(T, Option<Token>),
+    // self.next() already called
+    // dangerous if used improperly
+    NoFill(T),
 }
 
 use Take::{Fill, Next, NoFill};
@@ -103,7 +102,7 @@ where
         )
     }
 
-	fn span(&self) -> Span {
+    fn span(&self) -> Span {
         Span::new(self.start, self.end)
     }
 
@@ -113,24 +112,25 @@ where
 
     /// for owning enum fields
     fn take<T, F>(&mut self, f: F) -> T
-	where 
-		F: FnOnce(&mut Self, Option<Token>) -> Take<T> {
-		let t = self.tk.take();
+    where
+        F: FnOnce(&mut Self, Option<Token>) -> Take<T>,
+    {
+        let t = self.tk.take();
         match f(self, t) {
             Take::Next(t) => {
-				self.next();
-				t
-			},
+                self.next();
+                t
+            }
             Take::Fill(t, tk) => {
-				self.tk = tk;
-				t
-			},
-			Take::NoFill(t) => t
+                self.tk = tk;
+                t
+            }
+            Take::NoFill(t) => t,
         }
     }
 
-	pub fn expect_ident(&mut self, token_after: &Option<Token>) -> Spanned<String> {
-		if &self.tk == token_after {
+    pub fn expect_ident(&mut self, token_after: &Option<Token>) -> Spanned<String> {
+        if &self.tk == token_after {
             // struct  {
             //        ^
             let pos = self.start;
@@ -138,28 +138,30 @@ where
             self.error(Message::MissingIdentifier, span);
             Spanned("<unknown>".to_owned(), span)
         } else {
-            self.take(|this, t| Next(match t {
-                // take
-                Some(Token::Ident(s)) => {
-                    // struct ident {
-                    //        ^^^^^
-                    Spanned(s, this.span())
-                }
-                Some(Token::Label(s)) => {
-                    // struct $label {
-                    //        ^^^^^^
-                    let span = this.span();
-                    this.error(Message::LabelIsNotIdentifier, span);
-                    Spanned(format!("${}", s), span)
-                }
-                _ => {
-                    // struct ! {
-                    //        ^
-                    let span = this.span();
-                    this.error(Message::MalformedIdentifier, span);
-                    Spanned("<unknown>".to_owned(), span)
-                }
-            }))
+            self.take(|this, t| {
+                Next(match t {
+                    // take
+                    Some(Token::Ident(s)) => {
+                        // struct ident {
+                        //        ^^^^^
+                        Spanned(s, this.span())
+                    }
+                    Some(Token::Label(s)) => {
+                        // struct $label {
+                        //        ^^^^^^
+                        let span = this.span();
+                        this.error(Message::LabelIsNotIdentifier, span);
+                        Spanned(format!("${}", s), span)
+                    }
+                    _ => {
+                        // struct ! {
+                        //        ^
+                        let span = this.span();
+                        this.error(Message::MalformedIdentifier, span);
+                        Spanned("<unknown>".to_owned(), span)
+                    }
+                })
+            })
         }
     }
 
@@ -217,21 +219,21 @@ where
                         Span::new(start, end),
                     ));
                 }
-                _ => return self.take(|this, t| {
-					match t {
-						Some(Token::Ident(s)) => {
-							let end = this.end;
-							Next(Some(Spanned(
-								Type::with_indir(s.into(), indir),
-								Span::new(start, end),
-							)))
-						}
-						t => {
-							this.error(Message::MalformedType, this.span());
-							Fill(None, t)
-						}
-					}
-				}),
+                _ => {
+                    return self.take(|this, t| match t {
+                        Some(Token::Ident(s)) => {
+                            let end = this.end;
+                            Next(Some(Spanned(
+                                Type::with_indir(s.into(), indir),
+                                Span::new(start, end),
+                            )))
+                        }
+                        t => {
+                            this.error(Message::MalformedType, this.span());
+                            Fill(None, t)
+                        }
+                    })
+                }
             }
         }
     }
