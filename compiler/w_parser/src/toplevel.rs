@@ -2,13 +2,9 @@ use super::{Fill, Handler, Next, Parser};
 use std::collections::{hash_map::Entry, HashMap};
 use w_ast::{IdentPair, Program, Span, Spanned, WEnum, WFn, WStruct, WUnion};
 use w_errors::Message;
-use w_lexer::{BinOp, BinOpVariant, Token};
+use w_lexer::token::{BinOp, BinOpVariant, Token};
 
-impl<'a, H, I> Parser<'a, H, I>
-where
-    H: Handler<LexerInput = I>,
-    I: Iterator<Item = char>,
-{
+impl<'a, H: Handler> Parser<'a, H> {
     // enums
 
     fn enum_body(&mut self) -> Option<Spanned<HashMap<String, i64>>> {

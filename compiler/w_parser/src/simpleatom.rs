@@ -1,13 +1,9 @@
 use super::{Fill, Handler, Next, NoFill, Parser};
 use w_ast::{Atom, IncDec, Span, Spanned};
 use w_errors::Message;
-use w_lexer::{Token, UnOp};
+use w_lexer::token::{Token, UnOp};
 
-impl<'a, H, I> Parser<'a, H, I>
-where
-    H: Handler<LexerInput = I>,
-    I: Iterator<Item = char>,
-{
+impl<'a, H: Handler> Parser<'a, H> {
     pub(crate) fn parse_block(&mut self, label: Option<Spanned<String>>) -> Spanned<Atom> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::LeftBracket));

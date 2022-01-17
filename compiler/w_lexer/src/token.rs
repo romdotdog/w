@@ -32,8 +32,10 @@ pub enum Token {
     UnOp(UnOp),
     AmbiguousOp(AmbiguousOp),
 
+    UInteger(u64),
     Integer(i64),
     Float(f64),
+    Overflown,
 
     String(String),
     Char(char),

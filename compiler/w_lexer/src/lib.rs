@@ -1,479 +1,499 @@
-/*
-    BIP - Below Ident Priority
-    AIP - Above Ident Priority
-*/
+use std::ptr;
 
-mod token;
+use dec2flt::{
+    convert_sign_and_mantissa,
+    parse::{parse_decimal, parse_number},
+};
 
-use std::iter::FromIterator;
-pub use token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
+pub mod token;
+use token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
 
-pub struct Lexer<I>
-where
-    I: Iterator<Item = char>,
-{
-    stream: I,
-    buffer: Option<char>,
-    done: bool,
+// a reduced version of the rust std string-to-float parsing library
+mod dec2flt;
+pub struct Lexer<'a> {
+    buffer: &'a [u8],
     pos: usize,
 }
 
-impl<I> Lexer<I>
-where
-    I: Iterator<Item = char>,
-{
-    pub fn new(stream: I) -> Self {
-        Lexer {
-            stream,
-            buffer: None,
-            done: false,
-            pos: 0,
-        }
+impl<'a> Lexer<'a> {
+    pub fn new(buffer: &'a [u8]) -> Self {
+        Lexer { buffer, pos: 0 }
     }
 
-    fn try_take_equals(&mut self) -> bool {
-        match self.nextc() {
-            Some('=') => true,
-            t => {
-                self.backtrack(t);
-                false
+    unsafe fn step_by(&mut self, n: usize) {
+        self.buffer = self.buffer.get_unchecked(n..);
+    }
+
+    unsafe fn step(&mut self) {
+        self.step_by(1);
+    }
+
+    fn parse_radix(&mut self, radix: u8) -> Option<u64> {
+        assert!(radix <= 36, "parse_radix: radix is too high (maximum 36)");
+        let mut x: u64 = 0;
+        let mut not_overflown = true;
+        while let Some(&c) = self.buffer.first() {
+            let mut v = c.wrapping_sub(b'0');
+            if radix > 10 && v > 10 {
+                // Force the 6th bit to be set to ensure ascii is lower case.
+                v = (c | 0b10_0000).wrapping_sub(b'a').saturating_add(10);
             }
-        }
-    }
-
-    fn skip_digits(&mut self, buf: &mut String, radix: u32) {
-        loop {
-            match self.nextc() {
-                Some(t) if t.is_digit(radix) => {
-                    buf.push(t);
+            if v < radix {
+                if not_overflown {
+                    x
+                        .checked_mul(u64::from(radix))
+                        .and_then(|x| x.checked_add(u64::from(v)))
+						.map_or_else(|| not_overflown = false, |nx| x = nx);
                 }
-                c1 => {
-                    self.backtrack(c1);
-                    break;
+
+                unsafe {
+                    self.step();
                 }
-            }
-        }
-    }
-
-    fn parse_string(&mut self) -> String {
-        let mut res = String::new();
-
-        loop {
-            match self.nextc() {
-                Some('\\') => {
-                    // check the first character
-                    let header_char = self.nextc().expect("expected escape character, got <eof>");
-
-                    if let Some(radix) = char_to_radix(header_char) {
-                        let radix = u32::from(radix);
-
-                        //  ^ \x6e, \d71
-                        // if there is no applicable digit after, then treat as normal escape
-                        match self.nextc() {
-                            Some(header_digit) if header_digit.is_digit(radix) => {
-                                // go on parsing as normal
-                                let mut num = header_digit.to_string();
-                                loop {
-                                    match self.nextc() {
-                                        Some(t) if t.is_digit(radix) => {
-                                            num.push(t);
-                                        }
-                                        c1 => {
-                                            self.backtrack(c1);
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                let codepoint = u32::from_str_radix(&num, radix);
-                                assert!(codepoint.is_ok(), "max escape value is {}", u32::MAX);
-
-                                let escaped = std::char::from_u32(codepoint.unwrap());
-                                assert!(
-                                    escaped.is_some(),
-                                    "invalid codepoint, cannot add \\{}{} as part of escape",
-                                    header_char,
-                                    num
-                                );
-
-                                // push the codepoint
-                                res.push(escaped.unwrap());
-                            }
-                            t => self.backtrack(t),
-                        }
-                    } else {
-                        res.push(match header_char {
-                            't' => '\t',
-                            'r' => '\r',
-                            'n' => '\n',
-                            _ => header_char, // is not an escape
-                        });
-                    }
-                }
-                Some('"') => {
-                    break;
-                }
-                Some(c) => res.push(c),
-                None => panic!("incomplete string literal"),
-            }
-        }
-
-        res
-    }
-
-    fn parse_ident(&mut self, ident: &mut String) {
-        fn start_of_token(c: char) -> bool {
-            matches!(
-                c,
-                ':' | ';' | ',' | '.' | 
-                // sep
-                '{'| '}' | '(' | ')' | '[' | ']' | 
-                // sep
-                '*' | '/' | '%' | '^' | '&' | '|' | '~' |
-                // sep
-                '>'  | '<' | '=' | '!' | '+' | '-' |
-                // sep
-                '\'' | '"'
-            )
-        }
-
-        while let Some(c2) = self.nextc() {
-            if c2.is_whitespace() {
+            } else {
                 break;
             }
-
-            if start_of_token(c2) {
-                self.backtrack(Some(c2));
-                break;
-            }
-
-            ident.push(c2);
-        }
-    }
-
-    fn parse_char(&mut self) -> Token {
-        let c2 = self.nextc();
-        match self.nextc() {
-            Some('\'') => Token::Char(c2.unwrap()),
-            t => {
-                // Errors are idents
-                let mut ident = match t {
-                    Some(t) => String::from_iter(&['\'', c2.unwrap(), t]),
-                    None => match c2 {
-                        Some(t) => String::from_iter(&['\'', t]),
-                        None => "\'".to_string(),
-                    },
-                };
-                self.parse_ident(&mut ident);
-                Token::Ident(ident)
-            }
-        }
-    }
-
-    fn try_aip(&mut self, c: char) -> Option<Token> {
-        macro_rules! op {
-            (@ambiguous $t: ident) => {{
-                let amb = AmbiguousOp::$t;
-                match self.try_take_equals() {
-                    true => Token::BinOp(BinOp::Compound(amb.binary())),
-                    false => Token::AmbiguousOp(amb),
-                }
-            }};
-
-            (@binary $t: ident) => {
-                Token::BinOp(match self.try_take_equals() {
-                    true => BinOp::Compound(BinOpVariant::$t),
-                    false => BinOp::Regular(BinOpVariant::$t),
-                })
-            };
-
-            (@compound $t: ident) => {
-                Token::BinOp(BinOp::Compound(BinOpVariant::$t))
-            };
-
-            (@simple $t: ident) => {
-                Token::BinOp(BinOp::Regular(BinOpVariant::$t))
-            };
-
-            (@unary $t: ident) => {
-                Token::UnOp(UnOp::$t)
-            };
         }
 
-        Some(match c {
-            ':' => Token::Colon,
-            ';' => Token::Semicolon,
-            ',' => Token::Comma,
-            '{' => Token::LeftBracket,
-            '}' => Token::RightBracket,
-            '(' => Token::LeftParen,
-            ')' => Token::RightParen,
-            '[' => Token::LeftSqBracket,
-            ']' => Token::RightSqBracket,
-
-            '*' => op!(@ambiguous Asterisk),
-            '/' => op!(@binary Div),
-
-            '%' => op!(@binary Mod),
-            '^' => op!(@binary Xor),
-            '&' => op!(@ambiguous Ampersand),
-            '|' => op!(@binary Or),
-            '~' => op!(@unary BNot),
-
-            '\'' => self.parse_char(),
-            '"' => Token::String(self.parse_string()),
-
-            '>' | '<' | '=' | '!' | '+' | '-' => {
-                // two char ops
-                let c2 = self.nextc();
-                match (c, c2) {
-                    ('>', Some('=')) => op!(@binary Ge),
-                    ('<', Some('=')) => op!(@binary Le),
-                    ('<', Some('<')) => op!(@binary Lsh),
-                    ('>', Some('>')) => op!(@binary Rsh),
-                    ('<', _) => {
-                        self.backtrack(c2);
-                        op!(@simple Lt)
-                    }
-                    ('>', _) => {
-                        self.backtrack(c2);
-                        op!(@simple Gt)
-                    }
-
-                    ('=', Some('=')) => op!(@binary EqC),
-                    ('=', _) => {
-                        self.backtrack(c2);
-                        op!(@compound Id)
-                    }
-
-                    ('!', Some('=')) => op!(@binary Neq),
-                    ('!', _) => {
-                        self.backtrack(c2);
-                        op!(@unary LNot)
-                    }
-
-                    ('+', Some('+')) => op!(@unary Inc),
-                    ('+', _) => {
-                        self.backtrack(c2);
-                        op!(@ambiguous Plus)
-                    }
-
-                    ('-', Some('-')) => op!(@unary Dec),
-                    ('-', Some('>')) => Token::Arrow,
-                    ('-', _) => {
-                        self.backtrack(c2);
-                        op!(@ambiguous Minus)
-                    }
-
-                    (_, _) => panic!(),
-                }
-            }
-            _ => return None,
-        })
-    }
-
-    fn try_bip(&mut self, c: char) -> Option<Token> {
-        Some(match c {
-            '.' | '0'..='9' => {
-                let mut num = if c == '.' {
-                    match self.nextc() {
-                        Some(n @ '0'..='9') => {
-                            format!("0.{}", n)
-                        }
-                        ch => {
-                            self.backtrack(ch);
-                            return Some(Token::Period);
-                        }
-                    }
-                } else {
-                    c.to_string()
-                };
-
-                let mut radix = 10_u8;
-
-                if c == '0' {
-                    let t = self.nextc();
-                    match t {
-                        Some(header_char) => {
-                            if let Some(radix_) = char_to_radix(header_char) {
-                                radix = radix_;
-                            } else {
-                                self.backtrack(t);
-                            }
-                        }
-                        None => return Some(Token::Integer(0)),
-                    }
-                }
-
-                self.skip_digits(&mut num, radix.into());
-
-                let seen_period = if c == '.' {
-                    true
-                } else if radix == 10_u8 {
-                    match self.nextc() {
-                        Some('.') => {
-                            num.push('.');
-                            self.skip_digits(&mut num, 10);
-                            true
-                        }
-                        t => {
-                            self.backtrack(t);
-                            false
-                        }
-                    }
-                } else {
-                    false
-                };
-
-                match self.nextc() {
-                    Some('E' | 'e') if radix == 10_u8 => {
-                        match self.nextc() {
-                            Some(ch @ ('+' | '-')) => num.push(ch),
-                            ch @ Some(_) => self.backtrack(ch),
-                            None => todo!(),
-                        }
-                        self.skip_digits(&mut num, 10);
-                    }
-                    ch => self.backtrack(ch),
-                }
-
-                if seen_period {
-                    Token::Float(num.parse::<f64>().unwrap())
-                } else {
-                    let num = u64::from_str_radix(&num, radix.into()).unwrap();
-                    Token::Integer(unsafe { std::mem::transmute::<u64, i64>(num) })
-                }
-            }
-            _ => return self.try_aip(c),
-        })
-    }
-
-    fn try_tk_bip(&mut self, c: char) -> Option<Token> {
-        let t = self.try_bip(c)?;
-        Some(t)
-    }
-
-    fn nextc(&mut self) -> Option<char> {
-        self.pos += 1;
-        self.buffer.take().or_else(|| self.stream.next())
-    }
-
-    fn backtrack(&mut self, t: Option<char>) {
-        self.buffer = t;
-        self.pos -= 1;
-    }
-
-    /// returns the first non-comment character
-    #[allow(clippy::single_match)]
-    fn skip_comments(&mut self) -> Option<char> {
-        loop {
-            match self.nextc() {
-                Some('/') => match self.nextc() {
-                    // single comment
-                    Some('/') => loop {
-                        match self.nextc() {
-                            Some('\n') => break,
-                            None => return None,
-                            _ => {}
-                        }
-                    },
-                    // multi-line comment
-                    Some('*') => loop {
-                        match self.nextc() {
-                            Some('*') => match self.nextc() {
-                                Some('/') => break,
-                                _ => {}
-                            },
-                            None => todo!(),
-                            _ => {}
-                        }
-                    },
-                    // neither, break loop
-                    _ => break Some('/'),
-                },
-                Some(c) if !c.is_whitespace() => break Some(c),
-                None => return None,
-                _ => {}
-            }
-        }
-    }
-}
-
-fn keyword(s: String) -> Token {
-    match s.as_str() {
-        "fn" => Token::Fn,
-        "return" => Token::Return,
-        "if" => Token::If,
-        "else" => Token::Else,
-        "let" => Token::Let,
-        "mut" => Token::Mut,
-        "loop" => Token::Loop,
-        "br" => Token::Br,
-        "struct" => Token::Struct,
-        "union" => Token::Union,
-        "enum" => Token::Enum,
-        _ => Token::Ident(s),
-    }
-}
-
-impl<I> Iterator for Lexer<I>
-where
-    I: Iterator<Item = char>,
-{
-    type Item = (Token, usize, usize);
-
-    fn next(&mut self) -> Option<(Token, usize, usize)> {
-        if self.done {
-            return None;
-        }
-
-        let c = if let Some(c) = self.skip_comments() {
-            c
+        if not_overflown {
+            Some(x)
         } else {
-            self.done = true;
-            return None;
+            None
+        }
+    }
+
+    fn check_radix(&self) -> Option<u8> {
+        if let Some(&radixc) = self.buffer.get(1) {
+            return char_to_radix(radixc);
+        }
+        None
+    }
+
+    fn try_bip(&mut self, b: u8) -> Option<Token> {
+        let start = self.buffer;
+
+        let negative = match b {
+            b'-' => {
+				unsafe { self.step() };
+                true
+            }
+            _ => false,
         };
 
-        let start = self.pos;
-        self.try_tk_bip(c)
-            .or_else(|| {
-                let is_label = c == '$';
-                let mut ident = if is_label {
-                    String::new()
+        match self.buffer.first() {
+            Some(b'1'..=b'9') => self.load_number(parse_number(self.buffer, negative)),
+            Some(b'.') => self.load_number(parse_decimal(start, negative)),
+            Some(b'0') =>
+            {
+                #[allow(clippy::option_if_let_else)]
+                if let Some(radix) = self.check_radix() {
+                    Some(match self.parse_radix(radix) {
+                        Some(mantissa) => convert_sign_and_mantissa(negative, mantissa),
+                        None => Token::Overflown,
+                    })
                 } else {
-                    c.to_string()
+                    self.load_number(parse_number(start, negative))
+                }
+            }
+            Some(_) => {
+				self.buffer = start;
+				self.try_aip(b)
+			},
+			None => {
+				self.buffer = start;
+				None
+			}
+        }
+    }
+
+    fn skip(&mut self, b: u8) {
+        self.buffer = match b {
+            0x00..=0x7F => &self.buffer[1..],
+            0x80..=0xBF => panic!("misaligned"),
+            0xC0..=0xDF => &self.buffer[2..],
+            0xE0..=0xEF => &self.buffer[3..],
+            0xF0..=0xF7 => &self.buffer[4..],
+            _ => panic!("not unicode"),
+        }
+    }
+
+    fn parse_string(&mut self) -> Token {
+        unsafe { self.step() };
+        self.pos += 1;
+        let start = self.buffer;
+        loop {
+            match self.buffer.first() {
+                Some(b'\\') => {
+                    unsafe { self.step() };
+                    self.pos += 1;
+                    if let Some(b'\"') = self.buffer.first() {
+                        unsafe { self.step() };
+                        self.pos += 1;
+                    }
+                }
+                Some(b'\"') => {
+                    unsafe { self.step() };
+                    self.pos += 1;
+                    break;
+                }
+                Some(&b) => self.skip(b),
+                None => break,
+            }
+        }
+        let bytes_read = start.len() - self.buffer.len();
+        Token::String(String::from_utf8_lossy(&start[0..bytes_read]).to_string())
+    }
+
+    fn parse_char(&mut self) -> Option<Token> {
+        unsafe { self.step() };
+        self.pos += 1;
+
+        let r = match self.buffer.first() {
+            Some(b'\\') => {
+                unsafe { self.step() };
+                self.pos += 1;
+
+                self.buffer.first().and_then(|b| {
+                    unsafe { self.step() };
+                    self.pos += 1;
+                    // TODO: add more escapes
+                    match b {
+                        b't' => Some(Token::Char('\t')),
+                        b'r' => Some(Token::Char('\r')),
+                        b'n' => Some(Token::Char('\n')),
+                        _ => None,
+                    }
+                })
+            }
+            Some(&b) => {
+                /// Mask of the value bits of a continuation byte.
+                const CONT_MASK: u8 = 0b0011_1111;
+                fn utf8_acc_cont_byte(ch: u32, byte: u8) -> u32 {
+                    (ch << 6) | u32::from(byte & CONT_MASK)
+                }
+
+                // get codepoint from following bytes
+                unsafe { self.step() };
+                self.pos += 1;
+                let codepoint = if b < 128 {
+                    u32::from(b)
+                } else {
+                    let init = u32::from(b & 0x1F);
+                    let y = self.buffer.first().copied().unwrap_or(0);
+                    let mut ch = utf8_acc_cont_byte(init, y);
+                    if b >= 0xE0 {
+                        let z = self.buffer.get(1).copied().unwrap_or(0);
+                        let y_z = utf8_acc_cont_byte(u32::from(y & CONT_MASK), z);
+                        ch = init << 12 | y_z;
+                        if b >= 0xF0 {
+                            let w = self.buffer.get(2).copied().unwrap_or(0);
+                            ch = (init & 7) << 18 | utf8_acc_cont_byte(y_z, w);
+                        }
+                    }
+                    ch
                 };
 
-                self.parse_ident(&mut ident);
+                // TODO: unchecked
+                Some(Token::Char(std::char::from_u32(codepoint).unwrap()))
+            }
+            None => return None,
+        };
 
-                Some(if is_label {
-                    if ident.is_empty() {
-                        Token::Ident("$".to_owned())
-                    } else {
-                        Token::Label(ident)
-                    }
-                } else {
-                    keyword(ident)
-                })
-            })
-            .map(|t| (t, start - 1, self.pos))
+        if let Some(b'\'') = self.buffer.first() {
+            unsafe { self.step() };
+            self.pos += 1;
+            r
+        } else {
+            None
+        }
+    }
+
+    fn try_aip(&mut self, b: u8) -> Option<Token> {
+        macro_rules! token {
+            (@ambiguous $t: ident, $n: expr) => {
+                token!(Token::AmbiguousOp(AmbiguousOp::$t), $n)
+            };
+
+            (@compound $t: ident, $n: expr) => {
+                token!(Token::BinOp(BinOp::Compound(BinOpVariant::$t)), $n)
+            };
+
+            (@simple $t: ident, $n: expr) => {
+                token!(Token::BinOp(BinOp::Regular(BinOpVariant::$t)), $n)
+            };
+
+            (@unop $t: ident, $n: expr) => {
+                token!(Token::UnOp(UnOp::$t), $n)
+            };
+
+            (@token $t: ident, $n: expr) => {
+                token!(Token::$t, $n)
+            };
+
+            ($t: expr, $n: expr) => {{
+                unsafe { self.step_by($n) };
+                self.pos += $n;
+                $t
+            }};
+        }
+
+        Some(match b {
+            b':' => token!(@token Colon, 1),
+            b';' => token!(@token Semicolon, 1),
+            b',' => token!(@token Comma, 1),
+            b'{' => token!(@token LeftBracket, 1),
+            b'}' => token!(@token RightBracket, 1),
+            b'(' => token!(@token LeftParen, 1),
+            b')' => token!(@token RightParen, 1),
+            b'[' => token!(@token LeftSqBracket, 1),
+            b']' => token!(@token RightSqBracket, 1),
+            b'~' => token!(@unop BNot, 1),
+            b'\'' => self.parse_char()?,
+            b'"' => self.parse_string(),
+            _ => match (b, self.buffer.get(1)) {
+                (b'+', Some(b'+')) => token!(@unop Inc, 2),
+                (b'+', Some(b'=')) => token!(@compound Add, 2),
+                (b'+', _) => token!(@ambiguous Plus, 1),
+
+                (b'-', Some(b'-')) => token!(@unop Dec, 2),
+                (b'-', Some(b'>')) => token!(@token Arrow, 2),
+                (b'-', Some(b'=')) => token!(@compound Sub, 2),
+                (b'-', _) => token!(@ambiguous Minus, 1),
+
+                (b'*', Some(b'=')) => token!(@compound Mul, 2),
+                (b'*', _) => token!(@ambiguous Asterisk, 1),
+
+                (b'/', Some(b'=')) => token!(@compound Div, 2),
+                (b'/', _) => token!(@simple Div, 1),
+
+                (b'%', Some(b'=')) => token!(@compound Mod, 2),
+                (b'%', _) => token!(@simple Mod, 1),
+
+                (b'^', Some(b'=')) => token!(@compound Xor, 2),
+                (b'^', _) => token!(@simple Xor, 1),
+
+                (b'&', Some(b'=')) => token!(@compound And, 2),
+                (b'&', _) => token!(@ambiguous Ampersand, 1),
+
+                (b'|', Some(b'=')) => token!(@compound Or, 2),
+                (b'|', _) => token!(@simple Or, 1),
+
+                (_, c) => match (b, c, self.buffer.get(2)) {
+                    (b'>', Some(b'>'), Some(b'=')) => token!(@compound Rsh, 3),
+                    (b'>', Some(b'>'), _) => token!(@simple Rsh, 2),
+                    (b'>', Some(b'='), Some(b'=')) => token!(@compound Ge, 3),
+                    (b'>', Some(b'='), _) => token!(@simple Ge, 2),
+                    (b'>', _, _) => token!(@simple Gt, 1),
+
+                    (b'<', Some(b'<'), Some(b'=')) => token!(@compound Lsh, 3),
+                    (b'<', Some(b'<'), _) => token!(@simple Lsh, 2),
+                    (b'<', Some(b'='), Some(b'=')) => token!(@compound Le, 3),
+                    (b'<', Some(b'='), _) => token!(@simple Le, 2),
+                    (b'<', _, _) => token!(@simple Lt, 1),
+
+                    (b'=', Some(b'='), Some(b'=')) => token!(@compound EqC, 3),
+                    (b'=', Some(b'='), _) => token!(@simple EqC, 2),
+                    (b'=', _, _) => token!(@compound Id, 1),
+
+                    (b'!', Some(b'='), Some(b'=')) => token!(@compound Neq, 3),
+                    (b'!', Some(b'='), _) => token!(@simple Neq, 2),
+                    (b'!', _, _) => token!(@unop LNot, 1),
+
+                    _ => return None,
+                },
+            },
+        })
+    }
+
+    fn is_whitespace(&mut self, c: u8) -> bool {
+        match c {
+			0x20 | // space
+			0x09 | // tab
+			0x0A | // \n
+			0x0B | // vertical tab
+			0x0C | // form feed
+			0x0D   // \r
+			=> {
+				unsafe { self.step() };
+				self.pos += 1;
+				true
+			},
+
+			// U+0085 - NEXT LINE (NEL)
+			// C2 85 - 11000010 10000101
+			0xC2 => {
+				match self.buffer.get(1) {
+					Some(0x85) => {
+						unsafe { self.step_by(2) };
+						self.pos += 1;
+						true
+					}
+					_ => false
+				}
+			}
+
+			// U+200E - LEFT-TO-RIGHT MARK
+			// E2 80 8E - 11100010 10000000 10001110
+			// U+200F - RIGHT-TO-LEFT MARK
+			// E2 80 8F - 11100010 10000000 10001111
+			// U+2028 - LINE SEPARATOR
+			// E2 80 A8 - 11100010 10000000 10101000
+			// U+2029 - PARAGRAPH SEPARATOR
+			// E2 80 A9 - 11100010 10000000 10101001
+			0xE2 => {
+				match (self.buffer.get(1), self.buffer.get(2)) {
+					(Some(0x80), Some(0x8E | 0x8F | 0xA8 | 0xA9)) => {
+						unsafe { self.step_by(3) };
+						self.pos += 1;
+						true
+					}
+					(_, _) => false
+				}
+			}
+			_ => false
+		}
+    }
+
+    fn skip_comments_and_whitespace(&mut self) -> bool {
+        loop {
+            match self.buffer.first() {
+                Some(b'/') => {
+                    match self.buffer.get(1) {
+                        // single comment
+                        Some(b'/') => {
+                            unsafe { self.step_by(2) };
+                            self.pos += 2;
+                            loop {
+                                self.pos += 1;
+								match self.buffer.first() {
+									Some(b'\n') => {
+										unsafe { self.step() };
+										break;
+									}
+									Some(&b) => self.skip(b),
+									None => break
+								}                                
+                            }
+                        }
+                        // multi-line comment
+                        Some(b'*') => {
+                            unsafe { self.step_by(2) };
+                            self.pos += 2;
+                            loop {
+								match self.buffer.first() {
+									Some(b'*') => {
+										self.pos += 1;
+										unsafe { self.step() };
+										if let Some(b'/') = self.buffer.first() {
+											self.pos += 1;
+											unsafe { self.step() };
+											break;
+										}
+									}
+									Some(&b) => self.skip(b),
+									None => break
+								}
+                            }
+                        }
+                        _ => break true,
+                    };
+                }
+                Some(&c) if self.is_whitespace(c) => {}
+                Some(_) => break true,
+                None => break false,
+            }
+        }
     }
 }
 
-fn char_to_radix(c: char) -> Option<u8> {
+impl<'a> Iterator for Lexer<'a> {
+    type Item = (Token, usize, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+		fn start_of_token(c: u8) -> bool {
+			matches!(
+				c,
+				b':' | b';' | b',' | b'.' | 
+				// sep
+				b'{' | b'}' | b'(' | b')' | b'[' | b']' | 
+				// sep
+				b'*' | b'/' | b'%' | b'^' | b'&' | b'|' | b'~' |
+				// sep
+				b'>'  | b'<' | b'=' | b'!' | b'+' | b'-' |
+				// sep
+				b'\'' | b'"'
+			)
+		}
+
+        if !self.skip_comments_and_whitespace() {
+            return None;
+        }
+
+        let start = self.buffer;
+		let start_pos = self.pos;
+        let &c = start.first()?;
+		let t = if let Some(t) = self.try_bip(c) {
+			t
+		} else {
+			let is_label = c == b'$';
+			while let Some(&b) = self.buffer.first() {
+				if self.is_whitespace(b) {
+					break;
+				}
+
+				if start_of_token(b) {
+					break;
+				}
+
+				self.skip(b);
+				self.pos += 1;
+			}
+
+			let len = start.len() - self.buffer.len();
+			if is_label {
+				if len == 1 {
+					Token::Ident('$'.to_string())
+				} else {
+					Token::Label(String::from_utf8_lossy(&start[1..len]).to_string())
+				}
+			} else {
+				keyword(&start[0..len])
+			}
+		};
+		Some((t, start_pos - 1, self.pos))
+    }
+}
+
+fn keyword(s: &[u8]) -> Token {
+    match s {
+        b"fn" => Token::Fn,
+        b"return" => Token::Return,
+        b"if" => Token::If,
+        b"else" => Token::Else,
+        b"let" => Token::Let,
+        b"mut" => Token::Mut,
+        b"loop" => Token::Loop,
+        b"br" => Token::Br,
+        b"struct" => Token::Struct,
+        b"union" => Token::Union,
+        b"enum" => Token::Enum,
+        _ => Token::Ident(String::from_utf8_lossy(s).to_string()),
+    }
+}
+
+fn char_to_radix(c: u8) -> Option<u8> {
     match c {
-        'b' => Some(2),
-        't' => Some(3),
-        'q' => Some(4),
-        'p' => Some(5),
-        'h' => Some(6),
-        's' => Some(7),
-        'o' => Some(8),
-        'e' => Some(9),
-        'd' => Some(10),
-        'l' => Some(11),
-        'z' => Some(12),
-        'x' => Some(16),
+        b'b' => Some(2),
+        b't' => Some(3),
+        b'q' => Some(4),
+        b'p' => Some(5),
+        b'h' => Some(6),
+        b's' => Some(7),
+        b'o' => Some(8),
+        b'e' => Some(9),
+        b'd' => Some(10),
+        b'l' => Some(11),
+        b'z' => Some(12),
+        b'x' => Some(16),
         _ => None,
     }
 }

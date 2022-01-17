@@ -1,6 +1,7 @@
 use w_ast::{Atom, IdentPair, Indir, Span, Spanned, Type, TypeVariant};
 use w_errors::Message;
-use w_lexer::{AmbiguousOp, BinOp, BinOpVariant, Lexer, Token};
+use w_lexer::Lexer;
+use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token};
 
 mod handler;
 mod primaryatom;
@@ -9,14 +10,11 @@ mod toplevel;
 
 pub use handler::Handler;
 
-pub struct Parser<'a, H, I>
-where
-    H: Handler<LexerInput = I>,
-    I: Iterator<Item = char>,
+pub struct Parser<'a, H: Handler>
 {
     session: &'a H,
     src_ref: H::SourceRef,
-    lex: Lexer<I>,
+    lex: Lexer<'a>,
 
     start: usize,
     end: usize,
@@ -33,10 +31,7 @@ enum Take<T> {
 
 use Take::{Fill, Next, NoFill};
 
-impl<'a, H, I> Parser<'a, H, I>
-where
-    H: Handler<LexerInput = I>,
-    I: Iterator<Item = char>,
+impl<'a, H: Handler> Parser<'a, H>
 {
     pub fn new(session: &'a H, src_ref: H::SourceRef) -> Self {
         let src = session.get_source(&src_ref);

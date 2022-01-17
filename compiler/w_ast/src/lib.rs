@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use w_lexer::{BinOp, UnOp};
+use w_lexer::token::{BinOp, UnOp};
 
 mod types;
 pub use types::{Type, TypeVariant};

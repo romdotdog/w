@@ -1,7 +1,7 @@
 use crate::{Spanned, WEnum, WStruct, WUnion};
 
 use super::{Atom, IdentPair, IncDec, Program, Type, TypeVariant, WFn};
-use w_lexer::UnOp;
+use w_lexer::token::UnOp;
 
 use std::fmt::{Display, Result};
 

@@ -1,13 +1,9 @@
 use super::{Fill, Handler, Next, Parser};
 use w_ast::{Atom, Span, Spanned};
 use w_errors::Message;
-use w_lexer::{BinOp, BinOpVariant, Token, UnOp};
+use w_lexer::token::{BinOp, BinOpVariant, Token, UnOp};
 
-impl<'a, H, I> Parser<'a, H, I>
-where
-    H: Handler<LexerInput = I>,
-    I: Iterator<Item = char>,
-{
+impl<'a, H: Handler> Parser<'a, H> {
     pub(crate) fn parse_let(&mut self) -> Option<Spanned<Atom>> {
         let start = self.start;
         assert_eq!(self.tk, Some(Token::Let));
