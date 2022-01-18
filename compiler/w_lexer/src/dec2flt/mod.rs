@@ -117,7 +117,6 @@ pub fn convert_sign_and_mantissa<'ast>(negative: bool, mantissa: u64) -> Token<'
 impl<'ast> Lexer<'ast> {
     pub(crate) fn load_number(&mut self, n: (Option<Number>, usize)) -> Option<Token<'ast>> {
         let (o, len) = n;
-        println!("nl {}", len);
         self.pos += len;
         unsafe { self.step_by(len) };
         if let Some(num) = o {

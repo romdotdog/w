@@ -475,7 +475,6 @@ impl<'ast> Iterator for Lexer<'ast> {
 			};
 
 			let len = start.len() - self.buffer.len() - l;
-			println!("len {}", len);
 			if is_label {
 				if len == 1 {
 					Token::Ident("$")
@@ -486,7 +485,6 @@ impl<'ast> Iterator for Lexer<'ast> {
 				keyword(&start[0..len])
 			}
 		};
-		println!("{:?}", t);
 		Some((t, start_pos, end_pos))
     }
 }
