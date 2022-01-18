@@ -33,18 +33,18 @@ impl ErrorHandler<'_> {
     }
 }
 
-impl<'a> Handler for ErrorHandler<'a> {
+impl<'a> Handler<'a> for ErrorHandler<'a> {
     type SourceRef = ();
 
     fn error(&self, _src_ref: &Self::SourceRef, msg: Message, span: Span) {
         self.errors.borrow_mut().push((msg, span));
     }
 
-    fn load_source(&self, _name: String) -> Option<Self::SourceRef> {
+    fn load_source(&'a self, _name: String) -> Option<&'a Self::SourceRef> {
         panic!("imports are not allowed in parser tests.");
     }
 
-    fn get_source(&self, _src_ref: &Self::SourceRef) -> &[u8] {
+    fn get_source(&self, _src_ref: &'a Self::SourceRef) -> &'a [u8] {
         self.src.src.as_bytes()
     }
 }
@@ -61,7 +61,7 @@ macro_rules! test {
                 errors: RefCell::new(Vec::new()),
             };
 
-            let parser = Parser::new(&handler, ());
+            let parser = Parser::new(&handler, &());
             let prog = parser.parse();
 
             let t = format!("{}{}", prog, handler.serialize_errors());

@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Token {
+pub enum Token<'ast> {
     Fn,
     Return,
     If,
@@ -37,10 +37,10 @@ pub enum Token {
     Float(f64),
     Overflown,
 
-    String(String),
     Char(char),
-    Ident(String),
-    Label(String),
+    String(&'ast str),
+    Ident(&'ast str),
+    Label(&'ast str),
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]

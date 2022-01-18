@@ -88,62 +88,9 @@ use self::lemire::compute_float;
 use self::number::Number;
 use self::slow::parse_long_mantissa;
 use super::{token::Token, Lexer};
+use std::convert::TryFrom;
 
 pub const POSITIVE_MIN_I64: u64 = 9_223_372_036_854_775_808;
-
-/// An error which can be returned when parsing a float.
-///
-/// This error is used as the error type for the [`FromStr`] implementation
-/// for [`f32`] and [`f64`].
-///
-/// # Example
-///
-/// ```
-/// use std::str::FromStr;
-///
-/// if let Err(e) = f64::from_str("a.12") {
-///     println!("Failed conversion to f64: {}", e);
-/// }
-/// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParseFloatError {
-    kind: FloatErrorKind,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum FloatErrorKind {
-    Empty,
-    Invalid,
-}
-
-impl ParseFloatError {
-    pub fn __description(&self) -> &str {
-        match self.kind {
-            FloatErrorKind::Empty => "cannot parse float from empty string",
-            FloatErrorKind::Invalid => "invalid float literal",
-        }
-    }
-}
-
-impl fmt::Display for ParseFloatError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.__description().fmt(f)
-    }
-}
-
-pub(super) fn pfe_empty() -> ParseFloatError {
-    ParseFloatError {
-        kind: FloatErrorKind::Empty,
-    }
-}
-
-// Used in unit tests, keep public.
-// This is much better than making FloatErrorKind and ParseFloatError::kind public.
-pub fn pfe_invalid() -> ParseFloatError {
-    ParseFloatError {
-        kind: FloatErrorKind::Invalid,
-    }
-}
 
 /// Converts a `BiasedFp` to the closest machine float type.
 fn biased_fp_to_float<T: RawFloat>(x: BiasedFp) -> T {
@@ -152,7 +99,7 @@ fn biased_fp_to_float<T: RawFloat>(x: BiasedFp) -> T {
     T::from_u64_bits(word)
 }
 
-pub fn convert_sign_and_mantissa(negative: bool, mantissa: u64) -> Token {
+pub fn convert_sign_and_mantissa<'ast>(negative: bool, mantissa: u64) -> Token<'ast> {
     if negative {
         match mantissa.cmp(&POSITIVE_MIN_I64) {
             #[allow(clippy::cast_possible_wrap)]
@@ -160,14 +107,19 @@ pub fn convert_sign_and_mantissa(negative: bool, mantissa: u64) -> Token {
             Ordering::Equal => Token::Integer(i64::MIN),
             Ordering::Greater => Token::Overflown,
         }
+    } else if let Ok(m) = i64::try_from(mantissa) {
+        Token::Integer(m)
     } else {
         Token::UInteger(mantissa)
     }
 }
 
-impl<'a> Lexer<'a> {
-    pub(crate) fn load_number(&mut self, n: (Option<Number>, usize)) -> Option<Token> {
+impl<'ast> Lexer<'ast> {
+    pub(crate) fn load_number(&mut self, n: (Option<Number>, usize)) -> Option<Token<'ast>> {
         let (o, len) = n;
+        println!("nl {}", len);
+        self.pos += len;
+        unsafe { self.step_by(len) };
         if let Some(num) = o {
             if num.exponent == 0 {
                 match convert_sign_and_mantissa(num.negative, num.mantissa) {
@@ -204,7 +156,6 @@ impl<'a> Lexer<'a> {
 
             return Some(Token::Float(float));
         }
-        unsafe { self.step_by(len) };
         None
     }
 }

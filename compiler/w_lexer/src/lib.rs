@@ -10,18 +10,30 @@ use token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
 
 // a reduced version of the rust std string-to-float parsing library
 mod dec2flt;
-pub struct Lexer<'a> {
-    buffer: &'a [u8],
+pub struct Lexer<'ast> {
+    buffer: &'ast [u8],
     pos: usize,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn new(buffer: &'a [u8]) -> Self {
+impl<'ast> Lexer<'ast> {
+    pub fn new(buffer: &'ast [u8]) -> Self {
         Lexer { buffer, pos: 0 }
     }
 
     unsafe fn step_by(&mut self, n: usize) {
         self.buffer = self.buffer.get_unchecked(n..);
+    }
+
+	fn skip(&mut self, b: u8) {
+		self.pos += 1;
+        self.buffer = match b {
+            0x00..=0x7F => &self.buffer[1..],
+            0x80..=0xBF => panic!("misaligned"),
+            0xC0..=0xDF => &self.buffer[2..],
+            0xE0..=0xEF => &self.buffer[3..],
+            0xF0..=0xF7 => &self.buffer[4..],
+            _ => panic!("not unicode"),
+        }
     }
 
     unsafe fn step(&mut self) {
@@ -46,9 +58,8 @@ impl<'a> Lexer<'a> {
 						.map_or_else(|| not_overflown = false, |nx| x = nx);
                 }
 
-                unsafe {
-                    self.step();
-                }
+                unsafe { self.step() };
+				self.pos += 1;
             } else {
                 break;
             }
@@ -68,12 +79,14 @@ impl<'a> Lexer<'a> {
         None
     }
 
-    fn try_bip(&mut self, b: u8) -> Option<Token> {
+    fn try_bip(&mut self, b: u8) -> Option<Token<'ast>> {
         let start = self.buffer;
+		let start_pos = self.pos;
 
         let negative = match b {
             b'-' => {
 				unsafe { self.step() };
+				self.pos += 1;
                 true
             }
             _ => false,
@@ -81,11 +94,23 @@ impl<'a> Lexer<'a> {
 
         match self.buffer.first() {
             Some(b'1'..=b'9') => self.load_number(parse_number(self.buffer, negative)),
-            Some(b'.') => self.load_number(parse_decimal(start, negative)),
+            Some(b'.') => {
+				match self.buffer.get(1) {
+					Some(b'0'..=b'9') => self.load_number(parse_decimal(start, negative)),
+					Some(_) if negative => Some(Token::AmbiguousOp(AmbiguousOp::Minus)),
+					_ => {
+						unsafe { self.step() };
+						self.pos += 1;
+						Some(Token::Period)
+					}
+				}
+			},
             Some(b'0') =>
             {
                 #[allow(clippy::option_if_let_else)]
                 if let Some(radix) = self.check_radix() {
+					unsafe { self.step_by(2) };
+					self.pos += 2;
                     Some(match self.parse_radix(radix) {
                         Some(mantissa) => convert_sign_and_mantissa(negative, mantissa),
                         None => Token::Overflown,
@@ -96,27 +121,18 @@ impl<'a> Lexer<'a> {
             }
             Some(_) => {
 				self.buffer = start;
+				self.pos = start_pos;
 				self.try_aip(b)
 			},
 			None => {
 				self.buffer = start;
+				self.pos = start_pos;
 				None
 			}
         }
     }
 
-    fn skip(&mut self, b: u8) {
-        self.buffer = match b {
-            0x00..=0x7F => &self.buffer[1..],
-            0x80..=0xBF => panic!("misaligned"),
-            0xC0..=0xDF => &self.buffer[2..],
-            0xE0..=0xEF => &self.buffer[3..],
-            0xF0..=0xF7 => &self.buffer[4..],
-            _ => panic!("not unicode"),
-        }
-    }
-
-    fn parse_string(&mut self) -> Token {
+    fn parse_string(&mut self) -> Token<'ast> {
         unsafe { self.step() };
         self.pos += 1;
         let start = self.buffer;
@@ -125,7 +141,7 @@ impl<'a> Lexer<'a> {
                 Some(b'\\') => {
                     unsafe { self.step() };
                     self.pos += 1;
-                    if let Some(b'\"') = self.buffer.first() {
+                    if let Some(b'\"' | b'\\') = self.buffer.first() {
                         unsafe { self.step() };
                         self.pos += 1;
                     }
@@ -139,11 +155,11 @@ impl<'a> Lexer<'a> {
                 None => break,
             }
         }
-        let bytes_read = start.len() - self.buffer.len();
-        Token::String(String::from_utf8_lossy(&start[0..bytes_read]).to_string())
+        let bytes_read = start.len() - self.buffer.len() - 1;
+        Token::String(std::str::from_utf8(&start[0..bytes_read]).unwrap())
     }
 
-    fn parse_char(&mut self) -> Option<Token> {
+    fn parse_char(&mut self) -> Option<Token<'ast>> {
         unsafe { self.step() };
         self.pos += 1;
 
@@ -207,7 +223,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn try_aip(&mut self, b: u8) -> Option<Token> {
+    fn try_aip(&mut self, b: u8) -> Option<Token<'ast>> {
         macro_rules! token {
             (@ambiguous $t: ident, $n: expr) => {
                 token!(Token::AmbiguousOp(AmbiguousOp::$t), $n)
@@ -304,18 +320,16 @@ impl<'a> Lexer<'a> {
         })
     }
 
-    fn is_whitespace(&mut self, c: u8) -> bool {
+    fn is_whitespace(&mut self, c: u8) -> usize {
         match c {
 			0x20 | // space
-			0x09 | // tab
+			0x09 | // \t
 			0x0A | // \n
 			0x0B | // vertical tab
 			0x0C | // form feed
 			0x0D   // \r
 			=> {
-				unsafe { self.step() };
-				self.pos += 1;
-				true
+				1
 			},
 
 			// U+0085 - NEXT LINE (NEL)
@@ -323,11 +337,9 @@ impl<'a> Lexer<'a> {
 			0xC2 => {
 				match self.buffer.get(1) {
 					Some(0x85) => {
-						unsafe { self.step_by(2) };
-						self.pos += 1;
-						true
+						2
 					}
-					_ => false
+					_ => 0
 				}
 			}
 
@@ -342,14 +354,12 @@ impl<'a> Lexer<'a> {
 			0xE2 => {
 				match (self.buffer.get(1), self.buffer.get(2)) {
 					(Some(0x80), Some(0x8E | 0x8F | 0xA8 | 0xA9)) => {
-						unsafe { self.step_by(3) };
-						self.pos += 1;
-						true
+						3
 					}
-					(_, _) => false
+					(_, _) => 0
 				}
 			}
-			_ => false
+			_ => 0
 		}
     }
 
@@ -363,9 +373,9 @@ impl<'a> Lexer<'a> {
                             unsafe { self.step_by(2) };
                             self.pos += 2;
                             loop {
-                                self.pos += 1;
 								match self.buffer.first() {
 									Some(b'\n') => {
+										self.pos += 1;
 										unsafe { self.step() };
 										break;
 									}
@@ -397,16 +407,22 @@ impl<'a> Lexer<'a> {
                         _ => break true,
                     };
                 }
-                Some(&c) if self.is_whitespace(c) => {}
-                Some(_) => break true,
+                Some(&c) => {
+					let l = self.is_whitespace(c);
+					if l == 0 {
+						break true
+					}
+					self.pos += 1;
+					unsafe { self.step_by(l) };
+				}
                 None => break false,
             }
         }
     }
 }
 
-impl<'a> Iterator for Lexer<'a> {
-    type Item = (Token, usize, usize);
+impl<'ast> Iterator for Lexer<'ast> {
+    type Item = (Token<'ast>, usize, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
 		fn start_of_token(c: u8) -> bool {
@@ -431,35 +447,47 @@ impl<'a> Iterator for Lexer<'a> {
         let start = self.buffer;
 		let start_pos = self.pos;
         let &c = start.first()?;
+		let mut end_pos = 0;
 		let t = if let Some(t) = self.try_bip(c) {
+			end_pos = self.pos;
 			t
 		} else {
 			let is_label = c == b'$';
-			while let Some(&b) = self.buffer.first() {
-				if self.is_whitespace(b) {
-					break;
+			let l = loop {
+				if let Some(&b) = self.buffer.first() {
+					let l = self.is_whitespace(b);
+					if l != 0 {
+						end_pos = self.pos;
+						self.pos += 1;
+						unsafe { self.step_by(l) };
+						break l;
+					}
+
+					if start_of_token(b) {
+						end_pos = self.pos;
+						break 0;
+					}
+
+					self.skip(b);
+				} else {
+					break 0;
 				}
+			};
 
-				if start_of_token(b) {
-					break;
-				}
-
-				self.skip(b);
-				self.pos += 1;
-			}
-
-			let len = start.len() - self.buffer.len();
+			let len = start.len() - self.buffer.len() - l;
+			println!("len {}", len);
 			if is_label {
 				if len == 1 {
-					Token::Ident('$'.to_string())
+					Token::Ident("$")
 				} else {
-					Token::Label(String::from_utf8_lossy(&start[1..len]).to_string())
+					Token::Label(std::str::from_utf8(&start[1..len]).unwrap())
 				}
 			} else {
 				keyword(&start[0..len])
 			}
 		};
-		Some((t, start_pos - 1, self.pos))
+		println!("{:?}", t);
+		Some((t, start_pos, end_pos))
     }
 }
 
@@ -476,7 +504,7 @@ fn keyword(s: &[u8]) -> Token {
         b"struct" => Token::Struct,
         b"union" => Token::Union,
         b"enum" => Token::Enum,
-        _ => Token::Ident(String::from_utf8_lossy(s).to_string()),
+        _ => Token::Ident(std::str::from_utf8(s).unwrap()),
     }
 }
 

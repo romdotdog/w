@@ -3,8 +3,8 @@ use w_ast::{Atom, Span, Spanned};
 use w_errors::Message;
 use w_lexer::token::{BinOp, BinOpVariant, Token, UnOp};
 
-impl<'a, H: Handler> Parser<'a, H> {
-    pub(crate) fn parse_let(&mut self) -> Option<Spanned<Atom>> {
+impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
+    pub(crate) fn parse_let(&mut self) -> Option<Spanned<Atom<'ast>>> {
         let start = self.start;
         assert_eq!(self.tk, Some(Token::Let));
         self.next();
@@ -24,7 +24,7 @@ impl<'a, H: Handler> Parser<'a, H> {
         Some(Spanned(Atom::Let(pair, rhs), Span::new(start, end)))
     }
 
-    fn parse_cast(&mut self) -> Option<Spanned<Atom>> {
+    fn parse_cast(&mut self) -> Option<Spanned<Atom<'ast>>> {
         let start = self.start;
         assert_eq!(
             self.tk,
@@ -56,12 +56,15 @@ impl<'a, H: Handler> Parser<'a, H> {
         let atom = self.primaryatom()?;
         let end = atom.1.end;
         Some(Spanned(
-            Atom::Cast(t, Box::new(atom), is_reinterpret),
+            match is_reinterpret {
+                true => Atom::Reinterpret(t, Box::new(atom)),
+                false => Atom::Cast(t, Box::new(atom)),
+            },
             Span::new(start, end),
         ))
     }
 
-    fn parse_br(&mut self) -> Option<Spanned<Atom>> {
+    fn parse_br(&mut self) -> Option<Spanned<Atom<'ast>>> {
         let start = self.start;
         assert_eq!(self.tk, Some(Token::Br));
         let mut end = self.end;
@@ -90,14 +93,14 @@ impl<'a, H: Handler> Parser<'a, H> {
                         end = this.end;
                         let span = this.span();
                         this.error(Message::IdentifierIsNotLabel, span);
-                        Next(Spanned(format!("${}", x), span))
+                        Next(Spanned("<unknown>", span))
                     }
                     tk => {
                         // br -> if ...
                         //      ^
                         let span = this.span();
                         this.error(Message::MissingLabel, span);
-                        Fill(Spanned("<unknown>".to_owned(), span), tk)
+                        Fill(Spanned("<unknown>", span), tk)
                     }
                 }))
             }
@@ -114,10 +117,13 @@ impl<'a, H: Handler> Parser<'a, H> {
             _ => None,
         };
 
-        Some(Spanned(Atom::Br(ret, label, cond), Span::new(start, end)))
+        Some(Spanned(
+            Atom::Br { ret, label, cond },
+            Span::new(start, end),
+        ))
     }
 
-    fn parse_ret(&mut self) -> Option<Spanned<Atom>> {
+    fn parse_ret(&mut self) -> Option<Spanned<Atom<'ast>>> {
         let start = self.start;
         let mut end = self.end;
         debug_assert_eq!(self.tk, Some(Token::Return));
@@ -134,7 +140,7 @@ impl<'a, H: Handler> Parser<'a, H> {
         Some(Spanned(Atom::Return(a), Span::new(start, end)))
     }
 
-    fn unop(&mut self, u: UnOp) -> Option<Spanned<Atom>> {
+    fn unop(&mut self, u: UnOp) -> Option<Spanned<Atom<'ast>>> {
         let start = self.start;
         self.next();
 
@@ -143,7 +149,7 @@ impl<'a, H: Handler> Parser<'a, H> {
         Some(Spanned(Atom::UnOp(u, Box::new(a)), Span::new(start, end)))
     }
 
-    pub(crate) fn primaryatom(&mut self) -> Option<Spanned<Atom>> {
+    pub(crate) fn primaryatom(&mut self) -> Option<Spanned<Atom<'ast>>> {
         match self.tk {
             Some(Token::Let) => self.parse_let(),
             Some(Token::BinOp(BinOp::Regular(BinOpVariant::Lt))) => self.parse_cast(),

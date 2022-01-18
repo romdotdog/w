@@ -1,5 +1,3 @@
-mod reader;
-pub use reader::SourceReader;
 use w_utils::{LineCol, LineColResult};
 
 #[derive(Clone)]

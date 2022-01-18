@@ -9,52 +9,48 @@ pub mod source_map;
 use diag::emitter::Emitter;
 use diag::Diagnostic;
 use diag::Diagnostics;
-use source_map::{
-    loader::Loader,
-    source::{Source, SourceReader},
-    SourceMap,
-};
+use source_map::{loader::Loader, source::Source, SourceMap};
+use w_ast::Program;
 use w_ast::Span;
 use w_errors::Message;
 use w_parser::Parser;
 
-pub struct Session<L: Loader, E: Emitter> {
+pub struct Session<'src, L: Loader, E: Emitter> {
     pub source_map: SourceMap<L>,
-    diags: RefCell<Diagnostics<E>>,
+    diags: Diagnostics<'src, E>,
 }
 
-impl<L: Loader, E: Emitter> Session<L, E> {
+impl<'ast, L: Loader, E: Emitter> Session<'ast, L, E> {
     pub fn new(loader: L, emitter: E) -> Self {
         Session {
-            diags: RefCell::new(Diagnostics::new(emitter)),
+            diags: Diagnostics::new(emitter),
             source_map: SourceMap::new(loader),
         }
     }
 
-    pub fn parse(&self, src: Rc<Source>) -> Parser<'_, Self, SourceReader> {
-        Parser::new(self, src)
+    pub fn parse(&'ast self, src: &'ast Source) -> Program<'ast> {
+        Parser::new(self, &src).parse()
     }
 }
 
-impl<L: Loader, E: Emitter> w_parser::Handler for Session<L, E> {
-    type SourceRef = Rc<Source>;
-    type LexerInput = SourceReader;
+impl<'ast, L: Loader, E: Emitter> w_parser::Handler<'ast> for Session<'ast, L, E> {
+    type SourceRef = Source;
 
-    fn error(&self, src_ref: &Self::SourceRef, msg: Message, span: Span) {
-        self.diags.borrow_mut().error(Diagnostic {
-            source: Rc::clone(src_ref),
+    fn error(&self, src_ref: &'ast Source, msg: Message, span: Span) {
+        self.diags.error(Diagnostic {
+            source: src_ref,
             span,
             msg,
         });
     }
 
-    fn load_source(&self, name: String) -> Option<Self::SourceRef> {
+    fn load_source(&'ast self, name: String) -> Option<&'ast Source> {
         // TODO: remove .ok()
         self.source_map.load_source(name).ok()
     }
 
-    fn get_source(&self, src_ref: &Self::SourceRef) -> Self::LexerInput {
-        SourceReader::new(Rc::clone(src_ref))
+    fn get_source(&self, src_ref: &'ast Source) -> &'ast [u8] {
+        src_ref.src().as_bytes()
     }
 }
 

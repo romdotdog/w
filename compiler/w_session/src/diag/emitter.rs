@@ -1,18 +1,19 @@
+use appendlist::AppendList;
 use w_utils::LineColResult;
 
 use super::Diagnostic;
 
 pub trait Emitter {
-    fn emit_errors(self, errors: Vec<Diagnostic>);
+    fn emit_errors(self, errors: AppendList<Diagnostic>);
 }
 
 #[allow(clippy::module_name_repetitions)]
 pub struct DefaultEmitter;
 
 impl Emitter for DefaultEmitter {
-    fn emit_errors(self, errors: Vec<Diagnostic>) {
-        for error in errors {
-            let src = &error.source;
+    fn emit_errors(self, errors: AppendList<Diagnostic>) {
+        for error in (0..errors.len()).map(|i| &errors[i]) {
+            let src = error.source;
             let content = src.src();
             let start_pos = error.span.start;
             let end_pos = error.span.end;

@@ -1,20 +1,20 @@
 use crate::{IdentPair, Indir, Spanned};
 
 #[derive(Clone)]
-pub struct Type {
-    pub v: TypeVariant,
+pub struct Type<'ast> {
+    pub v: TypeVariant<'ast>,
     pub indir: Indir,
 }
 
-impl Type {
-    pub fn new(v: TypeVariant) -> Self {
+impl<'ast> Type<'ast> {
+    pub fn new(v: TypeVariant<'ast>) -> Self {
         Type {
             v,
             indir: Indir::none(),
         }
     }
 
-    pub fn with_indir(v: TypeVariant, indir: Indir) -> Self {
+    pub fn with_indir(v: TypeVariant<'ast>, indir: Indir) -> Self {
         Type { v, indir }
     }
 
@@ -24,7 +24,7 @@ impl Type {
 }
 
 #[derive(Clone)]
-pub enum TypeVariant {
+pub enum TypeVariant<'ast> {
     Void,
     I32,
     I64,
@@ -32,14 +32,14 @@ pub enum TypeVariant {
     U64,
     F32,
     F64,
-    Struct(Spanned<Vec<Spanned<IdentPair>>>),
-    Union(Spanned<Vec<Spanned<IdentPair>>>),
-    Unresolved(String),
+    Struct(Spanned<Vec<Spanned<IdentPair<'ast>>>>),
+    Union(Spanned<Vec<Spanned<IdentPair<'ast>>>>),
+    Unresolved(&'ast str),
 }
 
-impl From<String> for TypeVariant {
-    fn from(s: String) -> Self {
-        match s.as_str() {
+impl<'ast> From<&'ast str> for TypeVariant<'ast> {
+    fn from(s: &'ast str) -> Self {
+        match s {
             "i32" => TypeVariant::I32,
             "i64" => TypeVariant::I64,
             "u32" => TypeVariant::U32,

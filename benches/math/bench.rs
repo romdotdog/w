@@ -1,5 +1,4 @@
 #![allow(clippy::missing_panics_doc)]
-use std::str::Chars;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use w_ast::Span;
@@ -11,18 +10,18 @@ struct Session<'a> {
     src: &'a str,
 }
 
-impl<'a> Handler for Session<'a> {
+impl<'a> Handler<'a> for Session<'a> {
     type SourceRef = ();
 
     fn error(&self, _src_ref: &Self::SourceRef, _msg: Message, _span: Span) {
         panic!("source errored in bench");
     }
 
-    fn load_source(&self, _name: String) -> Option<Self::SourceRef> {
-        panic!("imports are not allowed in benches");
+    fn load_source(&'a self, _name: String) -> Option<&'a Self::SourceRef> {
+        panic!("imports are not allowed in parser tests.");
     }
 
-    fn get_source(&self, _src_ref: &Self::SourceRef) -> &[u8] {
+    fn get_source(&self, _src_ref: &'a Self::SourceRef) -> &'a [u8] {
         self.src.as_bytes()
     }
 }
@@ -41,7 +40,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 src: black_box(&src),
             };
 
-            let parser = Parser::new(&handler, ());
+            let parser = Parser::new(&handler, &());
             parser.parse();
         });
     });

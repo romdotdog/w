@@ -215,20 +215,8 @@ pub fn parse_decimal(s: &[u8], negative: bool) -> (Option<Number>, usize) {
     unsafe { s.step() };
     let mut mantissa = 0_u64;
     let n_after_dot = parse_after_period(&mut s, &mut mantissa);
-    if n_after_dot == 0 {
-        return (None, 1);
-    }
-
     let exponent = -(n_after_dot as i64);
-    finish_number(
-        start,
-        negative,
-        mantissa,
-        exponent,
-        start,
-        start,
-        n_after_dot,
-    )
+    finish_number(s, negative, mantissa, exponent, start, start, n_after_dot)
 }
 
 pub fn parse_number(s: &[u8], negative: bool) -> (Option<Number>, usize) {
