@@ -49,8 +49,8 @@ impl<'ast, L: Loader, E: Emitter> w_parser::Handler<'ast> for Session<'ast, L, E
         self.source_map.load_source(name).ok()
     }
 
-    fn get_source(&self, src_ref: &'ast Source) -> &'ast [u8] {
-        src_ref.src().as_bytes()
+    fn get_source(&self, src_ref: &'ast Source) -> &'ast str {
+        src_ref.src()
     }
 }
 

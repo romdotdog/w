@@ -35,7 +35,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H>
 {
     pub fn new(session: &'ast H, src_ref: &'ast H::SourceRef) -> Self {
         let src = session.get_source(src_ref);
-        let lex = Lexer::new(src);
+        let lex = Lexer::from_str(src);
 
         let mut parser = Parser {
             session,

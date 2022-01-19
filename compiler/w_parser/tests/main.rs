@@ -44,8 +44,8 @@ impl<'a> Handler<'a> for ErrorHandler<'a> {
         panic!("imports are not allowed in parser tests.");
     }
 
-    fn get_source(&self, _src_ref: &'a Self::SourceRef) -> &'a [u8] {
-        self.src.src.as_bytes()
+    fn get_source(&self, _src_ref: &'a Self::SourceRef) -> &'a str {
+        &self.src.src
     }
 }
 

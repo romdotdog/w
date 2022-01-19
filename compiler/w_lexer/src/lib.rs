@@ -16,7 +16,15 @@ pub struct Lexer<'ast> {
 }
 
 impl<'ast> Lexer<'ast> {
-    pub fn new(buffer: &'ast [u8]) -> Self {
+	#[allow(clippy::should_implement_trait)]
+	pub fn from_str(buffer: &'ast str) -> Self {
+        unsafe { Self::from_bytes(buffer.as_bytes()) }
+    }
+
+	/// # Safety
+	/// 
+	/// The &[u8] must be utf-8 validated
+    pub unsafe fn from_bytes(buffer: &'ast [u8]) -> Self {
         Lexer { buffer, pos: 0 }
     }
 
@@ -479,7 +487,7 @@ impl<'ast> Iterator for Lexer<'ast> {
 				if len == 1 {
 					Token::Ident("$")
 				} else {
-					Token::Label(std::str::from_utf8(&start[1..len]).unwrap())
+					Token::Label(debug_check_utf8(&start[1..len]))
 				}
 			} else {
 				keyword(&start[0..len])
@@ -502,7 +510,7 @@ fn keyword(s: &[u8]) -> Token {
         b"struct" => Token::Struct,
         b"union" => Token::Union,
         b"enum" => Token::Enum,
-        _ => Token::Ident(std::str::from_utf8(s).unwrap()),
+        _ => Token::Ident(debug_check_utf8(s)),
     }
 }
 
@@ -523,3 +531,9 @@ fn char_to_radix(c: u8) -> Option<u8> {
         _ => None,
     }
 }
+
+fn debug_check_utf8(x: &[u8]) -> &str {
+	debug_assert!(std::str::from_utf8(x).is_ok());
+	unsafe { std::str::from_utf8_unchecked(x) }
+}
+
