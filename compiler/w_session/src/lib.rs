@@ -1,8 +1,5 @@
 #![allow(clippy::must_use_candidate)]
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 pub mod diag;
 pub mod source_map;
 
@@ -29,7 +26,7 @@ impl<'ast, L: Loader, E: Emitter> Session<'ast, L, E> {
     }
 
     pub fn parse(&'ast self, src: &'ast Source) -> Program<'ast> {
-        Parser::new(self, &src).parse()
+        Parser::new(self, src).parse()
     }
 }
 

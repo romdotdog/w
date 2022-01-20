@@ -89,7 +89,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                         let span = this.span();
                         Next(Spanned(x, span))
                     }
-                    Some(Token::Ident(x)) => {
+                    Some(Token::Ident(_)) => {
                         end = this.end;
                         let span = this.span();
                         this.error(Message::IdentifierIsNotLabel, span);

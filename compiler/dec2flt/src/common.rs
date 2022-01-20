@@ -1,6 +1,6 @@
 //! Common utilities, for internal use only.
 
-use crate::ptr;
+use std::ptr;
 
 /// Helper methods to process immutable bytes.
 pub(crate) trait ByteSlice: AsRef<[u8]> {

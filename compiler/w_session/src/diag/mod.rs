@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use appendlist::AppendList;
 use w_ast::Span;
 use w_errors::Message;

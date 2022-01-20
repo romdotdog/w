@@ -1,7 +1,6 @@
 //! Functions to parse floating-point numbers.
 
 use super::common::{is_8digits, AsciiStr, ByteSlice};
-use super::float::RawFloat;
 use super::number::Number;
 
 const MIN_19DIGIT_INT: u64 = 100_0000_0000_0000_0000;

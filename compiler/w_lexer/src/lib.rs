@@ -1,15 +1,15 @@
-use std::ptr;
+use std::cmp::Ordering;
+use std::convert::TryFrom;
 
 use dec2flt::{
-    convert_sign_and_mantissa,
+    load_number,
+	number::Number,
     parse::{parse_decimal, parse_number},
 };
 
 pub mod token;
 use token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
 
-// a reduced version of the rust std string-to-float parsing library
-mod dec2flt;
 pub struct Lexer<'ast> {
     buffer: &'ast [u8],
     pos: usize,
@@ -83,6 +83,23 @@ impl<'ast> Lexer<'ast> {
     fn check_radix(&self) -> Option<u8> {
         if let Some(&radixc) = self.buffer.get(1) {
             return char_to_radix(radixc);
+        }
+        None
+    }
+
+	fn load_number(&mut self, n: (Option<Number>, usize)) -> Option<Token<'ast>> {
+        let (o, len) = n;
+        self.pos += len;
+        unsafe { self.step_by(len) };
+        if let Some(num) = o {
+            if num.exponent == 0 {
+                match convert_sign_and_mantissa(num.negative, num.mantissa) {
+                    Token::Overflown => {}
+                    t => return Some(t),
+                }
+            }
+
+            return Some(Token::Float(load_number(num, self.buffer)));
         }
         None
     }
@@ -488,6 +505,24 @@ impl<'ast> Iterator for Lexer<'ast> {
 		Some((t, start_pos, end_pos))
     }
 }
+
+const POSITIVE_MIN_I64: u64 = 9_223_372_036_854_775_808;
+fn convert_sign_and_mantissa<'ast>(negative: bool, mantissa: u64) -> Token<'ast> {
+	if negative {
+        match mantissa.cmp(&POSITIVE_MIN_I64) {
+            #[allow(clippy::cast_possible_wrap)]
+            Ordering::Less => Token::Integer(-(mantissa as i64)),
+            Ordering::Equal => Token::Integer(i64::MIN),
+            Ordering::Greater => Token::Overflown,
+        }
+    } else if let Ok(m) = i64::try_from(mantissa) {
+        Token::Integer(m)
+    } else {
+        Token::UInteger(mantissa)
+    }
+}
+
+
 
 fn keyword(s: &[u8]) -> Token {
     match s {

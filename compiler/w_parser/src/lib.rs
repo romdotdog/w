@@ -103,7 +103,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H>
     }
 
     pub(crate) fn error(&self, msg: Message, span: Span) {
-        self.session.error(&self.src_ref, msg, span);
+        self.session.error(self.src_ref, msg, span);
     }
 
     /// for owning enum fields
@@ -142,7 +142,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H>
                         //        ^^^^^
                         Spanned(s, this.span())
                     }
-                    Some(Token::Label(s)) => {
+                    Some(Token::Label(_)) => {
                         // struct $label {
                         //        ^^^^^^
                         let span = this.span();

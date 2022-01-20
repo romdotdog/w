@@ -1,3 +1,7 @@
+#![allow(clippy::all)]
+#![allow(unused_unsafe)]
+// a reduced version of the rust std string-to-float parsing library
+
 //! Converting decimal strings into IEEE 754 binary floating point numbers.
 //!
 //! # Problem statement
@@ -68,8 +72,6 @@
 //! Larger exponents are accepted, but we don't do arithmetic with them, they are immediately
 //! turned into {positive,negative} {zero,infinity}.
 
-use std::cmp::Ordering;
-
 mod common;
 mod decimal;
 mod fpu;
@@ -86,10 +88,6 @@ use self::float::RawFloat;
 use self::lemire::compute_float;
 use self::number::Number;
 use self::slow::parse_long_mantissa;
-use super::{token::Token, Lexer};
-use std::convert::TryFrom;
-
-pub const POSITIVE_MIN_I64: u64 = 9_223_372_036_854_775_808;
 
 /// Converts a `BiasedFp` to the closest machine float type.
 fn biased_fp_to_float<T: RawFloat>(x: BiasedFp) -> T {
@@ -98,62 +96,28 @@ fn biased_fp_to_float<T: RawFloat>(x: BiasedFp) -> T {
     T::from_u64_bits(word)
 }
 
-pub fn convert_sign_and_mantissa<'ast>(negative: bool, mantissa: u64) -> Token<'ast> {
-    if negative {
-        match mantissa.cmp(&POSITIVE_MIN_I64) {
-            #[allow(clippy::cast_possible_wrap)]
-            Ordering::Less => Token::Integer(-(mantissa as i64)),
-            Ordering::Equal => Token::Integer(i64::MIN),
-            Ordering::Greater => Token::Overflown,
-        }
-    } else if let Ok(m) = i64::try_from(mantissa) {
-        Token::Integer(m)
-    } else {
-        Token::UInteger(mantissa)
+pub fn load_number(num: Number, buffer: &[u8]) -> f64 {
+    if let Some(v) = num.try_fast_path::<f64>() {
+        return v;
     }
-}
 
-impl<'ast> Lexer<'ast> {
-    pub(crate) fn load_number(&mut self, n: (Option<Number>, usize)) -> Option<Token<'ast>> {
-        let (o, len) = n;
-        self.pos += len;
-        unsafe { self.step_by(len) };
-        if let Some(num) = o {
-            if num.exponent == 0 {
-                match convert_sign_and_mantissa(num.negative, num.mantissa) {
-                    Token::Overflown => {}
-                    t => return Some(t),
-                }
-            }
-
-            if let Some(v) = num.try_fast_path::<f64>() {
-                return Some(Token::Float(v));
-            }
-
-            // If significant digits were truncated, then we can have rounding error
-            // only if `mantissa + 1` produces a different result. We also avoid
-            // redundantly using the Eisel-Lemire algorithm if it was unable to
-            // correctly round on the first pass.
-            let mut fp = compute_float::<f64>(num.exponent, num.mantissa);
-            if num.many_digits
-                && fp.e >= 0
-                && fp != compute_float::<f64>(num.exponent, num.mantissa + 1)
-            {
-                fp.e = -1;
-            }
-            // Unable to correctly round the float using the Eisel-Lemire algorithm.
-            // Fallback to a slower, but always correct algorithm.
-            if fp.e < 0 {
-                fp = parse_long_mantissa::<f64>(self.buffer);
-            }
-
-            let mut float = biased_fp_to_float::<f64>(fp);
-            if num.negative {
-                float = -float;
-            }
-
-            return Some(Token::Float(float));
-        }
-        None
+    // If significant digits were truncated, then we can have rounding error
+    // only if `mantissa + 1` produces a different result. We also avoid
+    // redundantly using the Eisel-Lemire algorithm if it was unable to
+    // correctly round on the first pass.
+    let mut fp = compute_float::<f64>(num.exponent, num.mantissa);
+    if num.many_digits && fp.e >= 0 && fp != compute_float::<f64>(num.exponent, num.mantissa + 1) {
+        fp.e = -1;
     }
+    // Unable to correctly round the float using the Eisel-Lemire algorithm.
+    // Fallback to a slower, but always correct algorithm.
+    if fp.e < 0 {
+        fp = parse_long_mantissa::<f64>(buffer);
+    }
+
+    let mut float = biased_fp_to_float::<f64>(fp);
+    if num.negative {
+        float = -float;
+    }
+    float
 }
