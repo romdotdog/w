@@ -34,7 +34,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| for _t in Lexer::from_str(black_box(&src)) {});
     });
 
-    /*
     c.bench_function(format!("parser {} tk", count).as_str(), |b| {
         b.iter(|| {
             let handler = Session {
@@ -44,7 +43,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             let parser = Parser::new(&handler, &());
             parser.parse();
         });
-    }); */
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);
