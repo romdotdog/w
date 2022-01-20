@@ -69,7 +69,6 @@
 //! turned into {positive,negative} {zero,infinity}.
 
 use std::cmp::Ordering;
-use std::fmt;
 
 mod common;
 mod decimal;
@@ -82,7 +81,7 @@ pub mod lemire;
 pub mod number;
 pub mod parse;
 
-use self::common::{BiasedFp, ByteSlice};
+use self::common::BiasedFp;
 use self::float::RawFloat;
 use self::lemire::compute_float;
 use self::number::Number;

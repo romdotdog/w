@@ -1,5 +1,4 @@
 #![allow(clippy::missing_panics_doc)]
-use std::str::Chars;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use w_ast::Span;

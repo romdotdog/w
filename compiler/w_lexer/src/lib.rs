@@ -338,17 +338,13 @@ impl<'ast> Lexer<'ast> {
 			0x0D   // \r
 			=> {
 				1
-			},
+			}
 
 			// U+0085 - NEXT LINE (NEL)
 			// C2 85 - 11000010 10000101
-			0xC2 => {
-				match self.buffer.get(1) {
-					Some(0x85) => {
-						2
-					}
-					_ => 0
-				}
+			0xC2 => match unsafe { self.buffer.get_unchecked(1) } {
+				0x85 => 2,
+				_ => 0
 			}
 
 			// U+200E - LEFT-TO-RIGHT MARK
@@ -359,13 +355,9 @@ impl<'ast> Lexer<'ast> {
 			// E2 80 A8 - 11100010 10000000 10101000
 			// U+2029 - PARAGRAPH SEPARATOR
 			// E2 80 A9 - 11100010 10000000 10101001
-			0xE2 => {
-				match (self.buffer.get(1), self.buffer.get(2)) {
-					(Some(0x80), Some(0x8E | 0x8F | 0xA8 | 0xA9)) => {
-						3
-					}
-					(_, _) => 0
-				}
+			0xE2 => match unsafe { self.buffer.get_unchecked(1..=2) } {
+				[0x80, 0x8E | 0x8F | 0xA8 | 0xA9] => 3,
+				_ => 0
 			}
 			_ => 0
 		}
