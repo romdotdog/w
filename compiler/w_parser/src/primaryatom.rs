@@ -56,9 +56,10 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         let atom = self.primaryatom()?;
         let end = atom.1.end;
         Some(Spanned(
-            match is_reinterpret {
-                true => Atom::Reinterpret(t, Box::new(atom)),
-                false => Atom::Cast(t, Box::new(atom)),
+            if is_reinterpret {
+                Atom::Reinterpret(t, Box::new(atom))
+            } else {
+                Atom::Cast(t, Box::new(atom))
             },
             Span::new(start, end),
         ))
