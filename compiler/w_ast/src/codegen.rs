@@ -1,7 +1,7 @@
 use crate::{Spanned, WEnum, WStruct, WUnion};
 
 use super::{Atom, IdentPair, IncDec, Program, Type, TypeVariant, WFn};
-use w_lexer::UnOp;
+use w_lexer::token::UnOp;
 
 use std::fmt::{Display, Result};
 
@@ -11,7 +11,7 @@ impl<T: Display> Display for Spanned<T> {
     }
 }
 
-impl Display for Program {
+impl<'ast> Display for Program<'ast> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         for wenum in &self.enums {
             write!(f, "{}\n\n", wenum)?;
@@ -29,7 +29,7 @@ impl Display for Program {
     }
 }
 
-impl Display for WFn {
+impl<'ast> Display for WFn<'ast> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         write!(f, "fn {}(", self.name)?;
 
@@ -49,7 +49,7 @@ impl Display for WFn {
     }
 }
 
-impl Display for WStruct {
+impl<'ast> Display for WStruct<'ast> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         writeln!(f, "struct {} {{", self.name)?;
         for ident in &self.fields.0 {
@@ -59,7 +59,7 @@ impl Display for WStruct {
     }
 }
 
-impl Display for WUnion {
+impl<'ast> Display for WUnion<'ast> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         writeln!(f, "union {} {{", self.name)?;
         for ident in &self.fields.0 {
@@ -69,7 +69,7 @@ impl Display for WUnion {
     }
 }
 
-impl Display for WEnum {
+impl<'ast> Display for WEnum<'ast> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         writeln!(f, "enum {} {{", self.name)?;
         let mut v: Vec<_> = self.fields.0.iter().collect();
@@ -88,7 +88,7 @@ impl Display for WEnum {
     }
 }
 
-impl Display for Type {
+impl<'ast> Display for Type<'ast> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         write!(f, "{}{}", self.indir, self.v)
     }
@@ -109,7 +109,7 @@ fn type_struct_like(
     write!(f, " }}")
 }
 
-impl Display for TypeVariant {
+impl<'ast> Display for TypeVariant<'ast> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         match self {
             TypeVariant::Void => write!(f, "void"),
@@ -132,10 +132,11 @@ impl Display for TypeVariant {
     }
 }
 
-impl Display for Atom {
+impl<'ast> Display for Atom<'ast> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         match self {
             Atom::Integer(i) => write!(f, "{}", i),
+            Atom::UInteger(u) => write!(f, "{}", u),
             Atom::Float(n) => write!(f, "{}", n),
             Atom::Ident(t) => write!(f, "{}", t),
             Atom::String(s) => write!(f, "\"{}\"", s.replace("\"", "\\\"")),
@@ -148,8 +149,8 @@ impl Display for Atom {
                 IncDec::Inc => write!(f, "{}++", lhs),
                 IncDec::Dec => write!(f, "{}--", lhs),
             },
-            Atom::Cast(t, rhs, true) => write!(f, "<{}!>{}", t, rhs),
-            Atom::Cast(t, rhs, false) => write!(f, "<{}>{}", t, rhs),
+            Atom::Reinterpret(t, rhs) => write!(f, "<{}!>{}", t, rhs),
+            Atom::Cast(t, rhs) => write!(f, "<{}>{}", t, rhs),
             Atom::UnOp(o, rhs) => match o {
                 UnOp::Deref => write!(f, "*{}", rhs),
                 UnOp::AddrOf => write!(f, "&{}", rhs),
@@ -160,18 +161,18 @@ impl Display for Atom {
                 UnOp::BNot => write!(f, "~{}", rhs),
                 UnOp::LNot => write!(f, "!{}", rhs),
             },
-            Atom::Block(label, a, l) => {
+            Atom::Block { label, blocks, ret } => {
                 if let Some(label) = label {
                     writeln!(f, "${}: {{", label)?;
                 } else {
                     writeln!(f, "{{")?;
                 }
 
-                for atom in a {
+                for atom in blocks {
                     writeln!(f, "\t{};", format!("{}", atom).replace("\n", "\n\t"))?;
                 }
 
-                match l {
+                match ret {
                     None => write!(f, "}}"),
                     Some(l) => write!(f, "\t{}\n}}", format!("{}", l).replace("\n", "\n\t")),
                 }
@@ -196,24 +197,32 @@ impl Display for Atom {
                 }
                 Ok(())
             }
-            Atom::If(cond, body, else_) => match else_ {
-                Some(e) => write!(f, "if {} {} else {}", cond, body, e),
-                None => write!(f, "if {} {}", cond, body),
+            Atom::If {
+                cond,
+                true_branch,
+                false_branch,
+            } => match false_branch {
+                Some(e) => write!(f, "if {} {} else {}", cond, true_branch, e),
+                None => write!(f, "if {} {}", cond, true_branch),
             },
-            Atom::Loop(label, init, body) => {
+            Atom::Loop {
+                label,
+                binding,
+                block,
+            } => {
                 if let Some(label) = label {
                     write!(f, "${}: loop ", label)?;
                 } else {
                     write!(f, "loop ")?;
                 }
 
-                if let Some(init) = init {
-                    write!(f, "{} ", init)?;
+                if let Some(binding) = binding {
+                    write!(f, "{} ", binding)?;
                 }
 
-                write!(f, "{}", body)
+                write!(f, "{}", block)
             }
-            Atom::Br(ret, label, cond) => {
+            Atom::Br { ret, label, cond } => {
                 write!(f, "br")?;
                 if let Some(ret) = ret {
                     write!(f, " {}", ret)?;
@@ -232,7 +241,7 @@ impl Display for Atom {
     }
 }
 
-impl Display for IdentPair {
+impl<'ast> Display for IdentPair<'ast> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         if self.mutable.is_some() {
             write!(f, "mut ")?;

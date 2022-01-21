@@ -3,7 +3,7 @@ fn main() {
 	let b = 2;
 	let mut c = 3;
 	let mut d = 4;
-	let $f = 5;
+	let <unknown> = 5;
 	let <unknown> = 6;
 	let <unknown>;
 	7;
@@ -16,7 +16,7 @@ fn main() {
 	!~<f64!><f64>--+++-&*a++--;
 }
 
-// "labels cannot be used as identifiers" - 9:6+3
+// "labels cannot be used as identifiers" - 9:6+2
 // "invalid identifier here" - 10:6+1
 // "invalid identifier here" - 11:6+1
 // "missing a semicolon or closing brace" - 11:8+1

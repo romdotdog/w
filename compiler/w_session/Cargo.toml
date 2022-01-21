@@ -12,3 +12,4 @@ w_ast = { path = "../w_ast" }
 w_parser = { path = "../w_parser" }
 w_errors = { path = "../w_errors" }
 w_utils = { path = "../w_utils" }
+appendlist = "1.4"

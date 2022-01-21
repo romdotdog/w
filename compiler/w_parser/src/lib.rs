@@ -1,6 +1,7 @@
 use w_ast::{Atom, IdentPair, Indir, Span, Spanned, Type, TypeVariant};
 use w_errors::Message;
-use w_lexer::{AmbiguousOp, BinOp, BinOpVariant, Lexer, Token};
+use w_lexer::Lexer;
+use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token};
 
 mod handler;
 mod primaryatom;
@@ -9,23 +10,20 @@ mod toplevel;
 
 pub use handler::Handler;
 
-pub struct Parser<'a, H, I>
-where
-    H: Handler<LexerInput = I>,
-    I: Iterator<Item = char>,
+pub struct Parser<'ast, H: Handler<'ast>>
 {
-    session: &'a H,
-    src_ref: H::SourceRef,
-    lex: Lexer<I>,
+    session: &'ast H, // TODO: lifetime review
+    src_ref: &'ast H::SourceRef,
+    lex: Lexer<'ast>,
 
     start: usize,
     end: usize,
-    tk: Option<Token>,
+    tk: Option<Token<'ast>>,
 }
 
-enum Take<T> {
+enum Take<'ast, T> {
     Next(T),
-    Fill(T, Option<Token>),
+    Fill(T, Option<Token<'ast>>),
     // self.next() already called
     // dangerous if used improperly
     NoFill(T),
@@ -33,14 +31,11 @@ enum Take<T> {
 
 use Take::{Fill, Next, NoFill};
 
-impl<'a, H, I> Parser<'a, H, I>
-where
-    H: Handler<LexerInput = I>,
-    I: Iterator<Item = char>,
+impl<'ast, H: Handler<'ast>> Parser<'ast, H>
 {
-    pub fn new(session: &'a H, src_ref: H::SourceRef) -> Self {
-        let src = session.get_source(&src_ref);
-        let lex = Lexer::new(src);
+    pub fn new(session: &'ast H, src_ref: &'ast H::SourceRef) -> Self {
+        let src = session.get_source(src_ref);
+        let lex = Lexer::from_str(src);
 
         let mut parser = Parser {
             session,
@@ -93,6 +88,7 @@ where
                 
                 // literals
                 Token::Float(_) |
+				Token::UInteger(_) |
                 Token::Integer(_) |
                 Token::Ident(_) |
                 Token::String(_) |
@@ -107,13 +103,13 @@ where
     }
 
     pub(crate) fn error(&self, msg: Message, span: Span) {
-        self.session.error(&self.src_ref, msg, span);
+        self.session.error(self.src_ref, msg, span);
     }
 
     /// for owning enum fields
     fn take<T, F>(&mut self, f: F) -> T
     where
-        F: FnOnce(&mut Self, Option<Token>) -> Take<T>,
+        F: FnOnce(&mut Self, Option<Token<'ast>>) -> Take<'ast, T>,
     {
         let t = self.tk.take();
         match f(self, t) {
@@ -129,14 +125,14 @@ where
         }
     }
 
-    pub fn expect_ident(&mut self, token_after: &Option<Token>) -> Spanned<String> {
+    pub fn expect_ident(&mut self, token_after: &Option<Token>) -> Spanned<&'ast str> {
         if &self.tk == token_after {
             // struct  {
             //        ^
             let pos = self.start;
             let span = Span::new(pos - 1, pos);
             self.error(Message::MissingIdentifier, span);
-            Spanned("<unknown>".to_owned(), span)
+            Spanned("<unknown>", span)
         } else {
             self.take(|this, t| {
                 Next(match t {
@@ -146,26 +142,26 @@ where
                         //        ^^^^^
                         Spanned(s, this.span())
                     }
-                    Some(Token::Label(s)) => {
+                    Some(Token::Label(_)) => {
                         // struct $label {
                         //        ^^^^^^
                         let span = this.span();
                         this.error(Message::LabelIsNotIdentifier, span);
-                        Spanned(format!("${}", s), span)
+                        Spanned("<unknown>", span)
                     }
                     _ => {
                         // struct ! {
                         //        ^
                         let span = this.span();
                         this.error(Message::MalformedIdentifier, span);
-                        Spanned("<unknown>".to_owned(), span)
+                        Spanned("<unknown>", span)
                     }
                 })
             })
         }
     }
 
-    fn parse_type(&mut self) -> Option<Spanned<Type>> {
+    fn parse_type(&mut self) -> Option<Spanned<Type<'ast>>> {
         let start = self.start;
         let mut asterisk_overflow_start = None;
         let mut indir = Indir::none();
@@ -238,7 +234,7 @@ where
         }
     }
 
-    fn ident_type_pair(&mut self, require_type: bool) -> Option<Spanned<IdentPair>> {
+    fn ident_type_pair(&mut self, require_type: bool) -> Option<Spanned<IdentPair<'ast>>> {
         let start = self.start;
 
         // mut ident: type
@@ -278,7 +274,7 @@ where
         ))
     }
 
-    fn subatom(&mut self, mut lhs: Spanned<Atom>, min_prec: u8) -> Option<Spanned<Atom>> {
+    fn subatom(&mut self, mut lhs: Spanned<Atom<'ast>>, min_prec: u8) -> Option<Spanned<Atom<'ast>>> {
         // https://en.wikipedia.org/wiki/Operator-precedence_parser
 
         // while [t] is a
@@ -321,7 +317,7 @@ where
         Some(lhs)
     }
 
-    pub fn atom(&mut self) -> Option<Spanned<Atom>> {
+    pub fn atom(&mut self) -> Option<Spanned<Atom<'ast>>> {
         let lhs = self.primaryatom()?;
         self.subatom(lhs, 0)
     }

@@ -1,6 +1,6 @@
 use similar::{ChangeTag, TextDiff};
 use std::fmt::Write;
-use std::{cell::RefCell, fs, str::Chars};
+use std::{cell::RefCell, fs};
 
 use w_ast::Span;
 use w_errors::Message;
@@ -33,20 +33,19 @@ impl ErrorHandler<'_> {
     }
 }
 
-impl<'a> Handler for ErrorHandler<'a> {
+impl<'a> Handler<'a> for ErrorHandler<'a> {
     type SourceRef = ();
-    type LexerInput = Chars<'a>;
 
     fn error(&self, _src_ref: &Self::SourceRef, msg: Message, span: Span) {
         self.errors.borrow_mut().push((msg, span));
     }
 
-    fn load_source(&self, _name: String) -> Option<Self::SourceRef> {
+    fn load_source(&'a self, _name: String) -> Option<&'a Self::SourceRef> {
         panic!("imports are not allowed in parser tests.");
     }
 
-    fn get_source(&self, _src_ref: &Self::SourceRef) -> Self::LexerInput {
-        self.src.src.chars()
+    fn get_source(&self, _src_ref: &'a Self::SourceRef) -> &'a str {
+        &self.src.src
     }
 }
 
@@ -62,7 +61,7 @@ macro_rules! test {
                 errors: RefCell::new(Vec::new()),
             };
 
-            let parser = Parser::new(&handler, ());
+            let parser = Parser::new(&handler, &());
             let prog = parser.parse();
 
             let t = format!("{}{}", prog, handler.serialize_errors());

@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "appendlist"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e149dc73cd30538307e7ffa2acd3d2221148eaeed4871f246657b1c3eaa1cbd2"
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -170,6 +176,10 @@ checksum = "2b2466559f260f48ad25fe6317b3c8dac77b5bdb5763ac7d9d6103530663bc90"
 dependencies = [
  "memchr",
 ]
+
+[[package]]
+name = "dec2flt"
+version = "0.0.0"
 
 [[package]]
 name = "either"
@@ -545,6 +555,9 @@ version = "0.0.0"
 [[package]]
 name = "w_lexer"
 version = "0.0.0"
+dependencies = [
+ "dec2flt",
+]
 
 [[package]]
 name = "w_parser"
@@ -561,6 +574,7 @@ dependencies = [
 name = "w_session"
 version = "0.0.0"
 dependencies = [
+ "appendlist",
  "w_ast",
  "w_errors",
  "w_lexer",

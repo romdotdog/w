@@ -1,24 +1,20 @@
 use super::{Fill, Handler, Next, NoFill, Parser};
 use w_ast::{Atom, IncDec, Span, Spanned};
 use w_errors::Message;
-use w_lexer::{Token, UnOp};
+use w_lexer::token::{Token, UnOp};
 
-impl<'a, H, I> Parser<'a, H, I>
-where
-    H: Handler<LexerInput = I>,
-    I: Iterator<Item = char>,
-{
-    pub(crate) fn parse_block(&mut self, label: Option<Spanned<String>>) -> Spanned<Atom> {
+impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
+    pub(crate) fn parse_block(&mut self, label: Option<Spanned<&'ast str>>) -> Spanned<Atom<'ast>> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::LeftBracket));
         self.next();
 
-        let mut r = Vec::new();
+        let mut blocks = Vec::new();
         let mut last = None;
 
         let end = 'm: loop {
             if let Some(t) = last.take() {
-                r.push(t);
+                blocks.push(t);
             }
 
             match self.tk {
@@ -74,38 +70,49 @@ where
         };
 
         Spanned(
-            Atom::Block(label, r, last.map(Box::new)),
+            Atom::Block {
+                label,
+                blocks,
+                ret: last.map(Box::new),
+            },
             Span::new(start, end),
         )
     }
 
-    pub(crate) fn parse_loop(&mut self, label: Option<Spanned<String>>) -> Option<Spanned<Atom>> {
+    pub(crate) fn parse_loop(
+        &mut self,
+        label: Option<Spanned<&'ast str>>,
+    ) -> Option<Spanned<Atom<'ast>>> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::Loop));
         self.next();
 
-        let initial = match self.tk {
+        let binding = match self.tk {
             Some(Token::Let) => Some(Box::new(self.parse_let()?)),
             _ => None,
         };
 
-        let loop_body = {
+        let block = {
             let a = self.atom()?;
             match a.0 {
-                Atom::Block(..) => {}
+                Atom::Block { .. } => {}
                 _ => self.error(Message::LoopBodyBlock, a.1),
             }
             Box::new(a)
         };
 
-        let end = loop_body.1.end;
+        let end = block.1.end;
         Some(Spanned(
-            Atom::Loop(label, initial, loop_body),
+            Atom::Loop {
+                label,
+                binding,
+                block,
+            },
             Span::new(start, end),
         ))
     }
 
-    fn postfixatom(&mut self, mut lhs: Spanned<Atom>) -> Option<Spanned<Atom>> {
+    fn postfixatom(&mut self, mut lhs: Spanned<Atom<'ast>>) -> Option<Spanned<Atom<'ast>>> {
         let start = lhs.1.start;
         loop {
             match self.tk {
@@ -191,16 +198,16 @@ where
         Some(lhs)
     }
 
-    fn parse_if(&mut self) -> Option<Spanned<Atom>> {
+    fn parse_if(&mut self) -> Option<Spanned<Atom<'ast>>> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::If));
         self.next();
 
         let cond = Box::new(self.atom()?);
-        let body = Box::new(self.atom()?);
+        let true_branch = Box::new(self.atom()?);
 
-        let mut end = body.1.end;
-        let else_body = match self.tk {
+        let mut end = true_branch.1.end;
+        let false_branch = match self.tk {
             Some(Token::Else) => {
                 self.next();
                 let a = self.atom()?;
@@ -211,12 +218,16 @@ where
         };
 
         Some(Spanned(
-            Atom::If(cond, body, else_body),
+            Atom::If {
+                cond,
+                true_branch,
+                false_branch,
+            },
             Span::new(start, end),
         ))
     }
 
-    pub(crate) fn simpleatom(&mut self) -> Option<Spanned<Atom>> {
+    pub(crate) fn simpleatom(&mut self) -> Option<Spanned<Atom<'ast>>> {
         let lhs = match self.tk {
             Some(Token::LeftParen) => {
                 let start = self.start;
@@ -238,6 +249,7 @@ where
             _ => {
                 self.take(|this, t| match t {
                     Some(Token::Float(f)) => Next(Some(Spanned(Atom::Float(f), this.span()))),
+                    Some(Token::UInteger(i)) => Next(Some(Spanned(Atom::UInteger(i), this.span()))),
                     Some(Token::Integer(i)) => Next(Some(Spanned(Atom::Integer(i), this.span()))),
                     Some(Token::String(s)) => Next(Some(Spanned(Atom::String(s), this.span()))),
                     Some(Token::Char(s)) => Next(Some(Spanned(Atom::Char(s), this.span()))),

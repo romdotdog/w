@@ -2,17 +2,13 @@ use super::{Fill, Handler, Next, Parser};
 use std::collections::{hash_map::Entry, HashMap};
 use w_ast::{IdentPair, Program, Span, Spanned, WEnum, WFn, WStruct, WUnion};
 use w_errors::Message;
-use w_lexer::{BinOp, BinOpVariant, Token};
+use w_lexer::token::{BinOp, BinOpVariant, Token};
 
-impl<'a, H, I> Parser<'a, H, I>
-where
-    H: Handler<LexerInput = I>,
-    I: Iterator<Item = char>,
-{
+impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
     // enums
 
-    fn enum_body(&mut self) -> Option<Spanned<HashMap<String, i64>>> {
-        let mut digit = 0;
+    fn enum_body(&mut self) -> Option<Spanned<HashMap<&'ast str, i64>>> {
+        let mut discriminant = 0;
         let start = self.start;
         let mut h = HashMap::new();
         self.next();
@@ -43,7 +39,7 @@ where
                         Some(Token::RightBracket) => {
                             match h.entry(s) {
                                 Entry::Vacant(e) => {
-                                    e.insert(digit);
+                                    e.insert(discriminant);
                                 }
                                 Entry::Occupied(_) => {
                                     self.error(Message::DuplicateEnumField, sident);
@@ -57,20 +53,20 @@ where
                         Some(Token::Comma) => {
                             match h.entry(s) {
                                 Entry::Vacant(e) => {
-                                    e.insert(digit);
+                                    e.insert(discriminant);
                                 }
                                 Entry::Occupied(_) => {
                                     self.error(Message::DuplicateEnumField, sident);
                                 }
                             }
 
-                            digit += 1;
+                            discriminant += 1;
                             self.next();
                             continue;
                         }
                         Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
                             self.next();
-                            digit = self.take(|this, t| match t {
+                            discriminant = self.take(|this, t| match t {
                                 // take
                                 Some(Token::Integer(i)) => {
                                     match h.entry(s) {
@@ -84,9 +80,22 @@ where
                                     }
                                     Next(i + 1)
                                 }
+                                Some(Token::UInteger(_)) => {
+                                    match h.entry(s) {
+                                        Entry::Vacant(e) => {
+                                            e.insert(discriminant);
+                                        }
+                                        Entry::Occupied(_) => {
+                                            this.error(Message::DuplicateEnumField, sident);
+                                        }
+                                    }
+
+                                    this.error(Message::IntegerNoFit, this.span());
+                                    Next(discriminant + 1)
+                                }
                                 t => {
                                     this.error(Message::MissingInteger, this.span());
-                                    Fill(digit + 1, t)
+                                    Fill(discriminant + 1, t)
                                 }
                             });
                             match self.tk {
@@ -117,7 +126,7 @@ where
         Some(Spanned(h, Span::new(start, end)))
     }
 
-    pub fn parse_enum(&mut self) -> Option<Spanned<WEnum>> {
+    pub fn parse_enum(&mut self) -> Option<Spanned<WEnum<'ast>>> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::Enum));
         self.next();
@@ -138,7 +147,7 @@ where
     pub(crate) fn type_body(
         &mut self,
         allow_no_trailing_semi: bool,
-    ) -> Option<Spanned<Vec<Spanned<IdentPair>>>> {
+    ) -> Option<Spanned<Vec<Spanned<IdentPair<'ast>>>>> {
         let start = self.start;
         if let Some(Token::LeftBracket) = self.tk {
             let mut v = Vec::new();
@@ -187,8 +196,8 @@ where
     pub fn struct_or_union(
         &mut self,
         is_struct: bool,
-        structs: &mut Vec<Spanned<WStruct>>,
-        unions: &mut Vec<Spanned<WUnion>>,
+        structs: &mut Vec<Spanned<WStruct<'ast>>>,
+        unions: &mut Vec<Spanned<WUnion<'ast>>>,
     ) {
         let start = self.start;
         debug_assert!(matches!(self.tk, Some(Token::Struct | Token::Union)));
@@ -209,7 +218,7 @@ where
 
     // functions
 
-    pub fn function(&mut self) -> Option<Spanned<WFn>> {
+    pub fn function(&mut self) -> Option<Spanned<WFn<'ast>>> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::Fn));
         self.next();
@@ -315,7 +324,7 @@ where
 
     // main
 
-    pub fn parse(mut self) -> Program {
+    pub fn parse(mut self) -> Program<'ast> {
         let mut fns = Vec::new();
         let mut structs = Vec::new();
         let mut unions = Vec::new();

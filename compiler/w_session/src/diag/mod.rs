@@ -1,5 +1,4 @@
-use std::rc::Rc;
-
+use appendlist::AppendList;
 use w_ast::Span;
 use w_errors::Message;
 
@@ -7,26 +6,26 @@ use crate::source_map::source::Source;
 
 pub mod emitter;
 
-pub struct Diagnostic {
-    pub source: Rc<Source>,
+pub struct Diagnostic<'ast> {
+    pub source: &'ast Source,
     pub span: Span,
     pub msg: Message,
 }
 
-pub struct Diagnostics<E: emitter::Emitter> {
+pub struct Diagnostics<'ast, E: emitter::Emitter> {
     emitter: E,
-    errors: Vec<Diagnostic>,
+    errors: AppendList<Diagnostic<'ast>>,
 }
 
-impl<E: emitter::Emitter> Diagnostics<E> {
+impl<'ast, E: emitter::Emitter> Diagnostics<'ast, E> {
     pub fn new(emitter: E) -> Self {
         Self {
             emitter,
-            errors: Vec::new(),
+            errors: AppendList::new(),
         }
     }
 
-    pub fn error(&mut self, diagnostic: Diagnostic) {
+    pub fn error(&self, diagnostic: Diagnostic<'ast>) {
         self.errors.push(diagnostic);
     }
 
