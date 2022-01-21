@@ -537,6 +537,7 @@ fn keyword(s: &[u8]) -> Token {
         b"struct" => Token::Struct,
         b"union" => Token::Union,
         b"enum" => Token::Enum,
+		b"export" => Token::Export,
         _ => Token::Ident(debug_check_utf8(s)),
     }
 }

@@ -218,7 +218,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
 
     // functions
 
-    pub fn function(&mut self) -> Option<Spanned<WFn<'ast>>> {
+    pub fn function(&mut self, exported: bool) -> Option<Spanned<WFn<'ast>>> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::Fn));
         self.next();
@@ -284,6 +284,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                 params,
                 atom,
                 t,
+                exported,
             },
             Span::new(start, end),
         ))
@@ -331,7 +332,14 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         let mut enums = Vec::new();
         loop {
             match self.tk {
-                Some(Token::Fn) => match self.function() {
+                Some(Token::Export) => {
+                    self.next();
+                    match self.function(true) {
+                        Some(f) => fns.push(f),
+                        None => self.panic_top_level(false),
+                    }
+                }
+                Some(Token::Fn) => match self.function(false) {
                     Some(f) => fns.push(f),
                     None => self.panic_top_level(false),
                 },

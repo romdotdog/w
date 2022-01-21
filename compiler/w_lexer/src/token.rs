@@ -3,6 +3,7 @@ use std::fmt::Display;
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token<'ast> {
     Fn,
+    Export,
     Return,
     If,
     Loop,

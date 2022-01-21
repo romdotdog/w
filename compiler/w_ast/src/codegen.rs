@@ -31,6 +31,10 @@ impl<'ast> Display for Program<'ast> {
 
 impl<'ast> Display for WFn<'ast> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
+        if self.exported {
+            write!(f, "export ")?;
+        }
+
         write!(f, "fn {}(", self.name)?;
 
         let l = self.params.len();

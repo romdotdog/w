@@ -27,6 +27,7 @@ pub struct WFn<'ast> {
     pub params: Vec<Spanned<IdentPair<'ast>>>,
     pub atom: Spanned<Atom<'ast>>,
     pub t: Option<Spanned<Type<'ast>>>,
+    pub exported: bool,
 }
 
 pub struct WStruct<'ast> {
