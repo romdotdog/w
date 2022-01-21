@@ -35,11 +35,11 @@ impl<'ast> Lexer<'ast> {
 	fn skip(&mut self, b: u8) {
 		self.pos += 1;
         self.buffer = match b {
-            0x00..=0x7F => &self.buffer[1..],
+            0x00..=0x7F => unsafe { self.buffer.get_unchecked(1..) },
             0x80..=0xBF => panic!("misaligned"),
-            0xC0..=0xDF => &self.buffer[2..],
-            0xE0..=0xEF => &self.buffer[3..],
-            0xF0..=0xF7 => &self.buffer[4..],
+            0xC0..=0xDF => unsafe { self.buffer.get_unchecked(2..) },
+            0xE0..=0xEF => unsafe { self.buffer.get_unchecked(3..) },
+            0xF0..=0xF7 => unsafe { self.buffer.get_unchecked(4..) },
             _ => panic!("not unicode"),
         }
     }
