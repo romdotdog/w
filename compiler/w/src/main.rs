@@ -13,7 +13,7 @@ USAGE:
 w [OPTIONS] INPUT
 
 DESCRIPTION:
-w is a compiler toolchain that emits optimized WebAssembly with a contemporary Rust-like syntax, and C-like semantics.
+w is a compiler toolchain that emits unoptimized WebAssembly with a contemporary Rust-like syntax, and C-like semantics.
 to learn more please visit https://github.com/romdotdog/w
 
 OPTIONS:
@@ -41,7 +41,6 @@ pub fn handle_options(args: &[String]) -> Option<getopts::Matches> {
         "comma separated list of formats to emit",
         "[wasm|wat]",
     );
-    options.optopt("O", "", "optimization level", "");
     options.optopt("", "color", "configure coloring", "[auto|always|never]");
 
     let matches = options.parse(args).unwrap_or_else(|e| panic!("{}", e));

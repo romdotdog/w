@@ -1,5 +1,6 @@
 [package]
 name = "dec2flt"
+description = "a reduced version of the rust std string-to-float parsing library"
 version = "0.0.0"
 edition = "2018"
 

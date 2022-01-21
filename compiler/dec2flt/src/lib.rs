@@ -1,7 +1,5 @@
 #![allow(clippy::all)]
 #![allow(unused_unsafe)]
-// a reduced version of the rust std string-to-float parsing library
-
 //! Converting decimal strings into IEEE 754 binary floating point numbers.
 //!
 //! # Problem statement
