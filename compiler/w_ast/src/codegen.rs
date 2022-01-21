@@ -37,10 +37,10 @@ impl<'ast> Display for WFn<'ast> {
 
         write!(f, "fn {}(", self.name)?;
 
-        let l = self.params.len() - 1;
+        let l = self.params.len();
         for (i, pair) in self.params.iter().enumerate() {
             write!(f, "{}", pair)?;
-            if i < l {
+            if i + 1 < l {
                 write!(f, ", ")?;
             }
         }
@@ -102,11 +102,11 @@ fn type_struct_like(
     f: &mut std::fmt::Formatter<'_>,
     v: &Spanned<Vec<Spanned<IdentPair>>>,
 ) -> Result {
-    let l = v.0.len() - 1;
+    let l = v.0.len();
     for (i, ident) in v.0.iter().enumerate() {
         write!(f, "{}", ident)?;
 
-        if i < l {
+        if i + 1 < l {
             write!(f, "; ")?;
         }
     }
@@ -183,11 +183,11 @@ impl<'ast> Display for Atom<'ast> {
             }
             Atom::Call(lhs, args) => {
                 write!(f, "{}(", lhs)?;
-                let l = args.len() - 1;
+                let l = args.len();
                 for (i, arg) in args.iter().enumerate() {
                     write!(f, "{}", arg)?;
 
-                    if i < l {
+                    if i + 1 < l {
                         write!(f, ", ")?;
                     }
                 }
