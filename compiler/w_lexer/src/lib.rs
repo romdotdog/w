@@ -531,6 +531,7 @@ fn keyword(s: &[u8]) -> Token {
         b"if" => Token::If,
         b"else" => Token::Else,
         b"let" => Token::Let,
+		b"static" => Token::Static,
         b"mut" => Token::Mut,
         b"loop" => Token::Loop,
         b"br" => Token::Br,

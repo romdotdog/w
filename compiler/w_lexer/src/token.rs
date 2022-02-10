@@ -8,6 +8,7 @@ pub enum Token<'ast> {
     If,
     Loop,
     Let,
+	Static,
     Struct,
     Union,
     Enum,
