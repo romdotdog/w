@@ -1,7 +1,7 @@
-use w_ast::{Atom, IdentPair, Indir, Span, Spanned, Type, TypeVariant, Decl};
+use w_ast::{Atom, Decl, IdentPair, Indir, Span, Spanned, Type, TypeVariant};
 use w_errors::Message;
-use w_lexer::Lexer;
 use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token};
+use w_lexer::Lexer;
 
 mod handler;
 mod primaryatom;
@@ -10,8 +10,7 @@ mod toplevel;
 
 pub use handler::Handler;
 
-pub struct Parser<'ast, H: Handler<'ast>>
-{
+pub struct Parser<'ast, H: Handler<'ast>> {
     session: &'ast H, // TODO: lifetime review
     src_ref: &'ast H::SourceRef,
     lex: Lexer<'ast>,
@@ -31,8 +30,7 @@ enum Take<'ast, T> {
 
 use Take::{Fill, Next, NoFill};
 
-impl<'ast, H: Handler<'ast>> Parser<'ast, H>
-{
+impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
     pub fn new(session: &'ast H, src_ref: &'ast H::SourceRef) -> Self {
         let src = session.get_source(src_ref);
         let lex = Lexer::from_str(src);
@@ -234,7 +232,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H>
         }
     }
 
-	fn parse_decl(&mut self) -> Option<Spanned<Decl<'ast>>> {
+    fn parse_decl(&mut self) -> Option<Spanned<Decl<'ast>>> {
         let start = self.start;
 
         let pair = self.ident_type_pair(false)?;
@@ -292,7 +290,11 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H>
         ))
     }
 
-    fn subatom(&mut self, mut lhs: Spanned<Atom<'ast>>, min_prec: u8) -> Option<Spanned<Atom<'ast>>> {
+    fn subatom(
+        &mut self,
+        mut lhs: Spanned<Atom<'ast>>,
+        min_prec: u8,
+    ) -> Option<Spanned<Atom<'ast>>> {
         // https://en.wikipedia.org/wiki/Operator-precedence_parser
 
         // while [t] is a

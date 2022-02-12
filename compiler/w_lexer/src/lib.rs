@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 
 use dec2flt::{
     load_number,
-	number::Number,
+    number::Number,
     parse::{parse_decimal, parse_number},
 };
 
@@ -16,14 +16,14 @@ pub struct Lexer<'ast> {
 }
 
 impl<'ast> Lexer<'ast> {
-	#[allow(clippy::should_implement_trait)]
-	pub fn from_str(buffer: &'ast str) -> Self {
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(buffer: &'ast str) -> Self {
         unsafe { Self::from_bytes(buffer.as_bytes()) }
     }
 
-	/// # Safety
-	/// 
-	/// The &[u8] must be utf-8 validated
+    /// # Safety
+    ///
+    /// The &[u8] must be utf-8 validated
     pub unsafe fn from_bytes(buffer: &'ast [u8]) -> Self {
         Lexer { buffer, pos: 0 }
     }
@@ -32,8 +32,8 @@ impl<'ast> Lexer<'ast> {
         self.buffer = self.buffer.get_unchecked(n..);
     }
 
-	fn skip(&mut self, b: u8) {
-		self.pos += 1;
+    fn skip(&mut self, b: u8) {
+        self.pos += 1;
         self.buffer = match b {
             0x00..=0x7F => unsafe { self.buffer.get_unchecked(1..) },
             0x80..=0xBF => panic!("misaligned"),
@@ -60,14 +60,13 @@ impl<'ast> Lexer<'ast> {
             }
             if v < radix {
                 if not_overflown {
-                    x
-                        .checked_mul(u64::from(radix))
+                    x.checked_mul(u64::from(radix))
                         .and_then(|x| x.checked_add(u64::from(v)))
-						.map_or_else(|| not_overflown = false, |nx| x = nx);
+                        .map_or_else(|| not_overflown = false, |nx| x = nx);
                 }
 
                 unsafe { self.step() };
-				self.pos += 1;
+                self.pos += 1;
             } else {
                 break;
             }
@@ -87,7 +86,7 @@ impl<'ast> Lexer<'ast> {
         None
     }
 
-	fn load_number(&mut self, n: (Option<Number>, usize)) -> Option<Token<'ast>> {
+    fn load_number(&mut self, n: (Option<Number>, usize)) -> Option<Token<'ast>> {
         let (o, len) = n;
         self.pos += len;
         unsafe { self.step_by(len) };
@@ -106,12 +105,12 @@ impl<'ast> Lexer<'ast> {
 
     fn try_bip(&mut self, b: u8) -> Option<Token<'ast>> {
         let start = self.buffer;
-		let start_pos = self.pos;
+        let start_pos = self.pos;
 
         let negative = match b {
             b'-' => {
-				unsafe { self.step() };
-				self.pos += 1;
+                unsafe { self.step() };
+                self.pos += 1;
                 true
             }
             _ => false,
@@ -119,23 +118,21 @@ impl<'ast> Lexer<'ast> {
 
         match self.buffer.first() {
             Some(b'1'..=b'9') => self.load_number(parse_number(self.buffer, negative)),
-            Some(b'.') => {
-				match self.buffer.get(1) {
-					Some(b'0'..=b'9') => self.load_number(parse_decimal(start, negative)),
-					Some(_) if negative => Some(Token::AmbiguousOp(AmbiguousOp::Minus)),
-					_ => {
-						unsafe { self.step() };
-						self.pos += 1;
-						Some(Token::Period)
-					}
-				}
-			},
+            Some(b'.') => match self.buffer.get(1) {
+                Some(b'0'..=b'9') => self.load_number(parse_decimal(start, negative)),
+                Some(_) if negative => Some(Token::AmbiguousOp(AmbiguousOp::Minus)),
+                _ => {
+                    unsafe { self.step() };
+                    self.pos += 1;
+                    Some(Token::Period)
+                }
+            },
             Some(b'0') =>
             {
                 #[allow(clippy::option_if_let_else)]
                 if let Some(radix) = self.check_radix() {
-					unsafe { self.step_by(2) };
-					self.pos += 2;
+                    unsafe { self.step_by(2) };
+                    self.pos += 2;
                     Some(match self.parse_radix(radix) {
                         Some(mantissa) => convert_sign_and_mantissa(negative, mantissa),
                         None => Token::Overflown,
@@ -145,15 +142,15 @@ impl<'ast> Lexer<'ast> {
                 }
             }
             Some(_) => {
-				self.buffer = start;
-				self.pos = start_pos;
-				self.try_aip(b)
-			},
-			None => {
-				self.buffer = start;
-				self.pos = start_pos;
-				None
-			}
+                self.buffer = start;
+                self.pos = start_pos;
+                self.try_aip(b)
+            }
+            None => {
+                self.buffer = start;
+                self.pos = start_pos;
+                None
+            }
         }
     }
 
@@ -390,15 +387,15 @@ impl<'ast> Lexer<'ast> {
                             unsafe { self.step_by(2) };
                             self.pos += 2;
                             loop {
-								match self.buffer.first() {
-									Some(b'\n') => {
-										self.pos += 1;
-										unsafe { self.step() };
-										break;
-									}
-									Some(&b) => self.skip(b),
-									None => break
-								}                                
+                                match self.buffer.first() {
+                                    Some(b'\n') => {
+                                        self.pos += 1;
+                                        unsafe { self.step() };
+                                        break;
+                                    }
+                                    Some(&b) => self.skip(b),
+                                    None => break,
+                                }
                             }
                         }
                         // multi-line comment
@@ -406,32 +403,32 @@ impl<'ast> Lexer<'ast> {
                             unsafe { self.step_by(2) };
                             self.pos += 2;
                             loop {
-								match self.buffer.first() {
-									Some(b'*') => {
-										self.pos += 1;
-										unsafe { self.step() };
-										if let Some(b'/') = self.buffer.first() {
-											self.pos += 1;
-											unsafe { self.step() };
-											break;
-										}
-									}
-									Some(&b) => self.skip(b),
-									None => break
-								}
+                                match self.buffer.first() {
+                                    Some(b'*') => {
+                                        self.pos += 1;
+                                        unsafe { self.step() };
+                                        if let Some(b'/') = self.buffer.first() {
+                                            self.pos += 1;
+                                            unsafe { self.step() };
+                                            break;
+                                        }
+                                    }
+                                    Some(&b) => self.skip(b),
+                                    None => break,
+                                }
                             }
                         }
                         _ => break true,
                     };
                 }
                 Some(&c) => {
-					let l = self.is_whitespace(c);
-					if l == 0 {
-						break true
-					}
-					self.pos += 1;
-					unsafe { self.step_by(l) };
-				}
+                    let l = self.is_whitespace(c);
+                    if l == 0 {
+                        break true;
+                    }
+                    self.pos += 1;
+                    unsafe { self.step_by(l) };
+                }
                 None => break false,
             }
         }
@@ -442,10 +439,10 @@ impl<'ast> Iterator for Lexer<'ast> {
     type Item = (Token<'ast>, usize, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
-		fn start_of_token(c: u8) -> bool {
-			matches!(
-				c,
-				b':' | b';' | b',' | b'.' | 
+        fn start_of_token(c: u8) -> bool {
+            matches!(
+                c,
+                b':' | b';' | b',' | b'.' | 
 				// sep
 				b'{' | b'}' | b'(' | b')' | b'[' | b']' | 
 				// sep
@@ -454,61 +451,61 @@ impl<'ast> Iterator for Lexer<'ast> {
 				b'>'  | b'<' | b'=' | b'!' | b'+' | b'-' |
 				// sep
 				b'\'' | b'"'
-			)
-		}
+            )
+        }
 
         if !self.skip_comments_and_whitespace() {
             return None;
         }
 
         let start = self.buffer;
-		let start_pos = self.pos;
+        let start_pos = self.pos;
         let &c = start.first()?;
-		let mut end_pos = 0;
-		let t = if let Some(t) = self.try_bip(c) {
-			end_pos = self.pos;
-			t
-		} else {
-			let is_label = c == b'$';
-			let l = loop {
-				if let Some(&b) = self.buffer.first() {
-					let l = self.is_whitespace(b);
-					if l != 0 {
-						end_pos = self.pos;
-						self.pos += 1;
-						unsafe { self.step_by(l) };
-						break l;
-					}
+        let mut end_pos = 0;
+        let t = if let Some(t) = self.try_bip(c) {
+            end_pos = self.pos;
+            t
+        } else {
+            let is_label = c == b'$';
+            let l = loop {
+                if let Some(&b) = self.buffer.first() {
+                    let l = self.is_whitespace(b);
+                    if l != 0 {
+                        end_pos = self.pos;
+                        self.pos += 1;
+                        unsafe { self.step_by(l) };
+                        break l;
+                    }
 
-					if start_of_token(b) {
-						end_pos = self.pos;
-						break 0;
-					}
+                    if start_of_token(b) {
+                        end_pos = self.pos;
+                        break 0;
+                    }
 
-					self.skip(b);
-				} else {
-					break 0;
-				}
-			};
+                    self.skip(b);
+                } else {
+                    break 0;
+                }
+            };
 
-			let len = start.len() - self.buffer.len() - l;
-			if is_label {
-				if len == 1 {
-					Token::Ident("$")
-				} else {
-					Token::Label(debug_check_utf8(&start[1..len]))
-				}
-			} else {
-				keyword(&start[0..len])
-			}
-		};
-		Some((t, start_pos, end_pos))
+            let len = start.len() - self.buffer.len() - l;
+            if is_label {
+                if len == 1 {
+                    Token::Ident("$")
+                } else {
+                    Token::Label(debug_check_utf8(&start[1..len]))
+                }
+            } else {
+                keyword(&start[0..len])
+            }
+        };
+        Some((t, start_pos, end_pos))
     }
 }
 
 const POSITIVE_MIN_I64: u64 = 9_223_372_036_854_775_808;
 fn convert_sign_and_mantissa<'ast>(negative: bool, mantissa: u64) -> Token<'ast> {
-	if negative {
+    if negative {
         match mantissa.cmp(&POSITIVE_MIN_I64) {
             #[allow(clippy::cast_possible_wrap)]
             Ordering::Less => Token::Integer(-(mantissa as i64)),
@@ -522,8 +519,6 @@ fn convert_sign_and_mantissa<'ast>(negative: bool, mantissa: u64) -> Token<'ast>
     }
 }
 
-
-
 fn keyword(s: &[u8]) -> Token {
     match s {
         b"fn" => Token::Fn,
@@ -531,14 +526,14 @@ fn keyword(s: &[u8]) -> Token {
         b"if" => Token::If,
         b"else" => Token::Else,
         b"let" => Token::Let,
-		b"static" => Token::Static,
+        b"static" => Token::Static,
         b"mut" => Token::Mut,
         b"loop" => Token::Loop,
         b"br" => Token::Br,
         b"struct" => Token::Struct,
         b"union" => Token::Union,
         b"enum" => Token::Enum,
-		b"export" => Token::Export,
+        b"export" => Token::Export,
         _ => Token::Ident(debug_check_utf8(s)),
     }
 }
@@ -562,7 +557,6 @@ fn char_to_radix(c: u8) -> Option<u8> {
 }
 
 fn debug_check_utf8(x: &[u8]) -> &str {
-	debug_assert!(std::str::from_utf8(x).is_ok());
-	unsafe { std::str::from_utf8_unchecked(x) }
+    debug_assert!(std::str::from_utf8(x).is_ok());
+    unsafe { std::str::from_utf8_unchecked(x) }
 }
-

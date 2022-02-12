@@ -349,7 +349,7 @@ fn number_of_digits_decimal_left_shift(d: &Decimal, mut shift: usize) -> usize {
         } else if d.digits[i] < p5 {
             return num_new_digits - 1;
         }
-		return num_new_digits;
+        return num_new_digits;
     }
     num_new_digits
 }

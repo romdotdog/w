@@ -9,8 +9,8 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         assert_eq!(self.tk, Some(Token::Let));
         self.next();
 
-		let decl = self.parse_decl()?;
-		let end = decl.1.end;
+        let decl = self.parse_decl()?;
+        let end = decl.1.end;
         Some(Spanned(Atom::Let(decl.0), Span::new(start, end)))
     }
 
