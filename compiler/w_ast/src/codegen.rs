@@ -3,16 +3,16 @@ use crate::{Decl, Spanned, TopLevel, TypeBody};
 use super::{Atom, IdentPair, IncDec, Program, Type, TypeVariant};
 use w_lexer::token::UnOp;
 
-use std::fmt::{Display, Result};
+use std::fmt::{Display, Formatter, Result};
 
 impl<T: Display> Display for Spanned<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         self.0.fmt(f)
     }
 }
 
 impl<'ast> Display for Program<'ast> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         for toplevel in &self.0 {
             write!(f, "{}\n\n", toplevel)?;
         }
@@ -21,7 +21,7 @@ impl<'ast> Display for Program<'ast> {
 }
 
 impl<'ast> Display for TopLevel<'ast> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             TopLevel::Fn {
                 name,
@@ -85,7 +85,7 @@ impl<'ast> Display for TopLevel<'ast> {
     }
 }
 
-fn verbose_type_body(f: &mut std::fmt::Formatter<'_>, body: &TypeBody) -> Result {
+fn verbose_type_body(f: &mut Formatter<'_>, body: &TypeBody) -> Result {
     writeln!(f, "{{")?;
     for ident in &body.0 {
         writeln!(f, "\t{};", ident)?;
@@ -93,7 +93,7 @@ fn verbose_type_body(f: &mut std::fmt::Formatter<'_>, body: &TypeBody) -> Result
     write!(f, "}}")
 }
 
-fn inline_type_body(f: &mut std::fmt::Formatter<'_>, body: &TypeBody) -> Result {
+fn inline_type_body(f: &mut Formatter<'_>, body: &TypeBody) -> Result {
     write!(f, "{{ ")?;
 
     let l = body.0.len();
@@ -109,13 +109,13 @@ fn inline_type_body(f: &mut std::fmt::Formatter<'_>, body: &TypeBody) -> Result 
 }
 
 impl<'ast> Display for Type<'ast> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}{}", self.indir, self.v)
     }
 }
 
 impl<'ast> Display for Decl<'ast> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match &self.rhs {
             Some(rhs) => write!(f, "{} = {}", self.pair, rhs),
             None => write!(f, "{}", self.pair),
@@ -124,7 +124,7 @@ impl<'ast> Display for Decl<'ast> {
 }
 
 impl<'ast> Display for TypeVariant<'ast> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             TypeVariant::Void => write!(f, "void"),
             TypeVariant::I32 => write!(f, "i32"),
@@ -147,7 +147,7 @@ impl<'ast> Display for TypeVariant<'ast> {
 }
 
 impl<'ast> Display for Atom<'ast> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Atom::Integer(i) => write!(f, "{}", i),
             Atom::UInteger(u) => write!(f, "{}", u),
@@ -251,7 +251,7 @@ impl<'ast> Display for Atom<'ast> {
 }
 
 impl<'ast> Display for IdentPair<'ast> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if self.mutable.is_some() {
             write!(f, "mut ")?;
         }
