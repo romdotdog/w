@@ -1,4 +1,4 @@
-use crate::{Spanned, WEnum, WStruct, WUnion};
+use crate::{Spanned, WEnum, WStruct, WUnion, Decl};
 
 use super::{Atom, IdentPair, IncDec, Program, Type, TypeVariant, WFn};
 use w_lexer::token::UnOp;
@@ -98,6 +98,15 @@ impl<'ast> Display for Type<'ast> {
     }
 }
 
+impl<'ast> Display for Decl<'ast> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
+        match &self.rhs {
+			Some(rhs) => write!(f, "{} = {}", self.pair, rhs),
+			None => write!(f, "{}", self.pair)
+		}
+    }
+}
+
 fn type_struct_like(
     f: &mut std::fmt::Formatter<'_>,
     v: &Spanned<Vec<Spanned<IdentPair>>>,
@@ -194,13 +203,9 @@ impl<'ast> Display for Atom<'ast> {
 
                 write!(f, ")")
             }
-            Atom::Let(pair, rhs) => {
-                write!(f, "let {}", pair)?;
-                if let Some(rhs) = rhs {
-                    write!(f, " = {}", rhs)?;
-                }
-                Ok(())
-            }
+            Atom::Let(decl) => {
+                write!(f, "let {}", decl)
+			},
             Atom::If {
                 cond,
                 true_branch,

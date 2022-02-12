@@ -1,10 +1,22 @@
 use super::{Fill, Handler, Next, Parser};
 use std::collections::{hash_map::Entry, HashMap};
-use w_ast::{IdentPair, Program, Span, Spanned, WEnum, WFn, WStruct, WUnion};
+use w_ast::{IdentPair, Program, Span, Spanned, WEnum, WFn, WStruct, WUnion, WStatic};
 use w_errors::Message;
 use w_lexer::token::{BinOp, BinOpVariant, Token};
 
 impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
+	// static
+
+	pub(crate) fn parse_static(&mut self) -> Option<Spanned<WStatic<'ast>>> {
+        let start = self.start;
+        assert_eq!(self.tk, Some(Token::Static));
+        self.next();
+
+		let decl = self.parse_decl()?;
+		let end = decl.1.end;
+        Some(Spanned(WStatic(decl.0), Span::new(start, end)))
+    }
+
     // enums
 
     fn enum_body(&mut self) -> Option<Spanned<HashMap<&'ast str, i64>>> {
@@ -330,6 +342,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         let mut structs = Vec::new();
         let mut unions = Vec::new();
         let mut enums = Vec::new();
+		let mut statics = Vec::new();
         loop {
             match self.tk {
                 Some(Token::Export) => {
@@ -353,6 +366,10 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                     Some(f) => enums.push(f),
                     None => self.panic_top_level(true),
                 },
+				Some(Token::Static) => match self.parse_static() {
+                    Some(f) => statics.push(f),
+                    None => self.panic_top_level(false),
+                },
                 Some(_) => {
                     self.error(Message::InvalidTopLevel, self.span());
                     self.panic_top_level(false);
@@ -366,6 +383,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             structs,
             unions,
             enums,
+			statics,
         }
     }
 }

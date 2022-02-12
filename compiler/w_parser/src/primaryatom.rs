@@ -9,19 +9,9 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         assert_eq!(self.tk, Some(Token::Let));
         self.next();
 
-        let pair = self.ident_type_pair(false)?;
-        let mut end = pair.1.end;
-        let rhs = match self.tk {
-            Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
-                self.next();
-                let atom = self.atom()?;
-                end = atom.1.end;
-                Some(Box::new(atom))
-            }
-            _ => None,
-        };
-
-        Some(Spanned(Atom::Let(pair, rhs), Span::new(start, end)))
+		let decl = self.parse_decl()?;
+		let end = decl.1.end;
+        Some(Spanned(Atom::Let(decl.0), Span::new(start, end)))
     }
 
     fn parse_cast(&mut self) -> Option<Spanned<Atom<'ast>>> {

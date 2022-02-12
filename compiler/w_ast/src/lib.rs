@@ -17,6 +17,7 @@ pub struct Program<'ast> {
     pub structs: Vec<Spanned<WStruct<'ast>>>,
     pub unions: Vec<Spanned<WUnion<'ast>>>,
     pub enums: Vec<Spanned<WEnum<'ast>>>,
+	pub statics: Vec<Spanned<WStatic<'ast>>>,
 }
 
 type SAtom<'ast> = Spanned<Atom<'ast>>;
@@ -43,6 +44,13 @@ pub struct WUnion<'ast> {
 pub struct WEnum<'ast> {
     pub name: Spanned<&'ast str>,
     pub fields: Spanned<HashMap<&'ast str, i64>>,
+}
+
+pub struct WStatic<'ast>(pub Decl<'ast>);
+
+pub struct Decl<'ast> {
+	pub pair: Spanned<IdentPair<'ast>>,
+	pub rhs: Option<BAtom<'ast>>,
 }
 
 pub enum IncDec {
@@ -82,7 +90,7 @@ pub enum Atom<'ast> {
         block: BAtom<'ast>,
     },
 
-    Let(Spanned<IdentPair<'ast>>, Option<BAtom<'ast>>),
+    Let(Decl<'ast>),
 
     If {
         cond: BAtom<'ast>,

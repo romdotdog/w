@@ -1,4 +1,4 @@
-use w_ast::{Atom, IdentPair, Indir, Span, Spanned, Type, TypeVariant};
+use w_ast::{Atom, IdentPair, Indir, Span, Spanned, Type, TypeVariant, Decl};
 use w_errors::Message;
 use w_lexer::Lexer;
 use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token};
@@ -232,6 +232,24 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H>
                 }
             }
         }
+    }
+
+	fn parse_decl(&mut self) -> Option<Spanned<Decl<'ast>>> {
+        let start = self.start;
+
+        let pair = self.ident_type_pair(false)?;
+        let mut end = pair.1.end;
+        let rhs = match self.tk {
+            Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
+                self.next();
+                let atom = self.atom()?;
+                end = atom.1.end;
+                Some(Box::new(atom))
+            }
+            _ => None,
+        };
+
+        Some(Spanned(Decl { pair, rhs }, Span::new(start, end)))
     }
 
     fn ident_type_pair(&mut self, require_type: bool) -> Option<Spanned<IdentPair<'ast>>> {
