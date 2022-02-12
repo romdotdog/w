@@ -100,3 +100,4 @@ test!(controlflow);
 test!(structs);
 test!(postfix);
 test!(functions);
+test!(statics);

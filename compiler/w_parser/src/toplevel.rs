@@ -14,6 +14,13 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
 
         let decl = self.parse_decl()?;
         let end = decl.1.end;
+
+        if let Some(Token::Semicolon) = self.tk {
+            self.next();
+        } else {
+            self.error(Message::MissingSemicolon, self.span());
+        }
+
         Some(Spanned(TopLevel::Static(decl.0), Span::new(start, end)))
     }
 
