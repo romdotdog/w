@@ -87,7 +87,7 @@ impl<'ast> Display for TopLevel<'ast> {
 
 fn verbose_type_body(f: &mut std::fmt::Formatter<'_>, body: &TypeBody) -> Result {
     writeln!(f, "{{")?;
-    for ident in body.0.iter() {
+    for ident in &body.0 {
         writeln!(f, "\t{};", ident)?;
     }
     write!(f, "}}")
@@ -204,9 +204,8 @@ impl<'ast> Display for Atom<'ast> {
 
                 write!(f, ")")
             }
-            Atom::Let(decl) => {
-                write!(f, "let {}", decl)
-            }
+            Atom::Let(decl) => write!(f, "let {}", decl),
+            Atom::Static(decl) => write!(f, "static {}", decl),
             Atom::If {
                 cond,
                 true_branch,

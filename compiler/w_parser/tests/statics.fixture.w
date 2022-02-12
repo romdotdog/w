@@ -4,4 +4,8 @@ static hello = "Hello, world!";
 
 static naughty_static = "no semicolon";
 
-// "missing a semicolon or closing brace" - 3:25+14
+fn main() {
+	static scoped_static = "hello, world!";
+}
+
+// "missing a semicolon or closing brace" - 5:1+2
