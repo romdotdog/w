@@ -1,4 +1,4 @@
-use crate::{IdentPair, Indir, Spanned};
+use crate::{Indir, Spanned, TypeBody};
 
 #[derive(Clone)]
 pub struct Type<'ast> {
@@ -32,8 +32,8 @@ pub enum TypeVariant<'ast> {
     U64,
     F32,
     F64,
-    Struct(Spanned<Vec<Spanned<IdentPair<'ast>>>>),
-    Union(Spanned<Vec<Spanned<IdentPair<'ast>>>>),
+    Struct(Spanned<TypeBody<'ast>>),
+    Union(Spanned<TypeBody<'ast>>),
     Unresolved(&'ast str),
 }
 

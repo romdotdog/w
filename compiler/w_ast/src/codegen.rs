@@ -1,6 +1,6 @@
-use crate::{Spanned, WEnum, WStruct, WUnion, Decl};
+use crate::{Decl, Spanned, TopLevel, TypeBody};
 
-use super::{Atom, IdentPair, IncDec, Program, Type, TypeVariant, WFn};
+use super::{Atom, IdentPair, IncDec, Program, Type, TypeVariant};
 use w_lexer::token::UnOp;
 
 use std::fmt::{Display, Result};
@@ -13,83 +13,99 @@ impl<T: Display> Display for Spanned<T> {
 
 impl<'ast> Display for Program<'ast> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
-        for wenum in &self.enums {
-            write!(f, "{}\n\n", wenum)?;
-        }
-        for wstruct in &self.structs {
-            write!(f, "{}\n\n", wstruct)?;
-        }
-        for wunion in &self.unions {
-            write!(f, "{}\n\n", wunion)?;
-        }
-        for wfn in &self.fns {
-            write!(f, "{}\n\n", wfn)?;
+        for toplevel in &self.0 {
+            write!(f, "{}\n\n", toplevel)?;
         }
         Ok(())
     }
 }
 
-impl<'ast> Display for WFn<'ast> {
+impl<'ast> Display for TopLevel<'ast> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
-        if self.exported {
-            write!(f, "export ")?;
-        }
+        match self {
+            TopLevel::Fn {
+                name,
+                params,
+                atom,
+                t,
+                exported,
+            } => {
+                if *exported {
+                    write!(f, "export ")?;
+                }
 
-        write!(f, "fn {}(", self.name)?;
+                write!(f, "fn {}(", name)?;
 
-        let l = self.params.len();
-        for (i, pair) in self.params.iter().enumerate() {
-            write!(f, "{}", pair)?;
-            if i + 1 < l {
-                write!(f, ", ")?;
+                let l = params.len();
+                for (i, pair) in params.iter().enumerate() {
+                    write!(f, "{}", pair)?;
+                    if i + 1 < l {
+                        write!(f, ", ")?;
+                    }
+                }
+
+                if let Some(t) = t {
+                    write!(f, "): {} {}", t, atom)
+                } else {
+                    write!(f, ") {}", atom)
+                }
+            }
+
+            TopLevel::Enum { name, fields } => {
+                writeln!(f, "enum {} {{", name)?;
+                let mut v: Vec<_> = fields.0.iter().collect();
+                v.sort_by_key(|k| k.1);
+                let mut d = 0;
+                for (s, &v) in v {
+                    if d == v {
+                        writeln!(f, "\t{},", s)?;
+                        d += 1;
+                    } else {
+                        writeln!(f, "\t{} = {},", s, v)?;
+                        d = v + 1;
+                    }
+                }
+                write!(f, "}}")
+            }
+
+            TopLevel::Static(decl) => {
+                write!(f, "static {};", decl)
+            }
+
+            TopLevel::Struct(name, body) => {
+                write!(f, "struct {} ", name)?;
+                verbose_type_body(f, &body.0)
+            }
+
+            TopLevel::Union(name, body) => {
+                write!(f, "union {} ", name)?;
+                verbose_type_body(f, &body.0)
             }
         }
-
-        if let Some(t) = &self.t {
-            write!(f, "): {} {}", t, self.atom)
-        } else {
-            write!(f, ") {}", self.atom)
-        }
     }
 }
 
-impl<'ast> Display for WStruct<'ast> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
-        writeln!(f, "struct {} {{", self.name)?;
-        for ident in &self.fields.0 {
-            writeln!(f, "\t{};", ident)?;
-        }
-        write!(f, "}}")
+fn verbose_type_body(f: &mut std::fmt::Formatter<'_>, body: &TypeBody) -> Result {
+    writeln!(f, "{{")?;
+    for ident in body.0.iter() {
+        writeln!(f, "\t{};", ident)?;
     }
+    write!(f, "}}")
 }
 
-impl<'ast> Display for WUnion<'ast> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
-        writeln!(f, "union {} {{", self.name)?;
-        for ident in &self.fields.0 {
-            writeln!(f, "\t{};", ident)?;
-        }
-        write!(f, "}}")
-    }
-}
+fn inline_type_body(f: &mut std::fmt::Formatter<'_>, body: &TypeBody) -> Result {
+    write!(f, "{{ ")?;
 
-impl<'ast> Display for WEnum<'ast> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
-        writeln!(f, "enum {} {{", self.name)?;
-        let mut v: Vec<_> = self.fields.0.iter().collect();
-        v.sort_by_key(|k| k.1);
-        let mut d = 0;
-        for (s, &v) in v {
-            if d == v {
-                writeln!(f, "\t{},", s)?;
-                d += 1;
-            } else {
-                writeln!(f, "\t{} = {},", s, v)?;
-                d = v + 1;
-            }
+    let l = body.0.len();
+    for (i, ident) in body.0.iter().enumerate() {
+        write!(f, "{}", ident)?;
+
+        if i + 1 < l {
+            write!(f, "; ")?;
         }
-        write!(f, "}}")
     }
+
+    write!(f, " }}")
 }
 
 impl<'ast> Display for Type<'ast> {
@@ -101,25 +117,10 @@ impl<'ast> Display for Type<'ast> {
 impl<'ast> Display for Decl<'ast> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result {
         match &self.rhs {
-			Some(rhs) => write!(f, "{} = {}", self.pair, rhs),
-			None => write!(f, "{}", self.pair)
-		}
-    }
-}
-
-fn type_struct_like(
-    f: &mut std::fmt::Formatter<'_>,
-    v: &Spanned<Vec<Spanned<IdentPair>>>,
-) -> Result {
-    let l = v.0.len();
-    for (i, ident) in v.0.iter().enumerate() {
-        write!(f, "{}", ident)?;
-
-        if i + 1 < l {
-            write!(f, "; ")?;
+            Some(rhs) => write!(f, "{} = {}", self.pair, rhs),
+            None => write!(f, "{}", self.pair),
         }
     }
-    write!(f, " }}")
 }
 
 impl<'ast> Display for TypeVariant<'ast> {
@@ -132,13 +133,13 @@ impl<'ast> Display for TypeVariant<'ast> {
             TypeVariant::U64 => write!(f, "u64"),
             TypeVariant::F32 => write!(f, "f32"),
             TypeVariant::F64 => write!(f, "f64"),
-            TypeVariant::Struct(v) => {
-                write!(f, "struct {{ ")?;
-                type_struct_like(f, v)
+            TypeVariant::Struct(body) => {
+                write!(f, "struct ")?;
+                inline_type_body(f, &body.0)
             }
-            TypeVariant::Union(v) => {
-                write!(f, "union {{ ")?;
-                type_struct_like(f, v)
+            TypeVariant::Union(body) => {
+                write!(f, "union ")?;
+                inline_type_body(f, &body.0)
             }
             TypeVariant::Unresolved(s) => write!(f, "{}", s),
         }
@@ -205,7 +206,7 @@ impl<'ast> Display for Atom<'ast> {
             }
             Atom::Let(decl) => {
                 write!(f, "let {}", decl)
-			},
+            }
             Atom::If {
                 cond,
                 true_branch,

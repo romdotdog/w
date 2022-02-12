@@ -1,15 +1,3 @@
-enum <unknown> {
-}
-
-enum <unknown> {
-}
-
-enum Foo {
-	Foo = 1,
-	Bar,
-	Baz = 5,
-}
-
 struct <unknown> {
 }
 
@@ -30,6 +18,18 @@ union <unknown> {
 union Foo {
 	foo: i32;
 	mut bar: i32;
+}
+
+enum <unknown> {
+}
+
+enum <unknown> {
+}
+
+enum Foo {
+	Foo = 1,
+	Bar,
+	Baz = 5,
 }
 
 // "missing identifier here" - 1:7+1

@@ -1,20 +1,20 @@
 use super::{Fill, Handler, Next, Parser};
 use std::collections::{hash_map::Entry, HashMap};
-use w_ast::{IdentPair, Program, Span, Spanned, WEnum, WFn, WStruct, WUnion, WStatic};
+use w_ast::{Program, Span, Spanned, TopLevel, TypeBody};
 use w_errors::Message;
 use w_lexer::token::{BinOp, BinOpVariant, Token};
 
 impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
-	// static
+    // static
 
-	pub(crate) fn parse_static(&mut self) -> Option<Spanned<WStatic<'ast>>> {
+    pub(crate) fn parse_static(&mut self) -> Option<Spanned<TopLevel<'ast>>> {
         let start = self.start;
         assert_eq!(self.tk, Some(Token::Static));
         self.next();
 
-		let decl = self.parse_decl()?;
-		let end = decl.1.end;
-        Some(Spanned(WStatic(decl.0), Span::new(start, end)))
+        let decl = self.parse_decl()?;
+        let end = decl.1.end;
+        Some(Spanned(TopLevel::Static(decl.0), Span::new(start, end)))
     }
 
     // enums
@@ -138,7 +138,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         Some(Spanned(h, Span::new(start, end)))
     }
 
-    pub fn parse_enum(&mut self) -> Option<Spanned<WEnum<'ast>>> {
+    pub fn parse_enum(&mut self) -> Option<Spanned<TopLevel<'ast>>> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::Enum));
         self.next();
@@ -147,7 +147,10 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         if let Some(Token::LeftBracket) = self.tk {
             let fields = self.enum_body()?;
             let end = fields.1.end;
-            Some(Spanned(WEnum { name, fields }, Span::new(start, end)))
+            Some(Spanned(
+                TopLevel::Enum { name, fields },
+                Span::new(start, end),
+            ))
         } else {
             self.error(Message::MissingOpeningBracket, self.span());
             None
@@ -159,7 +162,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
     pub(crate) fn type_body(
         &mut self,
         allow_no_trailing_semi: bool,
-    ) -> Option<Spanned<Vec<Spanned<IdentPair<'ast>>>>> {
+    ) -> Option<Spanned<TypeBody<'ast>>> {
         let start = self.start;
         if let Some(Token::LeftBracket) = self.tk {
             let mut v = Vec::new();
@@ -198,39 +201,34 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                 }
             };
 
-            Some(Spanned(v, Span::new(start, end)))
+            Some(Spanned(TypeBody(v), Span::new(start, end)))
         } else {
             self.error(Message::MissingOpeningBracket, self.span());
             None
         }
     }
 
-    pub fn struct_or_union(
-        &mut self,
-        is_struct: bool,
-        structs: &mut Vec<Spanned<WStruct<'ast>>>,
-        unions: &mut Vec<Spanned<WUnion<'ast>>>,
-    ) {
+    pub fn struct_or_union(&mut self, is_struct: bool) -> Option<Spanned<TopLevel<'ast>>> {
         let start = self.start;
         debug_assert!(matches!(self.tk, Some(Token::Struct | Token::Union)));
         self.next();
 
         let name = self.expect_ident(&Some(Token::LeftBracket));
-        if let Some(fields) = self.type_body(false) {
-            let end = fields.1.end;
+        let fields = self.type_body(false)?;
+        let end = fields.1.end;
+        Some(Spanned(
             if is_struct {
-                structs.push(Spanned(WStruct { name, fields }, Span::new(start, end)));
+                TopLevel::Struct(name, fields)
             } else {
-                unions.push(Spanned(WUnion { name, fields }, Span::new(start, end)));
-            }
-        } else {
-            self.panic_top_level(true);
-        }
+                TopLevel::Union(name, fields)
+            },
+            Span::new(start, end),
+        ))
     }
 
     // functions
 
-    pub fn function(&mut self, exported: bool) -> Option<Spanned<WFn<'ast>>> {
+    pub fn function(&mut self, exported: bool) -> Option<Spanned<TopLevel<'ast>>> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::Fn));
         self.next();
@@ -291,7 +289,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         let atom = self.atom()?;
         let end = atom.1.end;
         Some(Spanned(
-            WFn {
+            TopLevel::Fn {
                 name,
                 params,
                 atom,
@@ -338,36 +336,34 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
     // main
 
     pub fn parse(mut self) -> Program<'ast> {
-        let mut fns = Vec::new();
-        let mut structs = Vec::new();
-        let mut unions = Vec::new();
-        let mut enums = Vec::new();
-		let mut statics = Vec::new();
+        let mut toplevel = Vec::new();
         loop {
             match self.tk {
                 Some(Token::Export) => {
                     self.next();
                     match self.function(true) {
-                        Some(f) => fns.push(f),
+                        Some(f) => toplevel.push(f),
                         None => self.panic_top_level(false),
                     }
                 }
                 Some(Token::Fn) => match self.function(false) {
-                    Some(f) => fns.push(f),
+                    Some(f) => toplevel.push(f),
                     None => self.panic_top_level(false),
                 },
-                Some(Token::Struct) => {
-                    self.struct_or_union(true, &mut structs, &mut unions);
-                }
-                Some(Token::Union) => {
-                    self.struct_or_union(false, &mut structs, &mut unions);
-                }
-                Some(Token::Enum) => match self.parse_enum() {
-                    Some(f) => enums.push(f),
+                Some(Token::Struct) => match self.struct_or_union(true) {
+                    Some(f) => toplevel.push(f),
                     None => self.panic_top_level(true),
                 },
-				Some(Token::Static) => match self.parse_static() {
-                    Some(f) => statics.push(f),
+                Some(Token::Union) => match self.struct_or_union(false) {
+                    Some(f) => toplevel.push(f),
+                    None => self.panic_top_level(true),
+                },
+                Some(Token::Enum) => match self.parse_enum() {
+                    Some(f) => toplevel.push(f),
+                    None => self.panic_top_level(true),
+                },
+                Some(Token::Static) => match self.parse_static() {
+                    Some(f) => toplevel.push(f),
                     None => self.panic_top_level(false),
                 },
                 Some(_) => {
@@ -378,12 +374,6 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             }
         }
 
-        Program {
-            fns,
-            structs,
-            unions,
-            enums,
-			statics,
-        }
+        Program(toplevel)
     }
 }

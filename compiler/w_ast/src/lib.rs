@@ -12,45 +12,31 @@ pub use span::Span;
 
 mod codegen;
 
-pub struct Program<'ast> {
-    pub fns: Vec<Spanned<WFn<'ast>>>,
-    pub structs: Vec<Spanned<WStruct<'ast>>>,
-    pub unions: Vec<Spanned<WUnion<'ast>>>,
-    pub enums: Vec<Spanned<WEnum<'ast>>>,
-	pub statics: Vec<Spanned<WStatic<'ast>>>,
+pub struct Program<'ast>(pub Vec<Spanned<TopLevel<'ast>>>);
+pub enum TopLevel<'ast> {
+    Fn {
+        name: Spanned<&'ast str>,
+        params: Vec<Spanned<IdentPair<'ast>>>,
+        atom: Spanned<Atom<'ast>>,
+        t: Option<Spanned<Type<'ast>>>,
+        exported: bool,
+    },
+
+    Enum {
+        name: Spanned<&'ast str>,
+        fields: Spanned<HashMap<&'ast str, i64>>,
+    },
+
+    Struct(Spanned<&'ast str>, Spanned<TypeBody<'ast>>),
+    Union(Spanned<&'ast str>, Spanned<TypeBody<'ast>>),
+    Static(Decl<'ast>),
 }
 
-type SAtom<'ast> = Spanned<Atom<'ast>>;
-type BAtom<'ast> = Box<SAtom<'ast>>;
-
-pub struct WFn<'ast> {
-    pub name: Spanned<&'ast str>,
-    pub params: Vec<Spanned<IdentPair<'ast>>>,
-    pub atom: Spanned<Atom<'ast>>,
-    pub t: Option<Spanned<Type<'ast>>>,
-    pub exported: bool,
-}
-
-pub struct WStruct<'ast> {
-    pub name: Spanned<&'ast str>,
-    pub fields: Spanned<Vec<Spanned<IdentPair<'ast>>>>,
-}
-
-pub struct WUnion<'ast> {
-    pub name: Spanned<&'ast str>,
-    pub fields: Spanned<Vec<Spanned<IdentPair<'ast>>>>,
-}
-
-pub struct WEnum<'ast> {
-    pub name: Spanned<&'ast str>,
-    pub fields: Spanned<HashMap<&'ast str, i64>>,
-}
-
-pub struct WStatic<'ast>(pub Decl<'ast>);
-
+#[derive(Clone)]
+pub struct TypeBody<'ast>(pub Vec<Spanned<IdentPair<'ast>>>);
 pub struct Decl<'ast> {
-	pub pair: Spanned<IdentPair<'ast>>,
-	pub rhs: Option<BAtom<'ast>>,
+    pub pair: Spanned<IdentPair<'ast>>,
+    pub rhs: Option<BAtom<'ast>>,
 }
 
 pub enum IncDec {
@@ -58,6 +44,8 @@ pub enum IncDec {
     Dec,
 }
 
+type SAtom<'ast> = Spanned<Atom<'ast>>;
+type BAtom<'ast> = Box<SAtom<'ast>>;
 pub enum Atom<'ast> {
     String(&'ast str),
     Ident(&'ast str),
@@ -78,6 +66,7 @@ pub enum Atom<'ast> {
     Access(BAtom<'ast>, Spanned<&'ast str>),
     Index(BAtom<'ast>, BAtom<'ast>),
 
+    Let(Decl<'ast>),
     Block {
         label: Option<Spanned<&'ast str>>,
         blocks: Vec<SAtom<'ast>>,
@@ -89,8 +78,6 @@ pub enum Atom<'ast> {
         binding: Option<BAtom<'ast>>,
         block: BAtom<'ast>,
     },
-
-    Let(Decl<'ast>),
 
     If {
         cond: BAtom<'ast>,
