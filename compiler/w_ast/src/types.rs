@@ -1,25 +1,34 @@
 use crate::{Indir, Spanned, TypeBody};
 
 #[derive(Clone)]
+pub enum ReferenceKind {
+    None,
+    Immutable,
+    Mutable,
+}
+
+#[derive(Clone)]
 pub struct Type<'ast> {
     pub v: TypeVariant<'ast>,
     pub indir: Indir,
+    pub refkind: ReferenceKind,
 }
 
 impl<'ast> Type<'ast> {
-    pub fn new(v: TypeVariant<'ast>) -> Self {
+    pub fn new(v: TypeVariant<'ast>, refkind: ReferenceKind) -> Self {
         Type {
             v,
             indir: Indir::none(),
+            refkind,
         }
     }
 
-    pub fn with_indir(v: TypeVariant<'ast>, indir: Indir) -> Self {
-        Type { v, indir }
+    pub fn with_indir(v: TypeVariant<'ast>, indir: Indir, refkind: ReferenceKind) -> Self {
+        Type { v, indir, refkind }
     }
 
     pub fn void() -> Self {
-        Self::new(TypeVariant::Void)
+        Self::new(TypeVariant::Void, ReferenceKind::None)
     }
 }
 

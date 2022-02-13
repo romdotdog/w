@@ -1,4 +1,4 @@
-use w_ast::{Atom, Decl, IdentPair, Indir, Span, Spanned, Type, TypeVariant};
+use w_ast::{Atom, Decl, IdentPair, Indir, Span, Spanned, Type, TypeVariant, ReferenceKind};
 use w_errors::Message;
 use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token};
 use w_lexer::Lexer;
@@ -162,6 +162,20 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
 
     fn parse_type(&mut self) -> Option<Spanned<Type<'ast>>> {
         let start = self.start;
+		let refkind = match self.tk {
+			Some(Token::AmbiguousOp(AmbiguousOp::Ampersand)) => {
+				self.next();
+				match self.tk {
+					Some(Token::Mut) => {
+						self.next();
+						ReferenceKind::Mutable
+					}
+					_ => ReferenceKind::Immutable
+				}
+			}
+			_ => ReferenceKind::None
+		};
+
         let mut asterisk_overflow_start = None;
         let mut indir = Indir::none();
         let mut len = 0;
@@ -210,6 +224,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                                 TypeVariant::Union(body)
                             },
                             indir,
+							refkind
                         ),
                         Span::new(start, end),
                     ));
@@ -219,7 +234,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                         Some(Token::Ident(s)) => {
                             let end = this.end;
                             Next(Some(Spanned(
-                                Type::with_indir(s.into(), indir),
+                                Type::with_indir(s.into(), indir, refkind),
                                 Span::new(start, end),
                             )))
                         }

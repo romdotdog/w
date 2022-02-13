@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use w_lexer::token::{BinOp, UnOp};
 
 mod types;
-pub use types::{Type, TypeVariant};
+pub use types::{ReferenceKind, Type, TypeVariant};
 
 mod indir;
 pub use indir::Indir;

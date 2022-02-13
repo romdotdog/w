@@ -1,4 +1,4 @@
-use crate::{Decl, Spanned, TopLevel, TypeBody};
+use crate::{Decl, ReferenceKind, Spanned, TopLevel, TypeBody};
 
 use super::{Atom, IdentPair, IncDec, Program, Type, TypeVariant};
 use w_lexer::token::UnOp;
@@ -110,6 +110,11 @@ fn inline_type_body(f: &mut Formatter<'_>, body: &TypeBody) -> Result {
 
 impl<'ast> Display for Type<'ast> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self.refkind {
+            ReferenceKind::None => {}
+            ReferenceKind::Immutable => write!(f, "&")?,
+            ReferenceKind::Mutable => write!(f, "&mut ")?,
+        }
         write!(f, "{}{}", self.indir, self.v)
     }
 }

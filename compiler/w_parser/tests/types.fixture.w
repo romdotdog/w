@@ -7,6 +7,8 @@ fn main(mut a: *mut *mut **i32, mut b: *i64, c: u32, d: u64, e: f32, f: f64, g):
 	let f: struct { foo: i32; bar: i32 } = e;
 	let g: union { foo: i32 } = f;
 	let h: UnresolvedType = g;
+	let i: &var = h;
+	let j: &mut *mut i32 = i;
 }
 
 // "missing type here" - 1:80+1
