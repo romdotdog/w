@@ -13,6 +13,12 @@ pub use span::Span;
 mod codegen;
 
 pub struct Program<'ast>(pub Vec<Spanned<TopLevel<'ast>>>);
+
+pub enum AST<'ast> {
+    TopLevel(Spanned<TopLevel<'ast>>),
+    Atom(Spanned<Atom<'ast>>),
+}
+
 pub enum TopLevel<'ast> {
     Fn {
         name: Spanned<&'ast str>,
@@ -70,8 +76,7 @@ pub enum Atom<'ast> {
 
     Block {
         label: Option<Spanned<&'ast str>>,
-        toplevels: Vec<Spanned<TopLevel<'ast>>>,
-        blocks: Vec<SAtom<'ast>>,
+        contents: Vec<AST<'ast>>,
         ret: Option<BAtom<'ast>>,
     },
 

@@ -1,5 +1,5 @@
 use super::{Fill, Handler, Next, NoFill, Parser};
-use w_ast::{Atom, IncDec, Span, Spanned};
+use w_ast::{Atom, IncDec, Span, Spanned, AST};
 use w_errors::Message;
 use w_lexer::token::{Token, UnOp};
 
@@ -9,32 +9,38 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         debug_assert_eq!(self.tk, Some(Token::LeftBracket));
         self.next();
 
-        let mut toplevels = Vec::new();
-
-        't: while self.can_begin_toplevel() {
-            match self.parse_toplevel() {
-                Some(t) => toplevels.push(t),
-                None => loop {
-                    match self.tk {
-                        Some(Token::Semicolon) => {
-                            self.next();
-                            break 't;
-                        }
-                        Some(Token::RightBracket) | None => {
-                            break 't;
-                        }
-                        _ => self.next(),
-                    }
-                },
-            }
-        }
-
-        let mut blocks = Vec::new();
+        let mut contents = Vec::new();
         let mut last = None;
 
         let end = 'm: loop {
+            macro_rules! panic_block {
+                () => {
+                    loop {
+                        match self.tk {
+                            Some(Token::Semicolon) => {
+                                self.next();
+                                continue 'm;
+                            }
+                            Some(Token::RightBracket) | None => {
+                                let end_ = self.end;
+                                self.next();
+                                break 'm end_;
+                            }
+                            _ => self.next(),
+                        }
+                    }
+                };
+            }
+
             if let Some(t) = last.take() {
-                blocks.push(t);
+                contents.push(AST::Atom(t));
+            }
+
+            if self.can_begin_toplevel() {
+                match self.parse_toplevel() {
+                    Some(t) => contents.push(AST::TopLevel(t)),
+                    None => panic_block!(),
+                }
             }
 
             match self.tk {
@@ -46,28 +52,10 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                     break end_;
                 }
                 None => {}
-                _ => {
-                    match self.atom() {
-                        Some(a) => last = Some(a),
-                        None => {
-                            // panic!!
-                            loop {
-                                match self.tk {
-                                    Some(Token::Semicolon) => {
-                                        self.next();
-                                        continue 'm;
-                                    }
-                                    Some(Token::RightBracket) | None => {
-                                        let end_ = self.end;
-                                        self.next();
-                                        break 'm end_;
-                                    }
-                                    _ => self.next(),
-                                }
-                            }
-                        }
-                    }
-                }
+                _ => match self.atom() {
+                    Some(a) => last = Some(a),
+                    None => panic_block!(),
+                },
             }
 
             match self.tk {
@@ -92,8 +80,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         Spanned(
             Atom::Block {
                 label,
-                toplevels,
-                blocks,
+                contents,
                 ret: last.map(Box::new),
             },
             Span::new(start, end),

@@ -1,4 +1,4 @@
-use crate::{Decl, ReferenceKind, Spanned, TopLevel, TypeBody};
+use crate::{Decl, ReferenceKind, Spanned, TopLevel, TypeBody, AST};
 
 use super::{Atom, IdentPair, IncDec, Program, Type, TypeVariant};
 use w_lexer::token::UnOp;
@@ -182,8 +182,7 @@ impl<'ast> Display for Atom<'ast> {
             },
             Atom::Block {
                 label,
-                toplevels,
-                blocks,
+                contents,
                 ret,
             } => {
                 if let Some(label) = label {
@@ -192,12 +191,15 @@ impl<'ast> Display for Atom<'ast> {
                     writeln!(f, "{{")?;
                 }
 
-                for toplevel in toplevels {
-                    writeln!(f, "\t{}", format!("{}", toplevel).replace("\n", "\n\t"))?;
-                }
-
-                for atom in blocks {
-                    writeln!(f, "\t{};", format!("{}", atom).replace("\n", "\n\t"))?;
+                for item in contents {
+                    match item {
+                        AST::TopLevel(t) => {
+                            writeln!(f, "\t{}", format!("{}", t).replace("\n", "\n\t"))?;
+                        }
+                        AST::Atom(a) => {
+                            writeln!(f, "\t{};", format!("{}", a).replace("\n", "\n\t"))?;
+                        }
+                    }
                 }
 
                 match ret {
