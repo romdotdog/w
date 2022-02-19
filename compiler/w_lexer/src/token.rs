@@ -5,6 +5,7 @@ pub enum Token<'ast> {
     Fn,
     Export,
     Return,
+    Sizeof,
     If,
     Loop,
     Let,
