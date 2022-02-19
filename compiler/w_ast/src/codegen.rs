@@ -210,7 +210,6 @@ impl<'ast> Display for Atom<'ast> {
                 write!(f, ")")
             }
             Atom::Let(decl) => write!(f, "let {}", decl),
-            Atom::Static(decl) => write!(f, "static {}", decl),
             Atom::If {
                 cond,
                 true_branch,

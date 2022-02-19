@@ -88,7 +88,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         self.next();
 
         let binding = match self.tk {
-            Some(Token::Let) => Some(Box::new(self.parse_let_or_static(true)?)),
+            Some(Token::Let) => Some(Box::new(self.parse_let()?)),
             _ => None,
         };
 

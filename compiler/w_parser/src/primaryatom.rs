@@ -4,21 +4,14 @@ use w_errors::Message;
 use w_lexer::token::{BinOp, BinOpVariant, Token, UnOp};
 
 impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
-    pub(crate) fn parse_let_or_static(&mut self, is_let: bool) -> Option<Spanned<Atom<'ast>>> {
+    pub(crate) fn parse_let(&mut self) -> Option<Spanned<Atom<'ast>>> {
         let start = self.start;
-        matches!(self.tk, Some(Token::Let | Token::Static));
+        matches!(self.tk, Some(Token::Let));
         self.next();
 
         let decl = self.parse_decl()?;
         let end = decl.1.end;
-        Some(Spanned(
-            if is_let {
-                Atom::Let(decl.0)
-            } else {
-                Atom::Static(decl.0)
-            },
-            Span::new(start, end),
-        ))
+        Some(Spanned(Atom::Let(decl.0), Span::new(start, end)))
     }
 
     fn parse_cast(&mut self) -> Option<Spanned<Atom<'ast>>> {
@@ -149,8 +142,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
 
     pub(crate) fn primaryatom(&mut self) -> Option<Spanned<Atom<'ast>>> {
         match self.tk {
-            Some(Token::Let) => self.parse_let_or_static(true),
-            Some(Token::Static) => self.parse_let_or_static(false),
+            Some(Token::Let) => self.parse_let(),
             Some(Token::BinOp(BinOp::Regular(BinOpVariant::Lt))) => self.parse_cast(),
 
             Some(Token::Br) => self.parse_br(),

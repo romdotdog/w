@@ -66,7 +66,6 @@ pub enum Atom<'ast> {
     Access(BAtom<'ast>, Spanned<&'ast str>),
     Index(BAtom<'ast>, BAtom<'ast>),
 
-    Static(Decl<'ast>),
     Let(Decl<'ast>),
 
     Block {
