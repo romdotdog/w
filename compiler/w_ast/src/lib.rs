@@ -67,6 +67,7 @@ pub enum Atom<'ast> {
     Cast(Spanned<Type<'ast>>, BAtom<'ast>),
     PostIncDec(BAtom<'ast>, IncDec),
     Return(Option<BAtom<'ast>>),
+    Sizeof(Spanned<Type<'ast>>),
 
     Call(BAtom<'ast>, Vec<SAtom<'ast>>),
     Access(BAtom<'ast>, Spanned<&'ast str>),

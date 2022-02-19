@@ -9,6 +9,7 @@ fn main(mut a: *mut *mut **i32, mut b: *i64, c: u32, d: u64, e: f32, f: f64, g):
 	let h: UnresolvedType = g;
 	let i: &var = h;
 	let j: &mut *mut i32 = i;
+	let k = sizeof(&var);
 }
 
 // "missing type here" - 1:80+1

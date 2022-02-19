@@ -251,6 +251,25 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                 self.next();
                 Spanned(Atom::Paren(Box::new(e)), span)
             }
+            Some(Token::Sizeof) => {
+                let start = self.start;
+                self.next();
+
+                if self.tk != Some(Token::LeftParen) {
+                    self.error(Message::MissingOpeningParen, self.span());
+                }
+
+                self.next();
+                let t = self.parse_type()?;
+
+                if self.tk != Some(Token::RightParen) {
+                    self.error(Message::MissingClosingParen, self.span());
+                }
+
+                let span = Span::new(start, self.end);
+                self.next();
+                Spanned(Atom::Sizeof(t), span)
+            }
             Some(Token::If) => self.parse_if()?,
             Some(Token::LeftBracket) => self.parse_block(None),
             Some(Token::Loop) => self.parse_loop(None)?,

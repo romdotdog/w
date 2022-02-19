@@ -262,6 +262,7 @@ impl<'ast> Display for Atom<'ast> {
             }
             Atom::Return(Some(ret)) => write!(f, "return {}", ret),
             Atom::Return(None) => write!(f, "return"),
+            Atom::Sizeof(t) => write!(f, "sizeof({})", t),
         }
     }
 }
