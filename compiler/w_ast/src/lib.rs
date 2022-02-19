@@ -70,6 +70,7 @@ pub enum Atom<'ast> {
 
     Block {
         label: Option<Spanned<&'ast str>>,
+        toplevels: Vec<Spanned<TopLevel<'ast>>>,
         blocks: Vec<SAtom<'ast>>,
         ret: Option<BAtom<'ast>>,
     },

@@ -70,7 +70,6 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             Some(
                 // keywords
                 Token::Let |
-				Token::Static |
                 Token::Loop |
                 Token::Br |
                 Token::Return |

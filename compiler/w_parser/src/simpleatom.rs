@@ -9,6 +9,26 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         debug_assert_eq!(self.tk, Some(Token::LeftBracket));
         self.next();
 
+        let mut toplevels = Vec::new();
+
+        't: while self.can_begin_toplevel() {
+            match self.parse_toplevel() {
+                Some(t) => toplevels.push(t),
+                None => loop {
+                    match self.tk {
+                        Some(Token::Semicolon) => {
+                            self.next();
+                            break 't;
+                        }
+                        Some(Token::RightBracket) | None => {
+                            break 't;
+                        }
+                        _ => self.next(),
+                    }
+                },
+            }
+        }
+
         let mut blocks = Vec::new();
         let mut last = None;
 
@@ -72,6 +92,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         Spanned(
             Atom::Block {
                 label,
+                toplevels,
                 blocks,
                 ret: last.map(Box::new),
             },

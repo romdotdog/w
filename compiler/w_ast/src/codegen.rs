@@ -180,11 +180,20 @@ impl<'ast> Display for Atom<'ast> {
                 UnOp::BNot => write!(f, "~{}", rhs),
                 UnOp::LNot => write!(f, "!{}", rhs),
             },
-            Atom::Block { label, blocks, ret } => {
+            Atom::Block {
+                label,
+                toplevels,
+                blocks,
+                ret,
+            } => {
                 if let Some(label) = label {
                     writeln!(f, "${}: {{", label)?;
                 } else {
                     writeln!(f, "{{")?;
+                }
+
+                for toplevel in toplevels {
+                    writeln!(f, "\t{}", format!("{}", toplevel).replace("\n", "\n\t"))?;
                 }
 
                 for atom in blocks {

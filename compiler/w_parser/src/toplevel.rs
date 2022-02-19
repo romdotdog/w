@@ -5,6 +5,20 @@ use w_errors::Message;
 use w_lexer::token::{BinOp, BinOpVariant, Token};
 
 impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
+    pub fn can_begin_toplevel(&self) -> bool {
+        matches!(
+            self.tk,
+            Some(
+                Token::Export
+                    | Token::Fn
+                    | Token::Struct
+                    | Token::Union
+                    | Token::Enum
+                    | Token::Static
+            )
+        )
+    }
+
     // static
 
     pub(crate) fn parse_static(&mut self) -> Option<Spanned<TopLevel<'ast>>> {
@@ -323,14 +337,14 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         }
     }
 
-    pub fn panic_top_level(&mut self, in_bracket: bool) {
-        if in_bracket {
-            self.skip_bracket();
-        }
-
+    pub fn panic_top_level(&mut self) {
         loop {
+            if self.can_begin_toplevel() {
+                break;
+            }
+
             match self.tk {
-                None | Some(Token::Fn | Token::Struct | Token::Union | Token::Enum) => break,
+                None => break,
                 Some(Token::LeftBracket) => {
                     self.next();
                     self.skip_bracket();
@@ -340,44 +354,33 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         }
     }
 
+    pub fn parse_toplevel(&mut self) -> Option<Spanned<TopLevel<'ast>>> {
+        match self.tk {
+            Some(Token::Export) => {
+                self.next();
+                self.function(true)
+            }
+            Some(Token::Fn) => self.function(false),
+            Some(Token::Struct) => self.struct_or_union(true),
+            Some(Token::Union) => self.struct_or_union(false),
+            Some(Token::Enum) => self.parse_enum(),
+            Some(Token::Static) => self.parse_static(),
+            _ => None,
+        }
+    }
+
     // main
 
     pub fn parse(mut self) -> Program<'ast> {
         let mut toplevel = Vec::new();
         loop {
-            match self.tk {
-                Some(Token::Export) => {
-                    self.next();
-                    match self.function(true) {
-                        Some(f) => toplevel.push(f),
-                        None => self.panic_top_level(false),
-                    }
-                }
-                Some(Token::Fn) => match self.function(false) {
-                    Some(f) => toplevel.push(f),
-                    None => self.panic_top_level(false),
-                },
-                Some(Token::Struct) => match self.struct_or_union(true) {
-                    Some(f) => toplevel.push(f),
-                    None => self.panic_top_level(true),
-                },
-                Some(Token::Union) => match self.struct_or_union(false) {
-                    Some(f) => toplevel.push(f),
-                    None => self.panic_top_level(true),
-                },
-                Some(Token::Enum) => match self.parse_enum() {
-                    Some(f) => toplevel.push(f),
-                    None => self.panic_top_level(true),
-                },
-                Some(Token::Static) => match self.parse_static() {
-                    Some(f) => toplevel.push(f),
-                    None => self.panic_top_level(false),
-                },
-                Some(_) => {
-                    self.error(Message::InvalidTopLevel, self.span());
-                    self.panic_top_level(false);
-                }
-                None => break,
+            if self.tk.is_none() {
+                break;
+            }
+
+            match self.parse_toplevel() {
+                Some(t) => toplevel.push(t),
+                None => self.panic_top_level(),
             }
         }
 
