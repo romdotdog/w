@@ -152,6 +152,7 @@ impl<'ast> Display for TypeVariant<'ast> {
 }
 
 impl<'ast> Display for Atom<'ast> {
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Atom::Integer(i) => write!(f, "{}", i),

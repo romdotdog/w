@@ -47,113 +47,104 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         self.next();
 
         let end = loop {
-            match self.tk {
-                Some(Token::RightBracket) => {
-                    let end_ = self.end;
-                    self.next();
-                    break end_;
-                }
-                Some(Token::Comma) => {
-                    self.error(
-                        Message::MissingIdentifier,
-                        Span::new(self.start - 1, self.start),
-                    );
-                    self.next();
-                    continue;
-                }
-                _ => {
-                    let (sident, s) = self.take(|this, t| match t {
-                        // take
-                        Some(Token::Ident(s)) => Next(Some((this.span(), s))),
-                        t => Fill(None, t),
-                    })?;
-
+            macro_rules! bracketcomma {
+                ($b: block, $c: block) => {
                     match self.tk {
                         Some(Token::RightBracket) => {
-                            match h.entry(s) {
-                                Entry::Vacant(e) => {
-                                    e.insert(discriminant);
-                                }
-                                Entry::Occupied(_) => {
-                                    self.error(Message::DuplicateEnumField, sident);
-                                }
-                            }
-
+                            $b;
                             let end_ = self.end;
                             self.next();
                             break end_;
                         }
                         Some(Token::Comma) => {
-                            match h.entry(s) {
-                                Entry::Vacant(e) => {
-                                    e.insert(discriminant);
-                                }
-                                Entry::Occupied(_) => {
-                                    self.error(Message::DuplicateEnumField, sident);
-                                }
-                            }
-
-                            discriminant += 1;
+                            $c;
                             self.next();
                             continue;
                         }
-                        Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) => {
-                            self.next();
-                            discriminant = self.take(|this, t| match t {
-                                // take
-                                Some(Token::Integer(i)) => {
-                                    match h.entry(s) {
-                                        Entry::Vacant(e) => {
-                                            e.insert(i);
-                                        }
-                                        Entry::Occupied(_) => this.error(
-                                            Message::DuplicateEnumField,
-                                            Span::new(sident.start, this.end),
-                                        ),
-                                    }
-                                    Next(i + 1)
-                                }
-                                Some(Token::UInteger(_)) => {
-                                    match h.entry(s) {
-                                        Entry::Vacant(e) => {
-                                            e.insert(discriminant);
-                                        }
-                                        Entry::Occupied(_) => {
-                                            this.error(Message::DuplicateEnumField, sident);
-                                        }
-                                    }
+                        _ => {}
+                    }
+                };
+            }
 
-                                    this.error(Message::IntegerNoFit, this.span());
-                                    Next(discriminant + 1)
-                                }
-                                t => {
-                                    this.error(Message::MissingInteger, this.span());
-                                    Fill(discriminant + 1, t)
-                                }
-                            });
-                            match self.tk {
-                                Some(Token::RightBracket) => {
-                                    let end_ = self.end;
-                                    self.next();
-                                    break end_;
-                                }
-                                Some(Token::Comma) => {
-                                    self.next();
-                                    continue;
-                                }
-                                _ => {
-                                    self.error(Message::UnexpectedToken, self.span());
-                                    return None;
-                                }
-                            }
+            bracketcomma!({}, {
+                self.error(
+                    Message::MissingIdentifier,
+                    Span::new(self.start - 1, self.start),
+                );
+            });
+
+            // take identifier
+            let (sident, s) = self.take(|this, t| match t {
+                // take
+                Some(Token::Ident(s)) => Next(Some((this.span(), s))),
+                t => Fill(None, t),
+            })?;
+
+            bracketcomma!(
+                {
+                    match h.entry(s) {
+                        Entry::Vacant(e) => {
+                            e.insert(discriminant);
                         }
-                        _ => {
-                            self.error(Message::UnexpectedToken, self.span());
-                            return None;
+                        Entry::Occupied(_) => {
+                            self.error(Message::DuplicateEnumField, sident);
                         }
                     }
+                },
+                {
+                    match h.entry(s) {
+                        Entry::Vacant(e) => {
+                            e.insert(discriminant);
+                        }
+                        Entry::Occupied(_) => {
+                            self.error(Message::DuplicateEnumField, sident);
+                        }
+                    }
+
+                    discriminant += 1;
                 }
+            );
+
+            if let Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) = self.tk {
+                self.next();
+                discriminant = self.take(|this, t| match t {
+                    // take
+                    Some(Token::Integer(i)) => {
+                        match h.entry(s) {
+                            Entry::Vacant(e) => {
+                                e.insert(i);
+                            }
+                            Entry::Occupied(_) => this.error(
+                                Message::DuplicateEnumField,
+                                Span::new(sident.start, this.end),
+                            ),
+                        }
+                        Next(i + 1)
+                    }
+                    Some(Token::UInteger(_)) => {
+                        match h.entry(s) {
+                            Entry::Vacant(e) => {
+                                e.insert(discriminant);
+                            }
+                            Entry::Occupied(_) => {
+                                this.error(Message::DuplicateEnumField, sident);
+                            }
+                        }
+
+                        this.error(Message::IntegerNoFit, this.span());
+                        Next(discriminant + 1)
+                    }
+                    t => {
+                        this.error(Message::MissingInteger, this.span());
+                        Fill(discriminant + 1, t)
+                    }
+                });
+
+                bracketcomma!({}, {});
             }
+
+            self.error(Message::UnexpectedToken, self.span());
+            return None;
         };
 
         Some(Spanned(h, Span::new(start, end)))
