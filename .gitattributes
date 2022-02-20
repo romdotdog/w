@@ -1,1 +1,1 @@
-*.w -linguist-detectable
+*.w linguist-language=Rust
