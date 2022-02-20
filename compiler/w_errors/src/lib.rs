@@ -3,64 +3,45 @@ use std::fmt::Display;
 //#[cfg(not(wasm))]
 //mod for_humans;
 
-#[derive(PartialEq, Eq)]
-pub enum Message {
-    UnexpectedToken,
-    InvalidTopLevel,
-    MissingIdentifier,
-    MalformedIdentifier,
-    LabelIsNotIdentifier,
-    IdentifierIsNotLabel,
-    CannotFollowLabel,
-    DuplicateEnumField,
-    IntegerNoFit,
-    MissingInteger,
-    MissingLabel,
-    MissingSemicolon,
-    MissingColon,
-    MissingType,
-    MalformedType,
-    MissingOpeningBracket,
-    MissingOpeningParen,
-    MissingClosingParen,
-    MissingClosingBracket,
-    MissingClosingAngleBracket,
-    MissingClosingSqBracket,
-    TooMuchIndirection,
-    LoopBodyBlock,
+macro_rules! errors {
+	($($n: ident => $s: expr), *) => {
+		#[derive(PartialEq, Eq)]
+		pub enum Message {
+			$($n), *
+		}
+
+		impl Display for Message {
+			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+				match self {
+					$(Message::$n => write!(f, $s)), *
+				}
+			}
+		}
+	};
 }
 
-// TODO: target wasm
-impl Display for Message {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Message::UnexpectedToken => write!(f, "unexpected token"),
-            Message::MissingSemicolon => write!(f, "missing a semicolon or closing brace"),
-            Message::MissingIdentifier => write!(f, "missing identifier here"),
-            Message::MalformedIdentifier => write!(f, "invalid identifier here"),
-            Message::MissingType => write!(f, "missing type here"),
-            Message::MalformedType => write!(f, "found malformed type"),
-            Message::DuplicateEnumField => write!(f, "redeclaration of enumerator"),
-            Message::LabelIsNotIdentifier => write!(f, "labels cannot be used as identifiers"),
-            Message::IdentifierIsNotLabel => write!(f, "identifiers cannot be used as labels"),
-            Message::IntegerNoFit => write!(f, "literal does not fit inside an `i64`"),
-            Message::MissingInteger => write!(f, "integer expected here"),
-            Message::MissingLabel => write!(f, "missing label here"),
-            Message::CannotFollowLabel => write!(f, "only a loop or block can follow a label"),
-            Message::MissingOpeningBracket => write!(f, "'{{' expected here"),
-            Message::MissingOpeningParen => write!(f, "'(' expected here"),
-            Message::MissingClosingParen => write!(f, "')' expected here"),
-            Message::MissingClosingBracket => write!(f, "'}}' expected here"),
-            Message::MissingClosingAngleBracket => write!(f, "'>' expected here"),
-            Message::MissingClosingSqBracket => write!(f, "']' expected here"),
-            Message::MissingColon => write!(f, "':' expected here"),
-            Message::InvalidTopLevel => {
-                write!(f, "only functions, globals and directives are allowed here")
-            }
-            Message::TooMuchIndirection => {
-                write!(f, "at most only 5 levels of indirection are allowed")
-            }
-            Message::LoopBodyBlock => write!(f, "loop body may only be a block"),
-        }
-    }
-}
+errors!(
+    UnexpectedToken => "unexpected token",
+    MissingSemicolon => "missing a semicolon or closing brace",
+    MissingIdentifier => "missing identifier here",
+    MalformedIdentifier => "invalid identifier here",
+    MissingType => "missing type here",
+    MalformedType => "found malformed type",
+    DuplicateEnumField => "redeclaration of enumerator",
+    LabelIsNotIdentifier => "labels cannot be used as identifiers",
+    IdentifierIsNotLabel => "identifiers cannot be used as labels",
+    IntegerNoFit => "literal does not fit inside an `i64`",
+    MissingInteger => "integer expected here",
+    MissingLabel => "missing label here",
+    CannotFollowLabel => "only a loop or block can follow a label",
+    MissingOpeningBracket => "'{{' expected here",
+    MissingOpeningParen => "'(' expected here",
+    MissingClosingParen => "')' expected here",
+    MissingClosingBracket => "'}}' expected here",
+    MissingClosingAngleBracket => "'>' expected here",
+    MissingClosingSqBracket => "']' expected here",
+    MissingColon => "':' expected here",
+    InvalidTopLevel => "only functions, globals and directives are allowed here",
+    TooMuchIndirection => "at most only 5 levels of indirection are allowed",
+    LoopBodyBlock => "loop body may only be a block"
+);
