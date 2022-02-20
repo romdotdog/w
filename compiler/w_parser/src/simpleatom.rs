@@ -155,6 +155,22 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                     })?;
                 }
 
+                // TODO: figure out syntax
+                Some(Token::Arrow) => {
+                    self.next();
+                    lhs = self.take(|this, t| match t {
+                        Some(Token::Ident(s)) => Next(Some(Spanned(
+                            Atom::Offsetof(Box::new(lhs), Spanned(s, this.span())),
+                            Span::new(start, this.end),
+                        ))),
+                        tk => {
+                            // TODO: review
+                            this.error(Message::MissingIdentifier, this.span());
+                            Fill(None, tk)
+                        }
+                    })?;
+                }
+
                 Some(Token::LeftSqBracket) => {
                     self.next();
                     let atom = self.atom()?;

@@ -164,6 +164,7 @@ impl<'ast> Display for Atom<'ast> {
             Atom::Paren(a) => write!(f, "({})", a),
             Atom::BinOp(lhs, op, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
             Atom::Access(lhs, ident) => write!(f, "{}.{}", lhs, ident),
+            Atom::Offsetof(lhs, ident) => write!(f, "{}->{}", lhs, ident),
             Atom::Index(lhs, rhs) => write!(f, "{}[{}]", lhs, rhs),
             Atom::PostIncDec(lhs, incdec) => match incdec {
                 IncDec::Inc => write!(f, "{}++", lhs),

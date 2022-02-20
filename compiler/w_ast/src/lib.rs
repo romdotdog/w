@@ -71,6 +71,7 @@ pub enum Atom<'ast> {
 
     Call(BAtom<'ast>, Vec<SAtom<'ast>>),
     Access(BAtom<'ast>, Spanned<&'ast str>),
+    Offsetof(BAtom<'ast>, Spanned<&'ast str>),
     Index(BAtom<'ast>, BAtom<'ast>),
 
     Let(Decl<'ast>),

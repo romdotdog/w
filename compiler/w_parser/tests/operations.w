@@ -17,6 +17,8 @@ fn main() {
 	a * (b + c); // parentheses
 	a = b === c >>= d; // right-associativity
 	!~<f64!><f64>--+++-&*a++--;
+	foo.field;
+	Foo->field;
 }
 
 // comment that ends with eof

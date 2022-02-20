@@ -14,6 +14,8 @@ fn main() {
 	a * (b + c);
 	a = b === c >>= d;
 	!~<f64!><f64>--+++-&*a++--;
+	foo.field;
+	Foo->field;
 }
 
 // "labels cannot be used as identifiers" - 9:6+2
