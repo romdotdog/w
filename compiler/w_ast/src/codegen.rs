@@ -29,9 +29,14 @@ impl<'ast> Display for TopLevel<'ast> {
                 atom,
                 t,
                 exported,
+                static_,
             } => {
                 if *exported {
                     write!(f, "export ")?;
+                }
+
+                if *static_ {
+                    write!(f, "static ")?;
                 }
 
                 write!(f, "fn {}(", name)?;
