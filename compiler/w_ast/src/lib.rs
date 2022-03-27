@@ -26,6 +26,7 @@ pub enum TopLevel<'ast> {
         atom: Spanned<Atom<'ast>>,
         t: Option<Spanned<Type<'ast>>>,
         exported: bool,
+        static_: bool,
     },
 
     Enum {

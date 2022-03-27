@@ -26,6 +26,10 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         assert_eq!(self.tk, Some(Token::Static));
         self.next();
 
+        if let Some(Token::Fn) = self.tk {
+            return self.function(false, true);
+        }
+
         let decl = self.parse_decl()?;
         let end = decl.1.end;
 
@@ -240,7 +244,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
 
     // functions
 
-    pub fn function(&mut self, exported: bool) -> Option<Spanned<TopLevel<'ast>>> {
+    pub fn function(&mut self, exported: bool, static_: bool) -> Option<Spanned<TopLevel<'ast>>> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::Fn));
         self.next();
@@ -307,6 +311,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                 atom,
                 t,
                 exported,
+                static_,
             },
             Span::new(start, end),
         ))
@@ -349,9 +354,9 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         match self.tk {
             Some(Token::Export) => {
                 self.next();
-                self.function(true)
+                self.function(true, false)
             }
-            Some(Token::Fn) => self.function(false),
+            Some(Token::Fn) => self.function(false, false),
             Some(Token::Struct) => self.struct_or_union(true),
             Some(Token::Union) => self.struct_or_union(false),
             Some(Token::Enum) => self.parse_enum(),
