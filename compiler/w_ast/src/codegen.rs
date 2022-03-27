@@ -159,7 +159,7 @@ impl<'ast> Display for Atom<'ast> {
             Atom::UInteger(u) => write!(f, "{}", u),
             Atom::Float(n) => write!(f, "{}", n),
             Atom::Ident(t) => write!(f, "{}", t),
-            Atom::String(s) => write!(f, "\"{}\"", s.replace("\"", "\\\"")),
+            Atom::String(s) => write!(f, "\"{}\"", s.replace('\"', "\\\"")),
             Atom::Char(c) => write!(f, "'{}'", c),
             Atom::Paren(a) => write!(f, "({})", a),
             Atom::BinOp(lhs, op, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
@@ -196,17 +196,17 @@ impl<'ast> Display for Atom<'ast> {
                 for item in contents {
                     match item {
                         AST::TopLevel(t) => {
-                            writeln!(f, "\t{}", format!("{}", t).replace("\n", "\n\t"))?;
+                            writeln!(f, "\t{}", format!("{}", t).replace('\n', "\n\t"))?;
                         }
                         AST::Atom(a) => {
-                            writeln!(f, "\t{};", format!("{}", a).replace("\n", "\n\t"))?;
+                            writeln!(f, "\t{};", format!("{}", a).replace('\n', "\n\t"))?;
                         }
                     }
                 }
 
                 match ret {
                     None => write!(f, "}}"),
-                    Some(l) => write!(f, "\t{}\n}}", format!("{}", l).replace("\n", "\n\t")),
+                    Some(l) => write!(f, "\t{}\n}}", format!("{}", l).replace('\n', "\n\t")),
                 }
             }
             Atom::Call(lhs, args) => {
