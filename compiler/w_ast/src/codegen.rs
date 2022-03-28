@@ -1,6 +1,6 @@
-use crate::{Decl, ReferenceKind, Spanned, TopLevel, TypeBody, AST};
+use crate::{ASTObject, Decl, ReferenceKind, Spanned, TopLevel, TypeBody};
 
-use super::{Atom, IdentPair, IncDec, Program, Type, TypeVariant};
+use super::{Atom, IdentPair, IncDec, Type, TypeVariant, AST};
 use w_lexer::token::UnOp;
 
 use std::fmt::{Display, Formatter, Result};
@@ -11,7 +11,7 @@ impl<T: Display> Display for Spanned<T> {
     }
 }
 
-impl<'ast> Display for Program<'ast> {
+impl<'ast> Display for AST<'ast> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         for toplevel in &self.0 {
             write!(f, "{}\n\n", toplevel)?;
@@ -200,10 +200,10 @@ impl<'ast> Display for Atom<'ast> {
 
                 for item in contents {
                     match item {
-                        AST::TopLevel(t) => {
+                        ASTObject::TopLevel(t) => {
                             writeln!(f, "\t{}", format!("{}", t).replace('\n', "\n\t"))?;
                         }
-                        AST::Atom(a) => {
+                        ASTObject::Atom(a) => {
                             writeln!(f, "\t{};", format!("{}", a).replace('\n', "\n\t"))?;
                         }
                     }

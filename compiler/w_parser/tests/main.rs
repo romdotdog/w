@@ -4,7 +4,10 @@ use std::{cell::RefCell, fs};
 
 use w_ast::Span;
 use w_errors::Message;
-use w_parser::{Handler, Parser};
+use w_parser::{
+    handler::{ImportlessHandler, ImportlessHandlerHandler},
+    Parser,
+};
 use w_utils::{LineCol, LineColResult};
 
 struct ErrorHandler<'a> {
@@ -33,19 +36,9 @@ impl ErrorHandler<'_> {
     }
 }
 
-impl<'a> Handler<'a> for ErrorHandler<'a> {
-    type SourceRef = ();
-
-    fn error(&self, _src_ref: &Self::SourceRef, msg: Message, span: Span) {
+impl<'ast> ImportlessHandler<'ast> for ErrorHandler<'ast> {
+    fn error(&self, msg: Message, span: Span) {
         self.errors.borrow_mut().push((msg, span));
-    }
-
-    fn load_source(&'a self, _name: String) -> Option<&'a Self::SourceRef> {
-        panic!("imports are not allowed in parser tests.");
-    }
-
-    fn get_source(&self, _src_ref: &'a Self::SourceRef) -> &'a str {
-        &self.src.src
     }
 }
 
@@ -56,15 +49,16 @@ macro_rules! test {
             let filename = concat!("tests/", stringify!($f), ".w");
             let fixture = concat!("tests/", stringify!($f), ".fixture.w");
             let src = LineCol::new(fs::read_to_string(filename).unwrap());
+
             let handler = ErrorHandler {
                 src: &src,
                 errors: RefCell::new(Vec::new()),
             };
 
-            let parser = Parser::new(&handler, &());
-            let prog = parser.parse();
+            let session = ImportlessHandlerHandler { handler: &handler };
+            let ast = Parser::partial_parse(&session, &handler.src.src).parse();
 
-            let t = format!("{}{}", prog, handler.serialize_errors());
+            let t = format!("{}{}", ast, handler.serialize_errors());
             if let Ok(fixture_src) = fs::read_to_string(fixture) {
                 let mut failed = false;
                 let diff = TextDiff::from_lines(&fixture_src, &t);

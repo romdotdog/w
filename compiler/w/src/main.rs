@@ -1,6 +1,7 @@
 use std::{
     env,
     io::{self, Read},
+    path::PathBuf,
 };
 
 use w_session::{diag::emitter::DefaultEmitter, source_map::loader::FileLoader, Session};
@@ -99,12 +100,12 @@ fn main() {
 
     let src = match entry {
         Some(SourcePath::Loader(name)) => session
-            .source_map
-            .load_source(name)
-            .unwrap_or_else(|name| panic!("loader could not find file with name {}", name)),
+            .source_map()
+            .load_source(PathBuf::from(&name))
+            .unwrap_or_else(|name| panic!("loader could not find file with name {:?}", name)),
         Some(SourcePath::Source(src)) => session
-            .source_map
-            .register_source("<anon>".to_string(), src),
+            .source_map()
+            .register_source(PathBuf::from("./main.w"), src), // TODO: fix
         None => todo!(),
     };
 

@@ -433,6 +433,59 @@ impl<'ast> Lexer<'ast> {
             }
         }
     }
+
+    pub fn process_includes(&mut self) -> Vec<(&'ast str, usize, usize)> {
+        let mut imports = Vec::new();
+        'm: loop {
+            if !self.skip_comments_and_whitespace() {
+                break;
+            }
+
+            if let Some(b"#include") = self.buffer.get(0..8) {
+                let save = self.buffer;
+                let savepos = self.pos;
+    
+                self.pos += 8;
+                unsafe { self.step_by(8) };
+                if !self.skip_comments_and_whitespace() {
+                    break;
+                }
+
+                if let Some(b'<') = self.buffer.first() {
+                    self.pos += 1;
+                    unsafe { self.step_by(1) };
+
+                    let start = self.buffer;
+                    let startpos = self.pos;
+                    loop {
+                        match self.buffer.first() {
+                            Some(b'>') => {
+                                self.pos += 1;
+                                imports.push((debug_check_utf8(&start[0..start.len() - self.buffer.len()]), startpos, self.pos));
+                                unsafe { self.step_by(1) };
+                                continue 'm;
+                            }
+                            Some(b'\n') | None => {
+                                self.pos = savepos;
+                                self.buffer = save;
+                                break 'm;
+                            }
+                            Some(&b) => {
+                                self.skip(b)
+                            }
+                        }
+                    }
+                } else {
+                    self.pos = savepos;
+                    self.buffer = save;
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        imports
+    }
 }
 
 impl<'ast> Iterator for Lexer<'ast> {

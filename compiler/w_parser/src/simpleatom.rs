@@ -1,5 +1,5 @@
 use super::{Fill, Handler, Next, NoFill, Parser};
-use w_ast::{Atom, IncDec, Span, Spanned, AST};
+use w_ast::{ASTObject, Atom, IncDec, Span, Spanned};
 use w_errors::Message;
 use w_lexer::token::{Token, UnOp};
 
@@ -33,12 +33,12 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             }
 
             if let Some(t) = last.take() {
-                contents.push(AST::Atom(t));
+                contents.push(ASTObject::Atom(t));
             }
 
             if self.can_begin_toplevel() {
                 match self.parse_toplevel() {
-                    Some(t) => contents.push(AST::TopLevel(t)),
+                    Some(t) => contents.push(ASTObject::TopLevel(t)),
                     None => panic_block!(),
                 }
             }

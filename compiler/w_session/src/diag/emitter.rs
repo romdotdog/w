@@ -38,8 +38,8 @@ impl Emitter for DefaultEmitter {
                 .collect::<String>();
 
             println!(
-                "\x1b[1m{}:{}:{}: \x1b[91merror:\x1b[0m {}\n{}\n{}\x1b[91m\x1b[1m{}\x1b[0m",
-                src.name,
+                "\x1b[1m{:?}:{}:{}: \x1b[91merror:\x1b[0m {}\n{}\n{}\x1b[91m\x1b[1m{}\x1b[0m",
+                src.path,
                 line,
                 col,
                 error.msg,

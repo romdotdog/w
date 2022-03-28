@@ -3,12 +3,12 @@ use w_errors::Message;
 use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token};
 use w_lexer::Lexer;
 
-mod handler;
+pub mod handler;
 mod primaryatom;
 mod simpleatom;
 mod toplevel;
 
-pub use handler::Handler;
+use handler::{Handler, Status, ImportlessHandler, ImportlessHandlerHandler};
 
 pub struct Parser<'ast, H: Handler<'ast>> {
     session: &'ast H, // TODO: lifetime review
@@ -30,10 +30,54 @@ enum Take<'ast, T> {
 
 use Take::{Fill, Next, NoFill};
 
-impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
-    pub fn new(session: &'ast H, src_ref: &'ast H::SourceRef) -> Self {
-        let src = session.get_source(src_ref);
+impl<'ast, H: ImportlessHandler<'ast>> Parser<'ast, ImportlessHandlerHandler<'ast, H>> {
+    pub fn partial_parse(session: &'ast ImportlessHandlerHandler<'ast, H>, src: &'ast str) -> Self {
         let lex = Lexer::from_str(src);
+
+        let mut parser = Parser {
+            session,
+            src_ref: &(),
+            lex,
+
+            start: 0,
+            end: 0,
+            tk: None,
+        };
+
+        parser.next();
+        parser
+    }
+}
+
+impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
+    pub fn full_parse(session: &'ast H, src_ref: &'ast H::SourceRef) {
+        let src = session.get_source(src_ref);
+        let mut lex = Lexer::from_str(src);
+
+        // includes
+        for (path, start, end) in lex.process_includes() {
+            if let Some((new_src_ref, status)) = session.load_source(src_ref, path) {
+                match status {
+                    Status::NotParsing => {
+                        Parser::full_parse(session, new_src_ref)
+                    }
+                    Status::CurrentlyParsing => {
+                        session.error(
+                            src_ref,
+                            Message::RecursiveInclude,
+                            Span::new(start, end),
+                        )
+                    }
+                    Status::AlreadyParsed => {}
+                }
+            } else {
+                session.error(
+                    src_ref,
+                    Message::FileNotFound,
+                    Span::new(start, end),
+                )
+            }
+        }
 
         let mut parser = Parser {
             session,
@@ -46,7 +90,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         };
 
         parser.next();
-        parser
+        parser.session.set_ast(parser.src_ref, parser.parse())
     }
 
     fn next(&mut self) {

@@ -12,9 +12,9 @@ pub use span::Span;
 
 mod codegen;
 
-pub struct Program<'ast>(pub Vec<Spanned<TopLevel<'ast>>>);
+pub struct AST<'ast>(pub Vec<Spanned<TopLevel<'ast>>>);
 
-pub enum AST<'ast> {
+pub enum ASTObject<'ast> {
     TopLevel(Spanned<TopLevel<'ast>>),
     Atom(Spanned<Atom<'ast>>),
 }
@@ -79,7 +79,7 @@ pub enum Atom<'ast> {
 
     Block {
         label: Option<Spanned<&'ast str>>,
-        contents: Vec<AST<'ast>>,
+        contents: Vec<ASTObject<'ast>>,
         ret: Option<BAtom<'ast>>,
     },
 

@@ -1,6 +1,6 @@
 use super::{Fill, Handler, Next, Parser};
 use std::collections::{hash_map::Entry, HashMap};
-use w_ast::{Program, Span, Spanned, TopLevel, TypeBody};
+use w_ast::{Span, Spanned, TopLevel, TypeBody, AST};
 use w_errors::Message;
 use w_lexer::token::{BinOp, BinOpVariant, Token};
 
@@ -367,7 +367,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
 
     // main
 
-    pub fn parse(mut self) -> Program<'ast> {
+    pub fn parse(mut self) -> AST<'ast> {
         let mut toplevel = Vec::new();
         loop {
             if self.tk.is_none() {
@@ -380,6 +380,6 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             }
         }
 
-        Program(toplevel)
+        AST(toplevel)
     }
 }

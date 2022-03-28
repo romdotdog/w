@@ -22,6 +22,8 @@ macro_rules! errors {
 
 errors!(
     UnexpectedToken => "unexpected token",
+    FileNotFound => "file not found",
+    RecursiveInclude => "cannot include recursively",
     MissingSemicolon => "missing a semicolon or closing brace",
     MissingIdentifier => "missing identifier here",
     MalformedIdentifier => "invalid identifier here",

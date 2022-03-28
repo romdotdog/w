@@ -1,28 +1,20 @@
 #![allow(clippy::missing_panics_doc)]
 
+use std::path::PathBuf;
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use w_ast::Span;
 use w_errors::Message;
 use w_lexer::Lexer;
-use w_parser::{Handler, Parser};
+use w_parser::{
+    handler::{ImportlessHandler, ImportlessHandlerHandler},
+    Parser,
+};
 
-struct Session<'a> {
-    src: &'a str,
-}
-
-impl<'a> Handler<'a> for Session<'a> {
-    type SourceRef = ();
-
-    fn error(&self, _src_ref: &Self::SourceRef, _msg: Message, _span: Span) {
+struct Session;
+impl<'ast> ImportlessHandler<'ast> for Session {
+    fn error(&self, msg: Message, span: Span) {
         panic!("source errored in bench");
-    }
-
-    fn load_source(&'a self, _name: String) -> Option<&'a Self::SourceRef> {
-        panic!("imports are not allowed in parser tests.");
-    }
-
-    fn get_source(&self, _src_ref: &'a Self::SourceRef) -> &'a str {
-        self.src
     }
 }
 
@@ -36,11 +28,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function(format!("parser {} tk", count).as_str(), |b| {
         b.iter(|| {
-            let handler = Session {
-                src: black_box(&src),
-            };
-
-            let parser = Parser::new(&handler, &());
+            let session = Session;
+            let handler = ImportlessHandlerHandler { handler: &session };
+            let parser = Parser::partial_parse(&handler, black_box(&src));
             parser.parse();
         });
     });
