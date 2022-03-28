@@ -75,7 +75,7 @@ impl<'ast, L: Loader, E: Emitter> Handler<'ast> for Session<'ast, L, E> {
 
     fn set_ast(&self, src_ref: &'ast Self::SourceRef, prog: AST<'ast>) {
         src_ref.set_status(Status::AlreadyParsed);
-        self.prog.borrow_mut().push((src_ref, prog))
+        self.prog.borrow_mut().push((src_ref, prog));
     }
 }
 

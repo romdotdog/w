@@ -69,9 +69,10 @@ fn make_input(free_matches: &[String]) -> Option<SourcePath> {
         let file_path = &free_matches[0];
         if file_path == "-" {
             let mut src = String::new();
-            if io::stdin().read_to_string(&mut src).is_err() {
-                panic!("stdin contains invalid utf-8");
-            }
+            assert!(
+                io::stdin().read_to_string(&mut src).is_ok(),
+                "stdin contains invalid utf-8"
+            );
             return Some(SourcePath::Source(src));
         }
         return Some(SourcePath::Loader(file_path.to_string()));

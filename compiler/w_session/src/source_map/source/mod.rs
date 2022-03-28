@@ -30,7 +30,7 @@ impl Source {
     }
 
     pub fn set_status(&self, status: Status) {
-        self.status.set(status)
+        self.status.set(status);
     }
 
     pub fn get_status(&self) -> Status {

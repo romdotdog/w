@@ -59,14 +59,14 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             if let Some((new_src_ref, status)) = session.load_source(src_ref, path) {
                 match status {
                     Status::NotParsing => {
-                        Parser::full_parse(session, new_src_ref)
+                        Parser::full_parse(session, new_src_ref);
                     }
                     Status::CurrentlyParsing => {
                         session.error(
                             src_ref,
                             Message::RecursiveInclude,
                             Span::new(start, end),
-                        )
+                        );
                     }
                     Status::AlreadyParsed => {}
                 }
@@ -75,7 +75,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                     src_ref,
                     Message::FileNotFound,
                     Span::new(start, end),
-                )
+                );
             }
         }
 
@@ -90,7 +90,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         };
 
         parser.next();
-        parser.session.set_ast(parser.src_ref, parser.parse())
+        parser.session.set_ast(parser.src_ref, parser.parse());
     }
 
     fn next(&mut self) {

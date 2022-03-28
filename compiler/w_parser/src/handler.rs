@@ -36,7 +36,7 @@ impl<'ast, I: ImportlessHandler<'ast>> Handler<'ast> for ImportlessHandlerHandle
     type SourceRef = ();
 
     fn error(&self, _src_ref: &'ast Self::SourceRef, msg: Message, span: Span) {
-        self.handler.error(msg, span)
+        self.handler.error(msg, span);
     }
 
     fn load_source(
@@ -44,14 +44,14 @@ impl<'ast, I: ImportlessHandler<'ast>> Handler<'ast> for ImportlessHandlerHandle
         _src_ref: &'ast Self::SourceRef,
         _path: &'ast str,
     ) -> Option<(&'ast (), Status)> {
-        panic!("inappropriate use of ImportlessHandler")
+        panic!("inappropriate use of ImportlessHandler");
     }
 
     fn get_source(&self, _src_ref: &'ast Self::SourceRef) -> &'ast str {
-        panic!("inappropriate use of ImportlessHandler")
+        panic!("inappropriate use of ImportlessHandler");
     }
 
     fn set_ast(&self, _src_ref: &'ast Self::SourceRef, _ast: AST<'ast>) {
-        panic!("inappropriate use of ImportlessHandler")
+        panic!("inappropriate use of ImportlessHandler");
     }
 }

@@ -44,7 +44,7 @@ impl Indir {
     /// first 5 - len bits must be zeroed
     #[must_use]
     pub unsafe fn add_unchecked(mut self, mutable: bool) -> Self {
-        let a = (mutable as u8) << 3_u8 << self.len();
+        let a = u8::from(mutable) << 3_u8 << self.len();
         self.0 = self.0 & !a | a; // override the bit
         self.0 += 1_u8; // add one to length
         self

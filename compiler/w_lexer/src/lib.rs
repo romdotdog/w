@@ -471,7 +471,7 @@ impl<'ast> Lexer<'ast> {
                                 break 'm;
                             }
                             Some(&b) => {
-                                self.skip(b)
+                                self.skip(b);
                             }
                         }
                     }
