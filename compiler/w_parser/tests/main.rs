@@ -60,16 +60,16 @@ macro_rules! test {
 
             let t = format!("{}{}", ast, handler.serialize_errors());
             if let Ok(fixture_src) = fs::read_to_string(fixture) {
-                let mut failed = false;
+                let mut success = true;
                 let diff = TextDiff::from_lines(&fixture_src, &t);
                 for change in diff.iter_all_changes() {
                     let sign = match change.tag() {
                         ChangeTag::Delete => {
-                            failed = true;
+                            success = false;
                             "-"
                         }
                         ChangeTag::Insert => {
-                            failed = true;
+                            success = false;
                             "+"
                         }
                         ChangeTag::Equal => " ",
@@ -77,9 +77,7 @@ macro_rules! test {
                     print!("{}{}", sign, change);
                 }
 
-                if failed {
-                    panic!("FAIL");
-                }
+                assert!(success, "FAIL");
             } else {
                 fs::write(fixture, t).unwrap();
             }
