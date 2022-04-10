@@ -1,7 +1,5 @@
 #![allow(clippy::missing_panics_doc)]
 
-use std::path::PathBuf;
-
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use w_ast::Span;
 use w_errors::Message;
@@ -13,7 +11,7 @@ use w_parser::{
 
 struct Session;
 impl<'ast> ImportlessHandler<'ast> for Session {
-    fn error(&self, msg: Message, span: Span) {
+    fn error(&self, _msg: Message, _span: Span) {
         panic!("source errored in bench");
     }
 }
