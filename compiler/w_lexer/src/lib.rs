@@ -1,6 +1,3 @@
-use std::cmp::Ordering;
-use std::convert::TryFrom;
-
 use dec2flt::{
     load_number,
     number::Number,
@@ -576,7 +573,7 @@ fn convert_sign_and_mantissa<'ast>(negative: bool, mantissa: u64) -> Token<'ast>
         return Token::I32(0);
     }
 
-    #[allow(clippy::collapsible_else_if)]
+    #[allow(clippy::collapsible_else_if, clippy::cast_possible_truncation, clippy::cast_possible_wrap, clippy::cast_lossless)]
     if negative {
         if mantissa < i32::MAX as u64 {
             Token::I32(-(mantissa as i32))
