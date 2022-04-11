@@ -129,9 +129,15 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                 Token::LeftBracket |
                 
                 // literals
-                Token::Float(_) |
-				Token::UInteger(_) |
-                Token::Integer(_) |
+
+                Token::U31(_) |
+                Token::U63(_) |
+                Token::I32(_) |
+                Token::I64(_) |
+                Token::U32(_) |
+                Token::U64(_) |
+                Token::Fxx(_) |
+                Token::F64(_) |
                 Token::Ident(_) |
                 Token::String(_) |
                 Token::Char(_) |

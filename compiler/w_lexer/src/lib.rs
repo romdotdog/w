@@ -98,7 +98,20 @@ impl<'ast> Lexer<'ast> {
                 }
             }
 
-            return Some(Token::Float(load_number(num, self.buffer)));
+            let r64 = load_number(num, self.buffer);
+
+            #[allow(clippy::cast_possible_truncation)]
+            let r32 = r64 as f32;
+
+            // TODO: audit
+            if (f64::from(r32) - r64).abs() < f64::EPSILON { // check that r64 can be represented in 32 bits
+                let r32a = r32.abs();
+                if f64::from(r32a + 1.0 - r32a) > 1.0 - f64::EPSILON { // check that 1 + res is "correct"
+                    return Some(Token::Fxx(r32))
+                }
+            }
+
+            return Some(Token::F64(r64));
         }
         None
     }
@@ -556,19 +569,38 @@ impl<'ast> Iterator for Lexer<'ast> {
     }
 }
 
-const POSITIVE_MIN_I64: u64 = 9_223_372_036_854_775_808;
+
+// TODO: test, maybe optimize?
 fn convert_sign_and_mantissa<'ast>(negative: bool, mantissa: u64) -> Token<'ast> {
+    if mantissa == 0 {
+        return Token::I32(0);
+    }
+
+    #[allow(clippy::collapsible_else_if)]
     if negative {
-        match mantissa.cmp(&POSITIVE_MIN_I64) {
-            #[allow(clippy::cast_possible_wrap)]
-            Ordering::Less => Token::Integer(-(mantissa as i64)),
-            Ordering::Equal => Token::Integer(i64::MIN),
-            Ordering::Greater => Token::Overflown,
+        if mantissa < i32::MAX as u64 {
+            Token::I32(-(mantissa as i32))
+        } else if mantissa == 2_u64.pow(32) {
+            Token::I32(i32::MIN)
+        } else if mantissa < i64::MAX as u64 {
+            Token::I64(-(mantissa as i64))
+        } else if mantissa == 2_u64.pow(64) {
+            Token::I64(i64::MIN)
+        } else {
+            Token::Overflown
         }
-    } else if let Ok(m) = i64::try_from(mantissa) {
-        Token::Integer(m)
     } else {
-        Token::UInteger(mantissa)
+        if mantissa < i32::MAX as u64 {
+            Token::U31(mantissa as u32)
+        } else if mantissa < u32::MAX as u64 {
+            Token::U32(mantissa as u32)
+        } else if mantissa < i64::MAX as u64 {
+            Token::U63(mantissa as u64)
+        } else if mantissa < u64::MAX {
+            Token::U64(mantissa as u64)
+        } else {
+            Token::Overflown
+        }
     }
 }
 

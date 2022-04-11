@@ -160,10 +160,13 @@ impl<'ast> Display for Atom<'ast> {
     #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Atom::Integer(i) => write!(f, "{}", i),
-            Atom::UInteger(u) => write!(f, "{}", u),
-            Atom::Float(n) => write!(f, "{}", n),
-            Atom::Ident(t) => write!(f, "{}", t),
+            Atom::I32(n) => write!(f, "{}", n),
+            Atom::I64(n) => write!(f, "{}", n),
+            Atom::U32(n) | Atom::U31(n) => write!(f, "{}", n),
+            Atom::U64(n) | Atom::U63(n) => write!(f, "{}", n),
+            Atom::Fxx(n) => write!(f, "{}", n),
+            Atom::F64(n) => write!(f, "{}", n),
+            Atom::Ident(s) => write!(f, "{}", s),
             Atom::String(s) => write!(f, "\"{}\"", s.replace('\"', "\\\"")),
             Atom::Char(c) => write!(f, "'{}'", c),
             Atom::Paren(a) => write!(f, "({})", a),

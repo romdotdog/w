@@ -111,37 +111,45 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
 
             if let Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) = self.tk {
                 self.next();
-                discriminant = self.take(|this, t| match t {
+                discriminant = self.take(|this, t| {
                     // take
-                    Some(Token::Integer(i)) => {
-                        match h.entry(s) {
-                            Entry::Vacant(e) => {
-                                e.insert(i);
-                            }
-                            Entry::Occupied(_) => this.error(
-                                Message::DuplicateEnumField,
-                                Span::new(sident.start, this.end),
-                            ),
-                        }
-                        Next(i + 1)
-                    }
-                    Some(Token::UInteger(_)) => {
-                        match h.entry(s) {
-                            Entry::Vacant(e) => {
-                                e.insert(discriminant);
-                            }
-                            Entry::Occupied(_) => {
-                                this.error(Message::DuplicateEnumField, sident);
-                            }
-                        }
+                    let i = match t {
+                        Some(Token::I32(n)) => i64::from(n),
+                        Some(Token::U32(n) | Token::U31(n)) => i64::from(n),
 
-                        this.error(Message::IntegerNoFit, this.span());
-                        Next(discriminant + 1)
+                        #[allow(clippy::cast_possible_wrap)]
+                        Some(Token::U63(n)) => n as i64, // invariant
+                        Some(Token::I64(n)) => n,
+
+                        Some(Token::U64(_)) => {
+                            match h.entry(s) {
+                                Entry::Vacant(e) => {
+                                    e.insert(discriminant);
+                                }
+                                Entry::Occupied(_) => {
+                                    this.error(Message::DuplicateEnumField, sident);
+                                }
+                            }
+
+                            this.error(Message::IntegerNoFit, this.span());
+                            return Next(discriminant + 1);
+                        }
+                        t => {
+                            this.error(Message::MissingInteger, this.span());
+                            return Fill(discriminant + 1, t);
+                        }
+                    };
+
+                    match h.entry(s) {
+                        Entry::Vacant(e) => {
+                            e.insert(i);
+                        }
+                        Entry::Occupied(_) => this.error(
+                            Message::DuplicateEnumField,
+                            Span::new(sident.start, this.end),
+                        ),
                     }
-                    t => {
-                        this.error(Message::MissingInteger, this.span());
-                        Fill(discriminant + 1, t)
-                    }
+                    Next(i + 1)
                 });
 
                 bracketcomma!({}, {});

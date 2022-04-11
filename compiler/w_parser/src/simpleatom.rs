@@ -291,9 +291,14 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             Some(Token::Loop) => self.parse_loop(None)?,
             _ => {
                 self.take(|this, t| match t {
-                    Some(Token::Float(f)) => Next(Some(Spanned(Atom::Float(f), this.span()))),
-                    Some(Token::UInteger(i)) => Next(Some(Spanned(Atom::UInteger(i), this.span()))),
-                    Some(Token::Integer(i)) => Next(Some(Spanned(Atom::Integer(i), this.span()))),
+                    Some(Token::U31(n)) => Next(Some(Spanned(Atom::U31(n), this.span()))),
+                    Some(Token::U63(n)) => Next(Some(Spanned(Atom::U63(n), this.span()))),
+                    Some(Token::Fxx(n)) => Next(Some(Spanned(Atom::Fxx(n), this.span()))),
+                    Some(Token::I32(n)) => Next(Some(Spanned(Atom::I32(n), this.span()))),
+                    Some(Token::I64(n)) => Next(Some(Spanned(Atom::I64(n), this.span()))),
+                    Some(Token::U32(n)) => Next(Some(Spanned(Atom::U32(n), this.span()))),
+                    Some(Token::U64(n)) => Next(Some(Spanned(Atom::U64(n), this.span()))),
+                    Some(Token::F64(n)) => Next(Some(Spanned(Atom::F64(n), this.span()))),
                     Some(Token::String(s)) => Next(Some(Spanned(Atom::String(s), this.span()))),
                     Some(Token::Char(s)) => Next(Some(Spanned(Atom::Char(s), this.span()))),
                     Some(Token::Ident(s)) => {

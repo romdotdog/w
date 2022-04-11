@@ -35,9 +35,14 @@ pub enum Token<'ast> {
     UnOp(UnOp),
     AmbiguousOp(AmbiguousOp),
 
-    UInteger(u64),
-    Integer(i64),
-    Float(f64),
+    U31(u32),
+    U63(u64),
+    Fxx(f32),
+    I32(i32),
+    I64(i64),
+    U32(u32),
+    U64(u64),
+    F64(f64),
     Overflown,
 
     Char(char),
