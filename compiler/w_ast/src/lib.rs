@@ -10,8 +10,6 @@ pub use indir::Indir;
 mod span;
 pub use span::Span;
 
-mod codegen;
-
 pub struct AST<'ast>(pub Vec<Spanned<TopLevel<'ast>>>);
 
 pub enum ASTObject<'ast> {
