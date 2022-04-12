@@ -1,9 +1,13 @@
-use super::{Fill, Handler, Next, NoFill, Parser};
-use w_ast::{ASTObject, Atom, IncDec, Span, Spanned};
+use std::{any::TypeId, convert::TryInto};
+
+use crate::types::{Type, TypeVariant};
+
+use super::{Compiler, Fill, Handler, Next, NoFill};
+use w_codegen::Serializer;
 use w_errors::Message;
 use w_lexer::token::{Token, UnOp};
 
-impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
+impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     pub(crate) fn parse_block(&mut self, label: Option<Spanned<&'ast str>>) -> Spanned<Atom<'ast>> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::LeftBracket));
@@ -222,53 +226,59 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         Some(lhs)
     }
 
-    fn parse_if(&mut self) -> Option<Spanned<Atom<'ast>>> {
+    fn parse_if(&mut self) -> (S::ExpressionRef, Type) {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::If));
         self.next();
 
-        let cond = Box::new(self.atom()?);
-        let true_branch = Box::new(self.atom()?);
-
-        let mut end = true_branch.1.end;
+        let cond = self.atom(None);
+        let true_branch = self.atom(None);
         let false_branch = match self.tk {
             Some(Token::Else) => {
                 self.next();
-                let a = self.atom()?;
-                end = a.1.end;
-                Some(Box::new(a))
+                self.atom(Some(true_branch.1))
             }
             _ => None,
         };
 
-        Some(Spanned(
-            Atom::If {
-                cond,
-                true_branch,
-                false_branch,
-            },
-            Span::new(start, end),
-        ))
+        // TODO: merge
+        if let Some(branch_expr) = false_branch {
+            if false_branch.1 == true_branch.1 {
+                (
+                    self.module.if_(cond.0, true_branch.0, false_branch.0),
+                    false_branch.1,
+                )
+            } else {
+                self.error(Message::IfCannotReturn, self.span());
+                (self.module.unreachable(), TypeVariant::Unreachable.into())
+            }
+        } else if true_branch.1 != TypeVariant::Void.into() {
+            self.error(Message::IfCannotReturn, self.span())(
+                self.module.unreachable(),
+                TypeVariant::Unreachable.into(),
+            )
+        }
+        (
+            self.module.if_(cond.0, true_branch.0, false_branch.0),
+            TypeVariant::Void.into(),
+        )
     }
 
-    pub(crate) fn simpleatom(&mut self) -> Option<Spanned<Atom<'ast>>> {
+    pub(crate) fn simpleatom(&mut self, contextual_type: Option<Type>) -> (S::ExpressionRef, Type) {
         let lhs = match self.tk {
             Some(Token::LeftParen) => {
-                let start = self.start;
                 self.next();
 
-                let e = self.atom()?;
+                let e = self.atom(contextual_type);
 
                 if self.tk != Some(Token::RightParen) {
                     self.error(Message::MissingClosingParen, self.span());
                 }
 
-                let span = Span::new(start, self.end);
                 self.next();
-                Spanned(Atom::Paren(Box::new(e)), span)
+                e
             }
             Some(Token::Sizeof) => {
-                let start = self.start;
                 self.next();
 
                 if self.tk != Some(Token::LeftParen) {
@@ -282,25 +292,119 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                     self.error(Message::MissingClosingParen, self.span());
                 }
 
-                let span = Span::new(start, self.end);
                 self.next();
-                Spanned(Atom::Sizeof(t), span)
+                todo!()
             }
             Some(Token::If) => self.parse_if()?,
             Some(Token::LeftBracket) => self.parse_block(None),
             Some(Token::Loop) => self.parse_loop(None)?,
             _ => {
+                /*
+                    ┌───┐┌─────┐
+                    │f32││u31  │
+                    └┬──┘└┬───┬┘
+                     │┌───▽─┐┌▽──┐
+                     ││u32  ││i32│
+                     │└┬───┬┘└┬┬─┘
+                     │┌│───│──┘│
+                    ┌▽▽▽┐┌─▽──┐│
+                    │f64││u63 ││
+                    └───┘└┬──┬┘│
+                    ┌─────▽┐┌▽─▽┐
+                    │u64   ││i64│
+                    └──────┘└───┘
+                */
                 self.take(|this, t| match t {
-                    Some(Token::U31(n)) => Next(Some(Spanned(Atom::U31(n), this.span()))),
-                    Some(Token::U63(n)) => Next(Some(Spanned(Atom::U63(n), this.span()))),
-                    Some(Token::Fxx(n)) => Next(Some(Spanned(Atom::Fxx(n), this.span()))),
-                    Some(Token::I32(n)) => Next(Some(Spanned(Atom::I32(n), this.span()))),
-                    Some(Token::I64(n)) => Next(Some(Spanned(Atom::I64(n), this.span()))),
-                    Some(Token::U32(n)) => Next(Some(Spanned(Atom::U32(n), this.span()))),
-                    Some(Token::U64(n)) => Next(Some(Spanned(Atom::U64(n), this.span()))),
-                    Some(Token::F64(n)) => Next(Some(Spanned(Atom::F64(n), this.span()))),
-                    Some(Token::String(s)) => Next(Some(Spanned(Atom::String(s), this.span()))),
-                    Some(Token::Char(s)) => Next(Some(Spanned(Atom::Char(s), this.span()))),
+                    Some(Token::U31(n)) => {
+                        if let Some(t) = contextual_type {
+                            if t.is_reference() {
+                                this.error(Message::ReferenceCoercion, this.span())
+                            } else {
+                                match t.v {
+                                    TypeVariant::U32 => Next((
+                                        self.module.i32_const(reinterpret_u32(n)),
+                                        TypeVariant::U32.into(),
+                                    )),
+                                    TypeVariant::U64 => Next((
+                                        self.module.i64_const(reinterpret_u64(n)),
+                                        TypeVariant::U32.into(),
+                                    )),
+                                    TypeVariant::I32 => {
+                                        Next((
+                                            self.module.i32_const(n.try_into().unwrap()),
+                                            TypeVariant::I32,
+                                        )) // invariant
+                                    }
+                                    TypeVariant::I64 => {
+                                        Next((self.module.i64_const(n.into()), TypeVariant::I64))
+                                    }
+                                    TypeVariant::F64 => {
+                                        Next((self.module.f64_const(n.into()), TypeVariant::F64))
+                                    }
+                                    _ => this.error(Message::InvalidCoercion, this.span()),
+                                }
+                            }
+                        } else {
+                            this.error(Message::UncoercedU31, this.span());
+                        }
+
+                        Next((self.module.unreachable(), TypeVariant::Unreachable.into()))
+                    }
+                    Some(Token::U63(n)) => {
+                        if let Some(t) = contextual_type {
+                            if t.is_reference() {
+                                this.error(Message::ReferenceCoercion, this.span())
+                            } else {
+                                match t.v {
+                                    TypeVariant::U64 => Next((
+                                        self.module.i64_const(reinterpret_u64(n)),
+                                        TypeVariant::U32.into(),
+                                    )),
+                                    TypeVariant::I64 => {
+                                        Next((self.module.i64_const(n.into()), TypeVariant::I64))
+                                    }
+                                    _ => this.error(Message::InvalidCoercion, this.span()),
+                                }
+                            }
+                        } else {
+                            this.error(Message::UncoercedU63, this.span());
+                        }
+
+                        Next((self.module.unreachable(), TypeVariant::Unreachable.into()))
+                    }
+                    Some(Token::Fxx(n)) => {
+                        if let Some(t) = contextual_type {
+                            if t.is_reference() {
+                                this.error(Message::ReferenceCoercion, this.span())
+                            } else {
+                                match t.v {
+                                    TypeVariant::F32 => {
+                                        Next((self.module.f32_const(n), TypeVariant::F32))
+                                    }
+                                    TypeVariant::F64 => {
+                                        Next((self.module.f64_const(n.into()), TypeVariant::F64))
+                                    }
+                                    _ => this.error(Message::InvalidCoercion, this.span()),
+                                }
+                            }
+                        } else {
+                            this.error(Message::UncoercedFxx, this.span());
+                        }
+
+                        Next((self.module.unreachable(), TypeVariant::Unreachable.into()))
+                    }
+
+                    Some(Token::I32(n)) => (self.module.i32_const(n), TypeVariant::I32),
+                    Some(Token::I64(n)) => (self.module.i64_const(n), TypeVariant::I64),
+                    Some(Token::U32(n)) => {
+                        (self.module.i32_const(reinterpret_u32(n)), TypeVariant::U32)
+                    }
+                    Some(Token::U64(n)) => {
+                        (self.module.i64_const(reinterpret_u64(n)), TypeVariant::U64)
+                    }
+                    Some(Token::F64(n)) => (self.module.f64_const(n), TypeVariant::F64),
+                    Some(Token::String(s)) => todo!(),
+                    Some(Token::Char(s)) => todo!(),
                     Some(Token::Ident(s)) => {
                         let span = this.span();
                         this.next(); // fill
@@ -308,10 +412,9 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                             this.error(Message::IdentifierIsNotLabel, this.span());
                             // TODO: not label behavior
                         };
-                        NoFill(Some(Spanned(Atom::Ident(s), span)))
+                        todo!()
                     }
                     Some(Token::Label(x)) => {
-                        let x = Spanned(x, this.span());
                         this.next(); // fill
                         match this.tk {
                             Some(Token::Colon) => this.next(),
@@ -332,10 +435,18 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                         this.error(Message::UnexpectedToken, this.span());
                         Fill(None, tk)
                     }
-                })?
+                })
             }
         };
 
         self.postfixatom(lhs)
     }
+}
+
+fn reinterpret_u32(n: u32) -> i32 {
+    unsafe { std::mem::transmute::<u32, i32>(n) }
+}
+
+fn reinterpret_u64(n: u64) -> i64 {
+    unsafe { std::mem::transmute::<u64, i64>(n) }
 }

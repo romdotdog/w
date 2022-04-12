@@ -45,5 +45,12 @@ errors!(
     MissingColon => "':' expected here",
     InvalidTopLevel => "only functions, globals and directives are allowed here",
     TooMuchIndirection => "at most only 5 levels of indirection are allowed",
-    LoopBodyBlock => "loop body may only be a block"
+    LoopBodyBlock => "loop body may only be a block",
+    InvalidCoercion => "invalid coercion",
+    ReferenceCoercion => "cannot coerce to reference",
+    UncoercedFxx => "literal is of type fxx, must cast to either f32 or f64",
+    UncoercedU31 => "literal is of type u31, must cast to either i32, i64, u32, u64 or f64",
+    UncoercedU63 => "literal is of type u63, must cast to either i64 or u64",
+    BranchesSameTypes => "branches must return the same types",
+    IfCannotReturn => "if statement cannot have a result"
 );

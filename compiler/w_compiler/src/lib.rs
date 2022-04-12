@@ -1,17 +1,22 @@
-use w_ast::{Atom, Decl, IdentPair, Indir, Span, Spanned, Type, TypeVariant, ReferenceKind};
+use w_codegen::Serializer;
 use w_errors::Message;
 use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token};
 use w_lexer::Lexer;
+use types::{IdentPair, Type};
 
 pub mod handler;
 mod primaryatom;
 mod simpleatom;
 mod toplevel;
+mod types;
 
 use handler::{Handler, Status, ImportlessHandler, ImportlessHandlerHandler};
 
-pub struct Parser<'ast, H: Handler<'ast>> {
+
+pub struct Compiler<'ast, H: Handler<'ast>, S: Serializer> {
     session: &'ast H, // TODO: lifetime review
+    module: &'ast mut S,
+
     src_ref: &'ast H::SourceRef,
     lex: Lexer<'ast>,
 
@@ -29,13 +34,16 @@ enum Take<'ast, T> {
 }
 
 use Take::{Fill, Next, NoFill};
+use w_utils::span::Span;
 
-impl<'ast, H: ImportlessHandler<'ast>> Parser<'ast, ImportlessHandlerHandler<'ast, H>> {
-    pub fn partial_parse(session: &'ast ImportlessHandlerHandler<'ast, H>, src: &'ast str) -> Self {
+impl<'ast, H: ImportlessHandler<'ast>, S: Serializer> Compiler<'ast, ImportlessHandlerHandler<'ast, H>, S> {
+    pub fn compile_string(session: &'ast ImportlessHandlerHandler<'ast, H>, module: &'ast mut S, src: &'ast str) -> Self {
         let lex = Lexer::from_str(src);
 
-        let mut parser = Parser {
+        let mut compiler = Compiler {
             session,
+            module,
+
             src_ref: &(),
             lex,
 
@@ -44,13 +52,13 @@ impl<'ast, H: ImportlessHandler<'ast>> Parser<'ast, ImportlessHandlerHandler<'as
             tk: None,
         };
 
-        parser.next();
-        parser
+        compiler.next();
+        compiler
     }
 }
 
-impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
-    pub fn full_parse(session: &'ast H, src_ref: &'ast H::SourceRef) {
+impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
+    pub fn compile(session: &'ast H, serializer: &'ast mut S, src_ref: &'ast H::SourceRef) {
         let src = session.get_source(src_ref);
         let mut lex = Lexer::from_str(src);
 
@@ -59,7 +67,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             if let Some((new_src_ref, status)) = session.load_source(src_ref, path) {
                 match status {
                     Status::NotParsing => {
-                        Parser::full_parse(session, new_src_ref);
+                        Compiler::compile(session, serializer, new_src_ref);
                     }
                     Status::CurrentlyParsing => {
                         session.error(
@@ -79,8 +87,10 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             }
         }
 
-        let mut parser = Parser {
+        let mut compiler = Compiler {
             session,
+            module: serializer,
+
             src_ref,
             lex,
 
@@ -89,8 +99,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             tk: None,
         };
 
-        parser.next();
-        parser.session.set_ast(parser.src_ref, parser.parse());
+        compiler.next();
     }
 
     fn next(&mut self) {
@@ -402,7 +411,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         Some(lhs)
     }
 
-    pub fn atom(&mut self) -> Option<Spanned<Atom<'ast>>> {
+    pub fn atom(&mut self, contextual_type: Option<Type>) -> (S::ExpressionRef, Type) {
         let lhs = self.primaryatom()?;
         self.subatom(lhs, 0)
     }

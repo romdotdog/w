@@ -1,10 +1,10 @@
-use super::{Fill, Handler, Next, Parser};
+use super::{Compiler, Fill, Handler, Next};
 use std::collections::{hash_map::Entry, HashMap};
-use w_ast::{Span, Spanned, TopLevel, TypeBody, AST};
+use w_codegen::Serializer;
 use w_errors::Message;
 use w_lexer::token::{BinOp, BinOpVariant, Token};
 
-impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
+impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     pub fn can_begin_toplevel(&self) -> bool {
         matches!(
             self.tk,

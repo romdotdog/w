@@ -1,6 +1,6 @@
 use std::option::Option;
-use w_ast::{Span, AST};
 use w_errors::Message;
+use w_utils::span::Span;
 
 #[derive(Clone, Copy)]
 pub enum Status {
@@ -19,7 +19,6 @@ pub trait Handler<'ast> {
         path: &'ast str,
     ) -> Option<(&'ast Self::SourceRef, Status)>;
     fn get_source(&self, src_ref: &'ast Self::SourceRef) -> &'ast str;
-    fn set_ast(&self, src_ref: &'ast Self::SourceRef, prog: AST<'ast>);
 }
 
 // vv helpers vv
@@ -48,10 +47,6 @@ impl<'ast, I: ImportlessHandler<'ast>> Handler<'ast> for ImportlessHandlerHandle
     }
 
     fn get_source(&self, _src_ref: &'ast Self::SourceRef) -> &'ast str {
-        panic!("inappropriate use of ImportlessHandler");
-    }
-
-    fn set_ast(&self, _src_ref: &'ast Self::SourceRef, _ast: AST<'ast>) {
         panic!("inappropriate use of ImportlessHandler");
     }
 }

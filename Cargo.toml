@@ -1,5 +1,5 @@
 [workspace]
-members = ["compiler/w", "benches"]
+members = ["compiler/w"]
 
 [profile.release]
 codegen-units = 1

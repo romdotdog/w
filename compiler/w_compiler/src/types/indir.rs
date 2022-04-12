@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Indir(u8);
 
 impl Indir {

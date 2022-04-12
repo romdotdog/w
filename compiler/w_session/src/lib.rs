@@ -10,14 +10,11 @@ use diag::emitter::Emitter;
 use diag::Diagnostic;
 use diag::Diagnostics;
 use source_map::{loader::Loader, source::Source, SourceMap};
-use w_ast::Span;
-use w_ast::AST;
+use w_compiler::handler::Handler;
+use w_compiler::handler::Status;
+use w_compiler::Compiler;
 use w_errors::Message;
-use w_parser::handler::Handler;
-use w_parser::handler::Status;
-use w_parser::Parser;
 
-type Program<'a> = Vec<(&'a Source, AST<'a>)>;
 pub struct Session<'src, L: Loader, E: Emitter> {
     source_map: SourceMap<L>,
     diags: Diagnostics<'src, E>,
@@ -34,7 +31,7 @@ impl<'ast, L: Loader, E: Emitter> Session<'ast, L, E> {
     }
 
     pub fn parse(&'ast self, src: &'ast Source) -> Program<'ast> {
-        Parser::full_parse(self, src);
+        Compiler::full_parse(self, src);
         self.prog.replace(Vec::new())
     }
 

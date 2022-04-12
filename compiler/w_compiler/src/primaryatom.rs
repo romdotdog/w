@@ -1,9 +1,9 @@
-use super::{Fill, Handler, Next, Parser};
-use w_ast::{Atom, Span, Spanned};
+use super::{Compiler, Fill, Handler, Next};
+use w_codegen::Serializer;
 use w_errors::Message;
 use w_lexer::token::{BinOp, BinOpVariant, Token, UnOp};
 
-impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
+impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     pub(crate) fn parse_let(&mut self) -> Option<Spanned<Atom<'ast>>> {
         let start = self.start;
         matches!(self.tk, Some(Token::Let));
