@@ -23,8 +23,7 @@ impl<'ast> SymbolStack<'ast> {
 	}
 
 	fn free_var(&mut self, name: &'ast str) {
-		assert!(self.table.contains(name));
-		match &self.table.get(name) {
+		match &self.table.get(name).unwrap() { // invariant
 			[_] => {
 				self.table.remove(name);	
 			}

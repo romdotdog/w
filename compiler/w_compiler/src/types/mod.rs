@@ -2,7 +2,7 @@ use indir::Indir;
 
 pub mod indir;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ReferenceKind {
     None,
     Immutable,
@@ -29,7 +29,7 @@ impl Type {
         Type { v, indir, refkind }
     }
 
-    fn is_reference(&self) -> bool {
+    pub fn is_reference(&self) -> bool {
         return self.indir.len() == 0 && self.refkind == ReferenceKind::None;
     }
 }
@@ -74,56 +74,6 @@ impl<'ast> From<&'ast str> for TypeVariant {
             "f64" => TypeVariant::F64,
             "void" => TypeVariant::Void,
             _ => TypeVariant::Unresolved(s),
-        }
-    }
-}
-
-impl TypeVariant {
-    fn isImplicitlyAssignableTo(&self, target: &TypeVariant) -> bool {
-        match self {
-            TypeVariant::U31 => match target {
-                TypeVariant::U31
-                | TypeVariant::U32
-                | TypeVariant::U63
-                | TypeVariant::U64
-                | TypeVariant::I32
-                | TypeVariant::I64
-                | TypeVariant::F64 => true,
-                _ => false,
-            },
-            TypeVariant::U32 => match target {
-                TypeVariant::U32
-                | TypeVariant::U63
-                | TypeVariant::U64
-                | TypeVariant::I64
-                | TypeVariant::F64 => true,
-                _ => false,
-            },
-            TypeVariant::U63 => match target {
-                TypeVariant::U63 | TypeVariant::U64 | TypeVariant::I64 => true,
-                _ => false,
-            },
-            TypeVariant::U64 => match target {
-                TypeVariant::U64 => true,
-                _ => false,
-            },
-            TypeVariant::I64 => match target {
-                TypeVariant::I64 => true,
-                _ => false,
-            },
-            TypeVariant::I32 => match target {
-                TypeVariant::I32 | TypeVariant::I64 | TypeVariant::F64 => true,
-                _ => false,
-            },
-            TypeVariant::F32 => match target {
-                TypeVariant::F32 | TypeVariant::F64 => true,
-                _ => false,
-            },
-            TypeVariant::F64 => match target {
-                TypeVariant::F64 => true,
-                _ => false,
-            },
-            _ => false,
         }
     }
 }

@@ -264,7 +264,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     }
 
     pub(crate) fn simpleatom(&mut self, contextual_type: Option<Type>) -> (S::ExpressionRef, Type) {
-        let lhs = match self.tk {
+        let lhs: (S::ExpressionRef, Type) = match self.tk {
             Some(Token::LeftParen) => {
                 self.next();
 
@@ -320,25 +320,29 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                                 this.error(Message::ReferenceCoercion, this.span())
                             } else {
                                 match t.v {
-                                    TypeVariant::U32 => Next((
-                                        self.module.i32_const(reinterpret_u32(n)),
-                                        TypeVariant::U32.into(),
-                                    )),
-                                    TypeVariant::U64 => Next((
-                                        self.module.i64_const(reinterpret_u64(n)),
-                                        TypeVariant::U32.into(),
-                                    )),
+                                    TypeVariant::U32 => {
+										return Next((
+	                                        self.module.i32_const(reinterpret_u32(n)),
+	                                        Type::from(TypeVariant::U32),
+	                                    ));
+									},
+                                    TypeVariant::U64 => {
+										return Next((
+	                                        self.module.i64_const(reinterpret_u64(n)),
+	                                        Type::from(TypeVariant::U64),
+	                                    ));
+									},
                                     TypeVariant::I32 => {
-                                        Next((
+                                        return Next((
                                             self.module.i32_const(n.try_into().unwrap()),
-                                            TypeVariant::I32,
-                                        )) // invariant
+                                            Type::from(TypeVariant::I32),
+                                        )); // invariant
                                     }
                                     TypeVariant::I64 => {
-                                        Next((self.module.i64_const(n.into()), TypeVariant::I64))
+                                        return Next((self.module.i64_const(n.into()), Type::from(TypeVariant::I64)));
                                     }
                                     TypeVariant::F64 => {
-                                        Next((self.module.f64_const(n.into()), TypeVariant::F64))
+                                        return Next((self.module.f64_const(n.into()), Type::from(TypeVariant::F64)));
                                     }
                                     _ => this.error(Message::InvalidCoercion, this.span()),
                                 }
@@ -355,12 +359,14 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                                 this.error(Message::ReferenceCoercion, this.span())
                             } else {
                                 match t.v {
-                                    TypeVariant::U64 => Next((
-                                        self.module.i64_const(reinterpret_u64(n)),
-                                        TypeVariant::U32.into(),
-                                    )),
+                                    TypeVariant::U64 => {
+										return Next((
+	                                        self.module.i64_const(reinterpret_u64(n)),
+	                                        TypeVariant::U32.into(),
+	                                    ))
+									}
                                     TypeVariant::I64 => {
-                                        Next((self.module.i64_const(n.into()), TypeVariant::I64))
+                                        return Next((self.module.i64_const(n.into()), TypeVariant::I64))
                                     }
                                     _ => this.error(Message::InvalidCoercion, this.span()),
                                 }
@@ -378,10 +384,10 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                             } else {
                                 match t.v {
                                     TypeVariant::F32 => {
-                                        Next((self.module.f32_const(n), TypeVariant::F32))
+                                        return Next((self.module.f32_const(n), Type::from(TypeVariant::F32)));
                                     }
                                     TypeVariant::F64 => {
-                                        Next((self.module.f64_const(n.into()), TypeVariant::F64))
+                                        return Next((self.module.f64_const(n.into()), Type::from(TypeVariant::F64)));
                                     }
                                     _ => this.error(Message::InvalidCoercion, this.span()),
                                 }
@@ -390,18 +396,18 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                             this.error(Message::UncoercedFxx, this.span());
                         }
 
-                        Next((self.module.unreachable(), TypeVariant::Unreachable.into()))
+                        Next((self.module.unreachable(), Type::from(TypeVariant::Unreachable)))
                     }
 
-                    Some(Token::I32(n)) => (self.module.i32_const(n), TypeVariant::I32),
-                    Some(Token::I64(n)) => (self.module.i64_const(n), TypeVariant::I64),
+                    Some(Token::I32(n)) => Next((self.module.i32_const(n), Type::from(TypeVariant::I32))),
+                    Some(Token::I64(n)) => Next((self.module.i64_const(n), Type::from(TypeVariant::I64))),
                     Some(Token::U32(n)) => {
-                        (self.module.i32_const(reinterpret_u32(n)), TypeVariant::U32)
+                        Next((self.module.i32_const(reinterpret_u32(n)), Type::from(TypeVariant::U32)))
                     }
                     Some(Token::U64(n)) => {
-                        (self.module.i64_const(reinterpret_u64(n)), TypeVariant::U64)
+                        Next((self.module.i64_const(reinterpret_u64(n)), Type::from(ypeVariant::U64)))
                     }
-                    Some(Token::F64(n)) => (self.module.f64_const(n), TypeVariant::F64),
+                    Some(Token::F64(n)) => (self.module.f64_const(n), Type::from(TypeVariant::F64)),
                     Some(Token::String(s)) => todo!(),
                     Some(Token::Char(s)) => todo!(),
                     Some(Token::Ident(s)) => {
@@ -421,18 +427,18 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         };
 
                         NoFill(match this.tk {
-                            Some(Token::LeftBracket) => Some(this.parse_block(Some(x))),
+                            Some(Token::LeftBracket) => this.parse_block(Some(x)),
                             Some(Token::Loop) => this.parse_loop(Some(x)),
                             _ => {
                                 // TODO: parse atom?
                                 this.error(Message::CannotFollowLabel, this.span());
-                                None
+                                (self.module.unreachable(), Type::from(TypeVariant::Unreachable))
                             }
                         })
                     }
                     tk => {
                         this.error(Message::UnexpectedToken, this.span());
-                        Fill(None, tk)
+                        Fill((self.module.unreachable(), Type::from(TypeVariant::Unreachable)), tk)
                     }
                 })
             }
