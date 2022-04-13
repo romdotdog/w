@@ -4,17 +4,18 @@ use w_errors::Message;
 use w_lexer::token::{BinOp, BinOpVariant, Token, UnOp};
 
 impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
-    pub(crate) fn parse_let(&mut self) -> Option<Spanned<Atom<'ast>>> {
+    pub(crate) fn parse_let(&mut self) -> (S::ExpressionRef, Type) {
         let start = self.start;
         matches!(self.tk, Some(Token::Let));
         self.next();
 
         let decl = self.parse_decl()?;
         let end = decl.1.end;
-        Some(Spanned(Atom::Let(decl.0), Span::new(start, end)))
+        //Some(Spanned(Atom::Let(decl.0), Span::new(start, end)))
+		todo!()
     }
 
-    fn parse_cast(&mut self) -> Option<Spanned<Atom<'ast>>> {
+    fn parse_cast(&mut self) -> (S::ExpressionRef, Type) {
         let start = self.start;
         assert_eq!(
             self.tk,
@@ -45,17 +46,18 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
         let atom = self.primaryatom()?;
         let end = atom.1.end;
-        Some(Spanned(
+        /*Some(Spanned(
             if is_reinterpret {
                 Atom::Reinterpret(t, Box::new(atom))
             } else {
                 Atom::Cast(t, Box::new(atom))
             },
             Span::new(start, end),
-        ))
+        ))*/
+		todo!()
     }
 
-    fn parse_br(&mut self) -> Option<Spanned<Atom<'ast>>> {
+    fn parse_br(&mut self) -> (S::ExpressionRef, Type) {
         let start = self.start;
         assert_eq!(self.tk, Some(Token::Br));
         let mut end = self.end;
@@ -108,13 +110,15 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             _ => None,
         };
 
-        Some(Spanned(
-            Atom::Br { ret, label, cond },
-            Span::new(start, end),
-        ))
+        //Some(Spanned(
+        //    Atom::Br { ret, label, cond },
+        //    Span::new(start, end),
+        //))
+
+		todo!()
     }
 
-    fn parse_ret(&mut self) -> Option<Spanned<Atom<'ast>>> {
+    fn parse_ret(&mut self) -> (S::ExpressionRef, Type) {
         let start = self.start;
         let mut end = self.end;
         debug_assert_eq!(self.tk, Some(Token::Return));
@@ -128,19 +132,21 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             None
         };
 
-        Some(Spanned(Atom::Return(a), Span::new(start, end)))
+        //Some(Spanned(Atom::Return(a), Span::new(start, end)))
+		todo!()
     }
 
-    fn unop(&mut self, u: UnOp) -> Option<Spanned<Atom<'ast>>> {
+    fn unop(&mut self, u: UnOp) -> (S::ExpressionRef, Type) {
         let start = self.start;
         self.next();
 
         let a = self.primaryatom()?;
         let end = a.1.end;
-        Some(Spanned(Atom::UnOp(u, Box::new(a)), Span::new(start, end)))
+        //Some(Spanned(Atom::UnOp(u, Box::new(a)), Span::new(start, end)))
+		todo!()
     }
 
-    pub(crate) fn primaryatom(&mut self) -> Option<Spanned<Atom<'ast>>> {
+    pub(crate) fn primaryatom(&mut self) -> (S::ExpressionRef, Type) {
         match self.tk {
             Some(Token::Let) => self.parse_let(),
             Some(Token::BinOp(BinOp::Regular(BinOpVariant::Lt))) => self.parse_cast(),

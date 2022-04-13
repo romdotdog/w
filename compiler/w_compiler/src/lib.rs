@@ -2,27 +2,32 @@ use w_codegen::Serializer;
 use w_errors::Message;
 use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token};
 use w_lexer::Lexer;
-use types::{IdentPair, Type};
+use types::{IdentPair, ReferenceKind, Type};
 
 pub mod handler;
 mod primaryatom;
 mod simpleatom;
 mod toplevel;
 mod types;
+mod symbol_stack;
 
 use handler::{Handler, Status, ImportlessHandler, ImportlessHandlerHandler};
+use symbol_stack::SymbolStack;
 
 
 pub struct Compiler<'ast, H: Handler<'ast>, S: Serializer> {
     session: &'ast H, // TODO: lifetime review
-    module: &'ast mut S,
-
     src_ref: &'ast H::SourceRef,
+	
     lex: Lexer<'ast>,
-
     start: usize,
     end: usize,
     tk: Option<Token<'ast>>,
+
+	//
+
+	module: &'ast mut S,
+	symbols: SymbolStack<'ast>
 }
 
 enum Take<'ast, T> {
@@ -42,14 +47,15 @@ impl<'ast, H: ImportlessHandler<'ast>, S: Serializer> Compiler<'ast, ImportlessH
 
         let mut compiler = Compiler {
             session,
-            module,
-
             src_ref: &(),
-            lex,
-
+            
+			lex,
             start: 0,
             end: 0,
             tk: None,
+
+			module,
+			symbols: SymbolStack::default()
         };
 
         compiler.next();
@@ -58,7 +64,7 @@ impl<'ast, H: ImportlessHandler<'ast>, S: Serializer> Compiler<'ast, ImportlessH
 }
 
 impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
-    pub fn compile(session: &'ast H, serializer: &'ast mut S, src_ref: &'ast H::SourceRef) {
+    pub fn compile(session: &'ast H, module: &'ast mut S, src_ref: &'ast H::SourceRef) {
         let src = session.get_source(src_ref);
         let mut lex = Lexer::from_str(src);
 
@@ -67,7 +73,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             if let Some((new_src_ref, status)) = session.load_source(src_ref, path) {
                 match status {
                     Status::NotParsing => {
-                        Compiler::compile(session, serializer, new_src_ref);
+                        Compiler::compile(session, module, new_src_ref);
                     }
                     Status::CurrentlyParsing => {
                         session.error(
@@ -89,14 +95,15 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
         let mut compiler = Compiler {
             session,
-            module: serializer,
-
             src_ref,
+			
             lex,
-
             start: 0,
             end: 0,
             tk: None,
+
+			module,
+			symbol_stack: SymbolStack::default()
         };
 
         compiler.next();
@@ -182,14 +189,14 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         }
     }
 
-    pub fn expect_ident(&mut self, token_after: &Option<Token>) -> Spanned<&'ast str> {
+    pub fn expect_ident(&mut self, token_after: &Option<Token>) -> Option<&'ast str> {
         if &self.tk == token_after {
             // struct  {
             //        ^
             let pos = self.start;
             let span = Span::new(pos - 1, pos);
             self.error(Message::MissingIdentifier, span);
-            Spanned("<unknown>", span)
+            None
         } else {
             self.take(|this, t| {
                 Next(match t {
@@ -197,28 +204,26 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     Some(Token::Ident(s)) => {
                         // struct ident {
                         //        ^^^^^
-                        Spanned(s, this.span())
+                        Some(s)
                     }
                     Some(Token::Label(_)) => {
                         // struct $label {
                         //        ^^^^^^
-                        let span = this.span();
-                        this.error(Message::LabelIsNotIdentifier, span);
-                        Spanned("<unknown>", span)
+                        this.error(Message::LabelIsNotIdentifier, this.span());
+                        None
                     }
                     _ => {
                         // struct ! {
                         //        ^
-                        let span = this.span();
-                        this.error(Message::MalformedIdentifier, span);
-                        Spanned("<unknown>", span)
+                        this.error(Message::MalformedIdentifier, this.span());
+                        None
                     }
                 })
             })
         }
     }
 
-    fn parse_type(&mut self) -> Option<Spanned<Type<'ast>>> {
+    fn parse_type(&mut self) -> Option<Type> {
         let start = self.start;
 		let refkind = match self.tk {
 			Some(Token::AmbiguousOp(AmbiguousOp::Ampersand)) => {
@@ -274,7 +279,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     self.next();
                     let body = self.type_body(true)?;
                     let end = body.1.end;
-                    return Some(Spanned(
+                    /*return Some(Spanned(
                         Type::with_indir(
                             if is_struct {
                                 TypeVariant::Struct(body)
@@ -285,7 +290,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 							refkind
                         ),
                         Span::new(start, end),
-                    ));
+                    ));*/
+					todo!()
                 }
                 _ => {
                     return self.take(|this, t| match t {
@@ -366,9 +372,9 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
     fn subatom(
         &mut self,
-        mut lhs: Spanned<Atom<'ast>>,
+        mut lhs: (S::ExpressionRef, Type),
         min_prec: u8,
-    ) -> Option<Spanned<Atom<'ast>>> {
+    ) -> (S::ExpressionRef, Type) {
         // https://en.wikipedia.org/wiki/Operator-precedence_parser
 
         // while [t] is a
@@ -403,7 +409,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 }
 
                 let span = Span::new(lhs.1.start, rhs.1.end);
-                lhs = Spanned(Atom::BinOp(Box::new(lhs), t, Box::new(rhs)), span);
+                //lhs = Spanned(Atom::BinOp(Box::new(lhs), t, Box::new(rhs)), span);
+				todo!()
             } else {
                 break;
             }

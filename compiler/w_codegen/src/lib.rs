@@ -24,4 +24,5 @@ pub trait Serializer {
 
     fn return_(&mut self, value: Option<Self::ExpressionRef>);
     fn unreachable(&mut self) -> Self::ExpressionRef;
+	fn add_function(&mut self, name: &str, params: Vec<(&str, WASMType)>, results: Vec<(&str, WASMType)>, vars: Vec<(&str, WASMType)>, body: Self::ExpressionRef);
 }

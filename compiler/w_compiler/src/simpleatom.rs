@@ -1,4 +1,4 @@
-use std::{any::TypeId, convert::TryInto};
+use std::convert::TryInto;
 
 use crate::types::{Type, TypeVariant};
 
@@ -37,14 +37,11 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             }
 
             if let Some(t) = last.take() {
-                contents.push(ASTObject::Atom(t));
+                contents.push(t);
             }
 
-            if self.can_begin_toplevel() {
-                match self.parse_toplevel() {
-                    Some(t) => contents.push(ASTObject::TopLevel(t)),
-                    None => panic_block!(),
-                }
+            if self.can_begin_toplevel() && !self.parse_toplevel(){
+				panic_block!();
             }
 
             match self.tk {
@@ -81,14 +78,15 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             }
         };
 
-        Spanned(
+        /*Spanned(
             Atom::Block {
                 label,
                 contents,
                 ret: last.map(Box::new),
             },
             Span::new(start, end),
-        )
+        )*/
+		todo!()
     }
 
     pub(crate) fn parse_loop(
@@ -113,7 +111,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             Box::new(a)
         };
 
-        let end = block.1.end;
+        /*let end = block.1.end;
         Some(Spanned(
             Atom::Loop {
                 label,
@@ -121,10 +119,11 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 block,
             },
             Span::new(start, end),
-        ))
+        ))*/
+		todo!()
     }
 
-    fn postfixatom(&mut self, mut lhs: Spanned<Atom<'ast>>) -> Option<Spanned<Atom<'ast>>> {
+    fn postfixatom(&mut self, mut lhs: (S::ExpressionRef, Type)) -> (S::ExpressionRef, Type) {
         let start = lhs.1.start;
         loop {
             match self.tk {

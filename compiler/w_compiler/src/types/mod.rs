@@ -9,15 +9,15 @@ pub enum ReferenceKind {
     Mutable,
 }
 
-#[derive(Clone)]
-pub struct Type<'ast> {
-    pub v: TypeVariant<'ast>,
+#[derive(Clone, Copy)]
+pub struct Type {
+    pub v: TypeVariant,
     pub indir: Indir,
     pub refkind: ReferenceKind,
 }
 
-impl<'ast> Type<'ast> {
-    pub fn new(v: TypeVariant<'ast>, refkind: ReferenceKind) -> Self {
+impl Type {
+    pub fn new(v: TypeVariant, refkind: ReferenceKind) -> Self {
         Type {
             v,
             indir: Indir::none(),
@@ -25,7 +25,7 @@ impl<'ast> Type<'ast> {
         }
     }
 
-    pub fn with_indir(v: TypeVariant<'ast>, indir: Indir, refkind: ReferenceKind) -> Self {
+    pub fn with_indir(v: TypeVariant, indir: Indir, refkind: ReferenceKind) -> Self {
         Type { v, indir, refkind }
     }
 
@@ -34,8 +34,8 @@ impl<'ast> Type<'ast> {
     }
 }
 
-impl<'ast> From<TypeVariant<'ast>> for Type<'ast> {
-    fn from(v: TypeVariant<'ast>) -> Self {
+impl From<TypeVariant> for Type {
+    fn from(v: TypeVariant) -> Self {
         Type {
             v,
             indir: Indir::none(),
@@ -48,11 +48,11 @@ impl<'ast> From<TypeVariant<'ast>> for Type<'ast> {
 pub struct IdentPair<'ast> {
     pub mutable: bool,
     pub ident: &'ast str,
-    pub t: Option<Type<'ast>>,
+    pub t: Option<Type>,
 }
 
-#[derive(Clone)]
-pub enum TypeVariant<'ast> {
+#[derive(Clone, Copy)]
+pub enum TypeVariant {
     Unreachable,
     Void,
     I32,
@@ -63,7 +63,7 @@ pub enum TypeVariant<'ast> {
     F64,
 }
 
-impl<'ast> From<&'ast str> for TypeVariant<'ast> {
+impl<'ast> From<&'ast str> for TypeVariant {
     fn from(s: &'ast str) -> Self {
         match s {
             "i32" => TypeVariant::I32,
@@ -78,7 +78,7 @@ impl<'ast> From<&'ast str> for TypeVariant<'ast> {
     }
 }
 
-impl TypeVariant<'_> {
+impl TypeVariant {
     fn isImplicitlyAssignableTo(&self, target: &TypeVariant) -> bool {
         match self {
             TypeVariant::U31 => match target {

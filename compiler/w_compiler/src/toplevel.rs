@@ -2,6 +2,7 @@ use super::{Compiler, Fill, Handler, Next};
 use std::collections::{hash_map::Entry, HashMap};
 use w_codegen::Serializer;
 use w_errors::Message;
+use w_utils::span::Span;
 use w_lexer::token::{BinOp, BinOpVariant, Token};
 
 impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
@@ -21,7 +22,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
     // static
 
-    pub(crate) fn parse_static(&mut self) -> Option<Spanned<TopLevel<'ast>>> {
+    pub(crate) fn parse_static(&mut self) -> bool {
         let start = self.start;
         assert_eq!(self.tk, Some(Token::Static));
         self.next();
@@ -39,12 +40,13 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             self.error(Message::MissingSemicolon, self.span());
         }
 
-        Some(Spanned(TopLevel::Static(decl.0), Span::new(start, end)))
+        // Some(Spanned(TopLevel::Static(decl.0), Span::new(start, end)))
+		todo!()
     }
 
     // enums
 
-    fn enum_body(&mut self) -> Option<Spanned<HashMap<&'ast str, i64>>> {
+    fn enum_body(&mut self) -> bool {
         let mut discriminant = 0;
         let start = self.start;
         let mut h = HashMap::new();
@@ -232,7 +234,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         }
     }
 
-    pub fn struct_or_union(&mut self, is_struct: bool) -> Option<Spanned<TopLevel<'ast>>> {
+    pub fn struct_or_union(&mut self, is_struct: bool) -> bool {
         let start = self.start;
         debug_assert!(matches!(self.tk, Some(Token::Struct | Token::Union)));
         self.next();
@@ -252,7 +254,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
     // functions
 
-    pub fn function(&mut self, exported: bool, static_: bool) -> Option<Spanned<TopLevel<'ast>>> {
+    pub fn function(&mut self, exported: bool, static_: bool) -> bool {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::Fn));
         self.next();
@@ -312,6 +314,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
         let atom = self.atom()?;
         let end = atom.1.end;
+		
         Some(Spanned(
             TopLevel::Fn {
                 name,
@@ -358,7 +361,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         }
     }
 
-    pub fn parse_toplevel(&mut self) -> Option<Spanned<TopLevel<'ast>>> {
+    pub fn parse_toplevel(&mut self) -> bool {
         match self.tk {
             Some(Token::Export) => {
                 self.next();
@@ -376,18 +379,14 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     // main
 
     pub fn parse(mut self) -> AST<'ast> {
-        let mut toplevel = Vec::new();
         loop {
             if self.tk.is_none() {
                 break;
             }
 
-            match self.parse_toplevel() {
-                Some(t) => toplevel.push(t),
-                None => self.panic_top_level(),
-            }
+			if !self.parse_toplevel() {
+				self.panic_top_level();
+			}
         }
-
-        AST(toplevel)
     }
 }
