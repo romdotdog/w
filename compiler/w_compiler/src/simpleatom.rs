@@ -128,24 +128,24 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         loop {
             match self.tk {
                 Some(Token::UnOp(UnOp::Dec)) => {
-                    lhs = Spanned(
-                        Atom::PostIncDec(Box::new(lhs), IncDec::Dec),
-                        Span::new(start, self.end),
-                    );
+                    //lhs = Spanned(
+                    //    Atom::PostIncDec(Box::new(lhs), IncDec::Dec),
+                    //    Span::new(start, self.end),
+                    //);
                     self.next();
                 }
 
                 Some(Token::UnOp(UnOp::Inc)) => {
-                    lhs = Spanned(
-                        Atom::PostIncDec(Box::new(lhs), IncDec::Inc),
-                        Span::new(start, self.end),
-                    );
+                    //lhs = Spanned(
+                    //    Atom::PostIncDec(Box::new(lhs), IncDec::Inc),
+                    //    Span::new(start, self.end),
+                    //);
                     self.next();
                 }
 
                 Some(Token::Period) => {
                     self.next();
-                    lhs = self.take(|this, t| match t {
+                    /*lhs = self.take(|this, t| match t {
                         Some(Token::Ident(s)) => Next(Some(Spanned(
                             Atom::Access(Box::new(lhs), Spanned(s, this.span())),
                             Span::new(start, this.end),
@@ -155,13 +155,13 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                             this.error(Message::MissingIdentifier, this.span());
                             Fill(None, tk)
                         }
-                    })?;
+                    })?;*/
                 }
 
                 // TODO: figure out syntax
                 Some(Token::Arrow) => {
                     self.next();
-                    lhs = self.take(|this, t| match t {
+                    /*lhs = self.take(|this, t| match t {
                         Some(Token::Ident(s)) => Next(Some(Spanned(
                             Atom::Offsetof(Box::new(lhs), Spanned(s, this.span())),
                             Span::new(start, this.end),
@@ -171,7 +171,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                             this.error(Message::MissingIdentifier, this.span());
                             Fill(None, tk)
                         }
-                    })?;
+                    })?;*/
                 }
 
                 Some(Token::LeftSqBracket) => {
@@ -180,16 +180,16 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
                     match self.tk {
                         Some(Token::RightSqBracket) => {
-                            lhs = Spanned(
+                            /*lhs = Spanned(
                                 Atom::Index(Box::new(lhs), Box::new(atom)),
                                 Span::new(start, self.end),
-                            );
+                            );*/
                             self.next();
                         }
                         _ => {
                             // TODO: review
                             self.error(Message::MissingClosingSqBracket, self.span());
-                            return None;
+                            return (self.module.unreachable(), TypeVariant::Unreachable.into());
                         }
                     }
                 }
@@ -214,7 +214,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         },
                     };
 
-                    lhs = Spanned(Atom::Call(Box::new(lhs), args), Span::new(start, self.end));
+                    //lhs = Spanned(Atom::Call(Box::new(lhs), args), Span::new(start, self.end));
                     self.next(); // skip paren
                 }
 
@@ -222,7 +222,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             }
         }
 
-        Some(lhs)
+        lhs
     }
 
     fn parse_if(&mut self) -> (S::ExpressionRef, Type) {

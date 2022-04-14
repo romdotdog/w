@@ -2,7 +2,7 @@ use w_codegen::Serializer;
 use w_errors::Message;
 use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token};
 use w_lexer::Lexer;
-use types::{IdentPair, ReferenceKind, Type};
+use types::{IdentPair, ReferenceKind, Indir, Type};
 
 pub mod handler;
 mod primaryatom;

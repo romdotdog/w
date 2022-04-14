@@ -312,9 +312,15 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             _ => None,
         };
 
-        let atom = self.atom()?;
+        let atom = self.atom();
         let end = atom.1.end;
-		
+
+		// TODO: exports, mangling
+		self.add_function(
+			name,
+			params.iter().map(|p| )
+		)
+				
         Some(Spanned(
             TopLevel::Fn {
                 name,

@@ -14,22 +14,20 @@ impl<'ast> SymbolStack<'ast> {
 
 	pub fn free_frame(&mut self, top: usize) {
 		for var in self.stack.drain(top..) {
-			self.free_var();
+			self.free_var(var);
 		}
 	}
 
 	pub fn find(&mut self, name: &'ast str) -> Option<Type> {
-		self.table.get(name).map(|s| s.last())
+		self.table.get(name).and_then(|s| s.last()).copied()
 	}
 
 	fn free_var(&mut self, name: &'ast str) {
-		match &self.table.get(name).unwrap() { // invariant
-			[_] => {
-				self.table.remove(name);	
-			}
-			e => {
-				e.pop();
-			}
+		let v = self.table.get(name).unwrap();
+		if v.len() == 1 {
+			self.table.remove(name);
+		} else {
+			v.pop();
 		}
 	}
 }
