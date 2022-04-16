@@ -33,6 +33,7 @@ errors!(
     LabelIsNotIdentifier => "labels cannot be used as identifiers",
     IdentifierIsNotLabel => "identifiers cannot be used as labels",
     IntegerNoFit => "literal does not fit inside an `i64`",
+    LiteralTooLarge => "numeric literal too large",
     MissingInteger => "integer expected here",
     MissingLabel => "missing label here",
     CannotFollowLabel => "only a loop or block can follow a label",
@@ -47,10 +48,11 @@ errors!(
     TooMuchIndirection => "at most only 5 levels of indirection are allowed",
     LoopBodyBlock => "loop body may only be a block",
     InvalidCoercion => "invalid coercion",
+    InvalidOperation => "invalid operation",
     ReferenceCoercion => "cannot coerce to reference",
-    UncoercedFxx => "literal is of type fxx, must cast to either f32 or f64",
-    UncoercedU31 => "literal is of type u31, must cast to either i32, i64, u32, u64 or f64",
-    UncoercedU63 => "literal is of type u63, must cast to either i64 or u64",
+    UncoercedFxx => "literal is of type fxx, must coerce to either f32 or f64",
+    UncoercedU31 => "literal is of type u31, must coerce to either i32, i64, u32, u64 or f64",
+    UncoercedU63 => "literal is of type u63, must coerce to either i64 or u64",
     BranchesSameTypes => "branches must return the same types",
     IfCannotReturn => "if statement cannot have a result"
 );

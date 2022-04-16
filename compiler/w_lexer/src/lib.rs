@@ -87,30 +87,13 @@ impl<'ast> Lexer<'ast> {
         let (o, len) = n;
         self.pos += len;
         unsafe { self.step_by(len) };
-        if let Some(num) = o {
+        o.map(|num| {
             if num.exponent == 0 {
-                match convert_sign_and_mantissa(num.negative, num.mantissa) {
-                    Token::Overflown => {}
-                    t => return Some(t),
-                }
+                convert_sign_and_mantissa(num.negative, num.mantissa)
+            } else {
+                Token::Float(load_number(num, self.buffer))
             }
-
-            let r64 = load_number(num, self.buffer);
-
-            #[allow(clippy::cast_possible_truncation)]
-            let r32 = r64 as f32;
-
-            // TODO: audit
-            if (f64::from(r32) - r64).abs() < f64::EPSILON { // check that r64 can be represented in 32 bits
-                let r32a = r32.abs();
-                if f64::from(r32a + 1.0 - r32a) > 1.0 - f64::EPSILON { // check that 1 + res is "correct"
-                    return Some(Token::Fxx(r32))
-                }
-            }
-
-            return Some(Token::F64(r64));
-        }
-        None
+        })
     }
 
     fn try_bip(&mut self, b: u8) -> Option<Token<'ast>> {
@@ -262,11 +245,11 @@ impl<'ast> Lexer<'ast> {
             };
 
             (@compound $t: ident, $n: expr) => {
-                token!(Token::BinOp(BinOp::Compound(BinOpVariant::$t)), $n)
+                token!(Token::BinOp(BinOp(true, BinOpVariant::$t)), $n)
             };
 
             (@simple $t: ident, $n: expr) => {
-                token!(Token::BinOp(BinOp::Regular(BinOpVariant::$t)), $n)
+                token!(Token::BinOp(BinOp(false, BinOpVariant::$t)), $n)
             };
 
             (@unop $t: ident, $n: expr) => {
@@ -326,14 +309,14 @@ impl<'ast> Lexer<'ast> {
                 (b'|', _) => token!(@simple Or, 1),
 
                 (_, c) => match (b, c, self.buffer.get(2)) {
-                    (b'>', Some(b'>'), Some(b'=')) => token!(@compound Rsh, 3),
-                    (b'>', Some(b'>'), _) => token!(@simple Rsh, 2),
+                    (b'>', Some(b'>'), Some(b'=')) => token!(@compound Shr, 3),
+                    (b'>', Some(b'>'), _) => token!(@simple Shr, 2),
                     (b'>', Some(b'='), Some(b'=')) => token!(@compound Ge, 3),
                     (b'>', Some(b'='), _) => token!(@simple Ge, 2),
                     (b'>', _, _) => token!(@simple Gt, 1),
 
-                    (b'<', Some(b'<'), Some(b'=')) => token!(@compound Lsh, 3),
-                    (b'<', Some(b'<'), _) => token!(@simple Lsh, 2),
+                    (b'<', Some(b'<'), Some(b'=')) => token!(@compound Shl, 3),
+                    (b'<', Some(b'<'), _) => token!(@simple Shl, 2),
                     (b'<', Some(b'='), Some(b'=')) => token!(@compound Le, 3),
                     (b'<', Some(b'='), _) => token!(@simple Le, 2),
                     (b'<', _, _) => token!(@simple Lt, 1),
@@ -454,7 +437,7 @@ impl<'ast> Lexer<'ast> {
             if let Some(b"#include") = self.buffer.get(0..8) {
                 let save = self.buffer;
                 let savepos = self.pos;
-    
+
                 self.pos += 8;
                 unsafe { self.step_by(8) };
                 if !self.skip_comments_and_whitespace() {
@@ -471,7 +454,11 @@ impl<'ast> Lexer<'ast> {
                         match self.buffer.first() {
                             Some(b'>') => {
                                 self.pos += 1;
-                                imports.push((debug_check_utf8(&start[0..start.len() - self.buffer.len()]), startpos, self.pos));
+                                imports.push((
+                                    debug_check_utf8(&start[0..start.len() - self.buffer.len()]),
+                                    startpos,
+                                    self.pos,
+                                ));
                                 unsafe { self.step_by(1) };
                                 continue 'm;
                             }
@@ -566,38 +553,17 @@ impl<'ast> Iterator for Lexer<'ast> {
     }
 }
 
-
-// TODO: test, maybe optimize?
 fn convert_sign_and_mantissa<'ast>(negative: bool, mantissa: u64) -> Token<'ast> {
-    if mantissa == 0 {
-        return Token::I32(0);
-    }
-
-    #[allow(clippy::collapsible_else_if, clippy::cast_possible_truncation, clippy::cast_possible_wrap, clippy::cast_lossless)]
     if negative {
-        if mantissa < i32::MAX as u64 {
-            Token::I32(-(mantissa as i32))
-        } else if mantissa == 2_u64.pow(32) {
-            Token::I32(i32::MIN)
-        } else if mantissa < i64::MAX as u64 {
-            Token::I64(-(mantissa as i64))
+        if mantissa <= i64::MAX as u64 {
+            Token::Integer(-(mantissa as i64))
         } else if mantissa == 2_u64.pow(64) {
-            Token::I64(i64::MIN)
+            Token::Integer(i64::MIN)
         } else {
             Token::Overflown
         }
     } else {
-        if mantissa < i32::MAX as u64 {
-            Token::U31(mantissa as u32)
-        } else if mantissa < u32::MAX as u64 {
-            Token::U32(mantissa as u32)
-        } else if mantissa < i64::MAX as u64 {
-            Token::U63(mantissa as u64)
-        } else if mantissa < u64::MAX {
-            Token::U64(mantissa as u64)
-        } else {
-            Token::Overflown
-        }
+        Token::Uinteger(mantissa)
     }
 }
 
@@ -616,7 +582,7 @@ fn keyword(s: &[u8]) -> Token {
         b"union" => Token::Union,
         b"enum" => Token::Enum,
         b"export" => Token::Export,
-		b"sizeof" => Token::Sizeof,
+        b"sizeof" => Token::Sizeof,
         _ => Token::Ident(debug_check_utf8(s)),
     }
 }

@@ -1,9 +1,11 @@
+use crate::types::{Type, TypeVariant};
+
 use super::{Compiler, Fill, Handler, Next};
 use std::collections::{hash_map::Entry, HashMap};
 use w_codegen::Serializer;
 use w_errors::Message;
-use w_utils::span::Span;
 use w_lexer::token::{BinOp, BinOpVariant, Token};
+use w_utils::span::Span;
 
 impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     pub fn can_begin_toplevel(&self) -> bool {
@@ -41,7 +43,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         }
 
         // Some(Spanned(TopLevel::Static(decl.0), Span::new(start, end)))
-		todo!()
+        todo!()
     }
 
     // enums
@@ -312,26 +314,21 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             _ => None,
         };
 
-        let atom = self.atom();
-        let end = atom.1.end;
+        let atom = self.atom(t);
 
-		// TODO: exports, mangling
-		self.add_function(
-			name,
-			params.iter().map(|p| )
-		)
-				
-        Some(Spanned(
-            TopLevel::Fn {
-                name,
-                params,
-                atom,
-                t,
-                exported,
-                static_,
+        // TODO: exports, mangling
+        self.module.add_function(
+            name,
+            params
+                .iter()
+                .map(|p| (p.ident, p.t.unwrap().resolve()))
+                .collect(),
+            match t {
+                Some(t) if t.v != TypeVariant::Void => vec![t],
+                _ => Vec::new(),
             },
-            Span::new(start, end),
-        ))
+            Vec::new(),
+        );
     }
 
     // panicking behavior
@@ -390,9 +387,9 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 break;
             }
 
-			if !self.parse_toplevel() {
-				self.panic_top_level();
-			}
+            if !self.parse_toplevel() {
+                self.panic_top_level();
+            }
         }
     }
 }

@@ -1,3 +1,5 @@
+use crate::Value;
+
 use super::{Compiler, Fill, Handler, Next};
 use w_codegen::Serializer;
 use w_errors::Message;
@@ -12,27 +14,24 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         let decl = self.parse_decl()?;
         let end = decl.1.end;
         //Some(Spanned(Atom::Let(decl.0), Span::new(start, end)))
-		todo!()
+        todo!()
     }
 
-    fn parse_cast(&mut self) -> (S::ExpressionRef, Type) {
+    fn parse_cast(&mut self) -> Value<S> {
         let start = self.start;
-        assert_eq!(
-            self.tk,
-            Some(Token::BinOp(BinOp::Regular(BinOpVariant::Lt)))
-        );
+        assert_eq!(self.tk, Some(Token::BinOp(BinOp(false, BinOpVariant::Lt))));
         self.next();
 
         let t = self.parse_type()?;
         let is_reinterpret = match self.tk {
-            Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => {
+            Some(Token::BinOp(BinOp(false, BinOpVariant::Gt))) => {
                 self.next();
                 false
             }
             Some(Token::UnOp(UnOp::LNot)) => {
                 self.next();
                 match self.tk {
-                    Some(Token::BinOp(BinOp::Regular(BinOpVariant::Gt))) => self.next(),
+                    Some(Token::BinOp(BinOp(false, BinOpVariant::Gt))) => self.next(),
                     _ => self.error(Message::MissingClosingAngleBracket, self.span()),
                 }
 
@@ -54,10 +53,10 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             },
             Span::new(start, end),
         ))*/
-		todo!()
+        todo!()
     }
 
-    fn parse_br(&mut self) -> (S::ExpressionRef, Type) {
+    fn parse_br(&mut self) -> Value<S> {
         let start = self.start;
         assert_eq!(self.tk, Some(Token::Br));
         let mut end = self.end;
@@ -115,10 +114,10 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         //    Span::new(start, end),
         //))
 
-		todo!()
+        todo!()
     }
 
-    fn parse_ret(&mut self) -> (S::ExpressionRef, Type) {
+    fn parse_ret(&mut self) -> Value<S> {
         let start = self.start;
         let mut end = self.end;
         debug_assert_eq!(self.tk, Some(Token::Return));
@@ -133,20 +132,20 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         };
 
         //Some(Spanned(Atom::Return(a), Span::new(start, end)))
-		todo!()
+        todo!()
     }
 
-    fn unop(&mut self, u: UnOp) -> (S::ExpressionRef, Type) {
+    fn unop(&mut self, u: UnOp) -> Value<S> {
         let start = self.start;
         self.next();
 
-        let a = self.primaryatom()?;
+        let a = self.primaryatom();
         let end = a.1.end;
         //Some(Spanned(Atom::UnOp(u, Box::new(a)), Span::new(start, end)))
-		todo!()
+        todo!()
     }
 
-    pub(crate) fn primaryatom(&mut self) -> (S::ExpressionRef, Type) {
+    pub(crate) fn primaryatom(&mut self) -> Value<S> {
         match self.tk {
             Some(Token::Let) => self.parse_let(),
             Some(Token::BinOp(BinOp::Regular(BinOpVariant::Lt))) => self.parse_cast(),
