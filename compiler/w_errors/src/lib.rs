@@ -50,9 +50,7 @@ errors!(
     InvalidCoercion => "invalid coercion",
     InvalidOperation => "invalid operation",
     ReferenceCoercion => "cannot coerce to reference",
-    UncoercedFxx => "literal is of type fxx, must coerce to either f32 or f64",
-    UncoercedU31 => "literal is of type u31, must coerce to either i32, i64, u32, u64 or f64",
-    UncoercedU63 => "literal is of type u63, must coerce to either i64 or u64",
+    NeedType => "need type here",
     BranchesSameTypes => "branches must return the same types",
     IfCannotReturn => "if statement cannot have a result"
 );

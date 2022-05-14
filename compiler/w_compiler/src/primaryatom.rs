@@ -148,7 +148,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     pub(crate) fn primaryatom(&mut self) -> Value<S> {
         match self.tk {
             Some(Token::Let) => self.parse_let(),
-            Some(Token::BinOp(BinOp::Regular(BinOpVariant::Lt))) => self.parse_cast(),
+            Some(Token::BinOp(BinOp(false, BinOpVariant::Lt))) => self.parse_cast(),
 
             Some(Token::Br) => self.parse_br(),
             Some(Token::Return) => self.parse_ret(),
