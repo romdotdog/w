@@ -1,4 +1,10 @@
-use crate::types::{Type, TypeVariant};
+use crate::{
+    registry::Item,
+    types::{
+        typ::{Type, VOID},
+        IdentPair,
+    },
+};
 
 use super::{Compiler, Fill, Handler, Next};
 use std::collections::{hash_map::Entry, HashMap};
@@ -48,7 +54,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
     // enums
 
-    fn enum_body(&mut self) -> bool {
+    fn enum_body(&mut self) -> Option<HashMap<&'ast str, i64>> {
         let mut discriminant = 0;
         let start = self.start;
         let mut h = HashMap::new();
@@ -163,10 +169,10 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             return None;
         };
 
-        Some(Spanned(h, Span::new(start, end)))
+        Some(h)
     }
 
-    pub fn parse_enum(&mut self) -> Option<Spanned<TopLevel<'ast>>> {
+    pub fn parse_enum(&mut self) -> Item<'ast> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::Enum));
         self.next();
@@ -175,10 +181,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         if let Some(Token::LeftBracket) = self.tk {
             let fields = self.enum_body()?;
             let end = fields.1.end;
-            Some(Spanned(
-                TopLevel::Enum { name, fields },
-                Span::new(start, end),
-            ))
+            self.registry.push(name, fields)
         } else {
             self.error(Message::MissingOpeningBracket, self.span());
             None
@@ -187,10 +190,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
     // structs
 
-    pub(crate) fn type_body(
-        &mut self,
-        allow_no_trailing_semi: bool,
-    ) -> Option<Spanned<TypeBody<'ast>>> {
+    pub(crate) fn type_body(&mut self, allow_no_trailing_semi: bool) -> Vec<IdentPair> {
         let start = self.start;
         if let Some(Token::LeftBracket) = self.tk {
             let mut v = Vec::new();
@@ -229,7 +229,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 }
             };
 
-            Some(Spanned(TypeBody(v), Span::new(start, end)))
+            Some(v)
         } else {
             self.error(Message::MissingOpeningBracket, self.span());
             None
@@ -324,7 +324,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 .map(|p| (p.ident, p.typ.unwrap().resolve()))
                 .collect(),
             match t {
-                Some(t) if t.v != TypeVariant::Void => vec![t],
+                Some(t) if t != VOID => vec![t],
                 _ => Vec::new(),
             },
             Vec::new(),
@@ -381,7 +381,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
     // main
 
-    pub fn parse(mut self) -> AST<'ast> {
+    pub fn parse(mut self) -> S {
         loop {
             if self.tk.is_none() {
                 break;
@@ -391,5 +391,6 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 self.panic_top_level();
             }
         }
+        self.module
     }
 }

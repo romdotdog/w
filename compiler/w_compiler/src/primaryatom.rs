@@ -1,4 +1,4 @@
-use crate::Value;
+use crate::{types::typ::Type, Value};
 
 use super::{Compiler, Fill, Handler, Next};
 use w_codegen::Serializer;
@@ -6,7 +6,7 @@ use w_errors::Message;
 use w_lexer::token::{BinOp, BinOpVariant, Token, UnOp};
 
 impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
-    pub(crate) fn parse_let(&mut self) -> (S::ExpressionRef, Type) {
+    pub(crate) fn parse_let(&mut self) -> Value<S> {
         let start = self.start;
         matches!(self.tk, Some(Token::Let));
         self.next();

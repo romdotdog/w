@@ -265,7 +265,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         _ => {
                             // TODO: review
                             self.error(Message::MissingClosingSqBracket, self.span());
-                            return (self.module.unreachable(), TypeVariant::Unreachable.into());
+                            return self.unreachable();
                         }
                     }
                 }

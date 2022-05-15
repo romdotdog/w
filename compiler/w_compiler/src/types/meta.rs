@@ -1,7 +1,7 @@
 const IS_MUTABLE: u32 = 1 << 30;
 const IS_REFERENCE: u32 = 1 << 31;
 
-const VALUE: Meta = Meta(0);
+pub const VALUE: Meta = Meta(0);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Meta(u32);

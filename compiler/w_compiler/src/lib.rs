@@ -4,7 +4,7 @@ use registry::Registry;
 use types::{IdentPair, Value};
 use types::expression::Expression;
 use types::typ::{VOID, Type, UNREACHABLE, I32, U32, I8, U8, U16, I16, U64, I64};
-use w_codegen::{Serializer, WASMType};
+use w_codegen::{Serializer};
 use w_errors::Message;
 use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token};
 use w_lexer::Lexer;
@@ -431,7 +431,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             _ => None,
         };
 
-        Some((pair, rhs))
+        Some((rhs, rhs))
     }
 
     fn ident_type_pair(&mut self) -> Option<IdentPair<'ast>> {

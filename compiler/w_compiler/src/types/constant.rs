@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use w_codegen::Serializer;
 use w_lexer::token::{BinOp, BinOpVariant};
 
-use super::{expression::Expression, meta::Meta, typ::Type};
+use super::{expression::Expression, meta::Meta, typ::*};
 
 // arbitrary bounds
 const MIN_FLOAT: i64 = -(2i64.pow(53));
@@ -17,6 +17,7 @@ enum UntypedConstant {
     Float(f64),
 }
 
+#[derive(Clone, Copy)]
 pub struct Constant(Meta, UntypedConstant);
 
 impl Constant {
