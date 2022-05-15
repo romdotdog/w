@@ -18,7 +18,7 @@ impl Flow {
     pub fn get_temp_local(&mut self, t: Type) -> (String, usize) {
         let r = t.resolve();
         match self.1.entry(r) {
-            Entry::Occupied(x) => {
+            Entry::Occupied(mut x) => {
                 let x = x.get_mut();
                 if let Some(l) = x.iter().position(|&x| x) {
                     (format!("~{}{}", r, l), l)
@@ -35,13 +35,13 @@ impl Flow {
         }
     }
 
-    pub fn free_temp_local<S: Serializer>(&mut self, module: &mut S, t: Type, index: usize) {
+    pub fn free_temp_local<S: Serializer>(&mut self, t: Type, index: usize) {
         self.1.get_mut(&t.resolve()).unwrap()[index] = true;
     }
 
     // clears the struct
     pub fn vars(&mut self) -> Vec<(String, WASMType)> {
-        let res = mem::take(&mut self.0);
+        let mut res = mem::take(&mut self.0);
         for (t, v) in self.1.drain() {
             for n in 0..v.len() {
                 res.push((format!("~{}{}", t, n), t))

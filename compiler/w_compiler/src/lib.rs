@@ -34,7 +34,7 @@ pub struct Compiler<'ast, H: Handler<'ast>, S: Serializer> {
 
 	//
 
-	module: &'ast mut S,
+	module: S,
 	symbols: SymbolStack<'ast>,
     flow: Flow,
     registry: Registry<'ast>
@@ -52,7 +52,7 @@ use Take::{Fill, Next, NoFill};
 use w_utils::span::Span;
 
 impl<'ast, H: ImportlessHandler<'ast>, S: Serializer> Compiler<'ast, ImportlessHandlerHandler<'ast, H>, S> {
-    pub fn compile_string(session: &'ast ImportlessHandlerHandler<'ast, H>, module: &'ast mut S, src: &'ast str) -> Self {
+    pub fn compile_string(session: &'ast ImportlessHandlerHandler<'ast, H>, module: S, src: &'ast str) -> Self {
         let lex = Lexer::from_str(src);
 
         let mut compiler = Compiler {
@@ -76,7 +76,7 @@ impl<'ast, H: ImportlessHandler<'ast>, S: Serializer> Compiler<'ast, ImportlessH
 }
 
 impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
-    pub fn compile(session: &'ast H, module: &'ast mut S, src_ref: &'ast H::SourceRef) {
+    pub fn compile(session: &'ast H, mut module: S, src_ref: &'ast H::SourceRef) -> S {
         let src = session.get_source(src_ref);
         let mut lex = Lexer::from_str(src);
 
@@ -85,7 +85,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             if let Some((new_src_ref, status)) = session.load_source(src_ref, path) {
                 match status {
                     Status::NotParsing => {
-                        Compiler::compile(session, module, new_src_ref);
+                        module = Compiler::compile(session, module, new_src_ref);
                     }
                     Status::CurrentlyParsing => {
                         session.error(
@@ -121,6 +121,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         };
 
         compiler.next();
+        compiler.parse()
     }
 
     fn next(&mut self) {
@@ -234,11 +235,11 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
     pub fn operate_values(&mut self, lhs: Value<S>, rhs: Value<S>, op: BinOp) -> Value<S> {
         match (lhs, rhs) {
-            (Value::Constant(l), Value::Expression(Expression(_, t))) => {
-                if let Some(x) = l.compile(self.module, t) {
+            (Value::Constant(l), Value::Expression(r @ Expression(_, t))) => {
+                if let Some(l) = l.compile(&mut self.module, t) {
                     self.operate_values(
-                        Value::Expression(x), 
-                        rhs,
+                        Value::Expression(l), 
+                        Value::Expression(r),
                         op
                     )
                 } else {
@@ -246,11 +247,11 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     self.unreachable()
                 }
             },
-            (Value::Expression(Expression(_, t)), Value::Constant(r)) => {
-                if let Some(x) = r.compile(self.module, t) {
+            (Value::Expression(l @ Expression(_, t)), Value::Constant(r)) => {
+                if let Some(r) = r.compile(&mut self.module, t) {
                     self.operate_values(
-                        lhs, 
-                        Value::Expression(x),
+                        Value::Expression(l), 
+                        Value::Expression(r),
                         op
                     )
                 } else {
@@ -262,7 +263,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 if l.1 == UNREACHABLE || r.1 == UNREACHABLE {
                     return self.unreachable();
                 }
-                match l.operate(self.module, r, op) {
+                match l.operate(&mut self.module, r, op) {
                     Some(x) => Value::Expression(x),
                     None => {
                         self.error(Message::InvalidOperation, self.span());
@@ -317,8 +318,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     }
 
     fn parse_type(&mut self) -> Option<Type> {
-        let start = self.start;
-        let typ = VOID;
+        let mut typ = VOID;
 
         if let Some(Token::AmbiguousOp(AmbiguousOp::Ampersand)) = self.tk {
             self.next();
@@ -385,10 +385,9 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 _ => {
                     return self.take(|this, t| match t {
                         Some(Token::Ident(s)) => {
-                            let end = this.end;
                             let item_ref = if let Some(t) = ItemRef::from_str(s) {
                                 t
-                            } else if let Some(index) = self.registry.resolve(s) {
+                            } else if let Some(index) = this.registry.resolve(s) {
                                 ItemRef::ItemRef(index)
                             } else {
                                 this.error(Message::UnresolvedType, this.span());
@@ -431,7 +430,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         match self.tk {
             Some(Token::BinOp(BinOp(true, BinOpVariant::Id))) => {
                 self.next();
-                let v = self.atom();
+                let mut v = self.atom();
                 if let Some(typ) = typ {
                     match v {
                         Value::Expression(Expression(_, ref mut xt)) => {
@@ -458,7 +457,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     fn ident_type_pair(&mut self) -> Option<IdentPair<'ast>> {
         let mutable = self.mutable();
         let ident = self.expect_ident(&Some(Token::Colon))?;
-        let t = match self.tk {
+        let mut t = match self.tk {
             Some(Token::Colon) => {
                 self.next();
                 self.parse_type()?

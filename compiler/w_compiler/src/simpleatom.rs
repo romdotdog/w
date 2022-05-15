@@ -21,7 +21,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         self.next();
 
         let mut contents = Vec::new();
-        let typ = None;
+        let mut typ = None;
 
         let end = 'm: loop {
             macro_rules! panic_block {
@@ -110,24 +110,20 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         self.next();
 
         let binding = match self.tk {
-            Some(Token::Let) => Some(Box::new(self.parse_let())),
+            Some(Token::Let) => Some(self.parse_let()),
             _ => None,
         };
 
+        let body = match self.atom() {
+            Value::Expression(Expression(x, _)) => x,
+            Value::Constant(_) => {
+                self.error(Message::UselessConstant, self.span());
+                return self.unreachable();
+            }
+        };
+
         // TODO: results
-        Value::Expression(Expression(
-            self.module.loop_(
-                label,
-                match self.atom() {
-                    Value::Expression(Expression(x, _)) => x,
-                    Value::Constant(_) => {
-                        self.error(Message::UselessConstant, self.span());
-                        return self.unreachable();
-                    }
-                },
-            ),
-            VOID,
-        ))
+        Value::Expression(Expression(self.module.loop_(label, body), VOID))
     }
 
     fn parse_if(&mut self) -> Value<S> {
@@ -170,9 +166,10 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         };
 
         if let Some(false_branch) = false_branch {
-            if let Some((true_branch, false_branch)) = true_branch.coerce(self.module, false_branch)
+            if let Some((true_branch, false_branch)) =
+                true_branch.coerce(&mut self.module, false_branch)
             {
-                let true_branch = match true_branch.compile(self.module, None) {
+                let true_branch = match true_branch.compile(&mut self.module, None) {
                     Some(x) => x,
                     None => {
                         self.error(Message::NeedType, self.span());
@@ -180,7 +177,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     }
                 };
 
-                let false_branch = match false_branch.compile(self.module, None) {
+                let false_branch = match false_branch.compile(&mut self.module, None) {
                     Some(x) => x,
                     None => {
                         self.error(Message::NeedType, self.span());
@@ -274,7 +271,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         _ => {
                             // TODO: review
                             self.error(Message::MissingClosingSqBracket, self.span());
-                            return self.unreachable();
+                            todo!()
                         }
                     }
                 }
@@ -283,7 +280,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     self.next();
                     // typecheck lhs
                     let item = match lhs {
-                        Value::Expression(Expression(x, xt)) => {
+                        Value::Expression(Expression(_, xt)) => {
                             if let ItemRef::ItemRef(itemref) = xt.item {
                                 if let Some(item) = self.registry.get(itemref) {
                                     item
@@ -295,33 +292,33 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                                 todo!();
                             }
                         }
-                        Value::Constant(x) => {
+                        Value::Constant(_) => {
                             self.error(Message::TypeMismatch, self.span());
                             todo!();
                         }
                     };
 
                     if let Item::Fn(name, params, ret) = item {
+                        let param_types: Vec<Type> = params.iter().map(|p| p.typ).collect();
                         let mut args = Vec::new();
 
                         let mut i = 0;
                         match self.tk {
                             Some(Token::RightParen) => break,
                             _ => loop {
-                                let t = if let Some(p) = params.get(i) {
-                                    p.typ
-                                } else {
+                                let &t = param_types.get(i).unwrap_or_else(|| {
                                     self.error(Message::TooManyArgs, self.span());
-                                    return self.unreachable();
-                                };
+                                    todo!()
+                                });
 
-                                if let Some(Expression(x, xt)) =
-                                    self.atom().compile(self.module, Some(t))
+                                let atom = self.atom();
+                                if let Some(Expression(x, _)) =
+                                    atom.compile(&mut self.module, Some(t))
                                 {
                                     args.push(x);
                                 } else {
                                     self.error(Message::NeedType, self.span());
-                                    return self.unreachable();
+                                    todo!()
                                 }
 
                                 match self.tk {
@@ -329,7 +326,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                                     Some(Token::RightParen) => break,
                                     _ => {
                                         self.error(Message::MissingClosingParen, self.span());
-                                        return self.unreachable();
+                                        todo!()
                                     }
                                 }
 
@@ -341,7 +338,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         self.next(); // skip paren
                     } else {
                         self.error(Message::TypeMismatch, self.span());
-                        return self.unreachable();
+                        todo!()
                     }
                 }
 
@@ -419,13 +416,13 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                             _ => {
                                 // TODO: parse atom?
                                 this.error(Message::CannotFollowLabel, this.span());
-                                self.unreachable()
+                                this.unreachable()
                             }
                         })
                     }
                     tk => {
                         this.error(Message::UnexpectedToken, this.span());
-                        Fill(self.unreachable(), tk)
+                        Fill(this.unreachable(), tk)
                     }
                 })
             }

@@ -13,28 +13,29 @@ impl Meta {
             return None;
         }
 
-        self.0 += 1;
-        self.0 |= u32::from(mutable) << 5 << self.len();
+        let mut meta = self.0;
+        meta += 1;
+        meta |= u32::from(mutable) << 5 << self.len();
 
-        return Some(self);
+        return Some(Meta(meta));
     }
 
     #[must_use]
     pub fn deref(self) -> Option<Meta> {
-        if self.len() <= 0 {
+        if self.len() == 0 {
             return None;
         }
 
         let a = 0b1000_0000 << self.len();
-        self = if self.0 & a != 0 {
-            self.set_mutable()
-        } else {
+        let mut meta = if self.0 & a == 0 {
             self.unset_mutable()
+        } else {
+            self.set_mutable()
         };
 
-        self.0 -= 1;
-        self.0 &= (a - 1) | IS_MUTABLE | IS_REFERENCE; // TODO: audit
-        return Some(self);
+        meta.0 -= 1;
+        meta.0 &= (a - 1) | IS_MUTABLE | IS_REFERENCE; // TODO: audit
+        return Some(meta);
     }
 
     #[must_use]

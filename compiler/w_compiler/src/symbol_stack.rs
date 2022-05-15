@@ -20,7 +20,13 @@ impl<'ast> SymbolStack<'ast> {
 
     pub fn free_frame(&mut self, top: usize) {
         for var in self.stack.drain(top..) {
-            self.free_var(var);
+            // free var
+            let v = self.table.get_mut(var).unwrap();
+            if v.len() == 1 {
+                self.table.remove(var);
+            } else {
+                v.pop();
+            }
         }
     }
 
@@ -28,22 +34,13 @@ impl<'ast> SymbolStack<'ast> {
         self.table.get(name).and_then(|s| s.last()).copied()
     }
 
-    fn free_var(&mut self, name: &'ast str) {
-        let v = self.table.get(name).unwrap();
-        if v.len() == 1 {
-            self.table.remove(name);
-        } else {
-            v.pop();
-        }
-    }
-
     pub fn push(&mut self, name: &'ast str, binding: Binding) {
         self.stack.push(name);
         match self.table.entry(name) {
-            Entry::Occupied(x) => x.get_mut().push(binding),
+            Entry::Occupied(mut x) => x.get_mut().push(binding),
             Entry::Vacant(x) => {
                 x.insert(vec![binding]);
             }
-        };
+        }
     }
 }

@@ -22,37 +22,41 @@ fn unreachable<S: Serializer>(module: &mut S) -> Value<S> {
 }
 
 impl<S: Serializer> Value<S> {
-    fn coerce_to_expr(self, module: &mut S, typ: Type) -> Option<Value<S>> {
+    // result moves self back
+    fn coerce_to_expr(self, module: &mut S, typ: Type) -> Result<Value<S>, Value<S>> {
         match self {
-            x @ Value::Expression(Expression(_, xt)) if xt == UNREACHABLE || xt == typ => Some(x),
-            Value::Constant(x) => x.compile(module, typ).map(Value::Expression),
-            _ => None,
+            Value::Expression(Expression(_, xt)) if xt == UNREACHABLE || xt == typ => Ok(self),
+            Value::Constant(x) => x.compile(module, typ).map(Value::Expression).ok_or(self),
+            _ => Err(self),
         }
     }
 
-    fn coerce_to_const(self, module: &mut S, y: Constant) -> Option<Value<S>> {
+    // result moves self back
+    fn coerce_to_const(self, module: &mut S, y: Constant) -> Result<Value<S>, Value<S>> {
         match self {
-            Value::Expression(Expression(_, xt)) if xt == UNREACHABLE => Some(unreachable(module)),
-            Value::Expression(x @ Expression(_, xt)) => None,
-            Value::Constant(x) => x.coerce(y).map(Value::Constant),
+            Value::Expression(Expression(_, xt)) if xt == UNREACHABLE => Ok(unreachable(module)),
+            Value::Expression(_) => Err(self),
+            Value::Constant(x) => x.coerce(y).map(Value::Constant).ok_or(self),
         }
     }
 
-    fn coerce_inner(self, module: &mut S, right: Value<S>) -> Option<Value<S>> {
+    // result moves self back
+    fn coerce_inner(self, module: &mut S, right: &Value<S>) -> Result<Value<S>, Value<S>> {
         match right {
-            Value::Expression(Expression(_, typ)) if typ == UNREACHABLE => {
-                Some(unreachable(module))
-            }
-            Value::Expression(Expression(_, typ)) => self.coerce_to_expr(module, typ),
-            Value::Constant(y) => self.coerce_to_const(module, y),
-            _ => None,
+            Value::Expression(Expression(_, typ)) if *typ == UNREACHABLE => Ok(unreachable(module)),
+            Value::Expression(Expression(_, typ)) => self.coerce_to_expr(module, *typ),
+            Value::Constant(y) => self.coerce_to_const(module, *y),
         }
     }
 
     pub fn coerce(self, module: &mut S, right: Value<S>) -> Option<(Value<S>, Value<S>)> {
-        self.coerce_inner(module, right)
-            .map(|x| (x, right))
-            .or_else(|| right.coerce_inner(module, self).map(|x| (self, x)))
+        match self.coerce_inner(module, &right) {
+            Ok(x) => Some((x, right)),
+            Err(another_self) => right
+                .coerce_inner(module, &another_self)
+                .map(|x| (another_self, x))
+                .ok(),
+        }
     }
 
     // TODO: refactor to match Constant::compile?

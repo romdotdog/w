@@ -319,7 +319,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
         let atom = self.atom();
         let ret = atom
-            .compile(self.module, Some(return_type))
+            .compile(&mut self.module, Some(return_type))
             .unwrap_or_else(|| self.unreachable_expr());
 
         let vars = self.flow.vars();
@@ -388,7 +388,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
     // main
 
-    pub fn parse(mut self) {
+    pub fn parse(mut self) -> S {
         loop {
             if self.tk.is_none() {
                 break;
@@ -399,5 +399,6 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             //    self.panic_top_level();
             //}
         }
+        self.module
     }
 }
