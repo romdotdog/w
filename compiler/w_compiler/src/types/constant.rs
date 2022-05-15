@@ -3,7 +3,12 @@ use std::convert::TryInto;
 use w_codegen::Serializer;
 use w_lexer::token::{BinOp, BinOpVariant};
 
-use super::{expression::Expression, meta::Meta, typ::*};
+use super::{
+    expression::Expression,
+    itemref::{ItemRef, StackType},
+    meta::Meta,
+    typ::*,
+};
 
 // arbitrary bounds
 const MIN_FLOAT: i64 = -(2i64.pow(53));
@@ -17,15 +22,13 @@ enum UntypedConstant {
     Float(f64),
 }
 
-#[derive(Clone, Copy)]
-pub struct Constant(Meta, UntypedConstant);
-
-impl Constant {
+use UntypedConstant::*;
+impl UntypedConstant {
     pub fn coerce_to_i64(self) -> Option<i64> {
         match self {
-            Constant::Integer(x) => Some(x),
-            Constant::Uinteger(x) => x.try_into().ok(),
-            Constant::Float(x) => check_f64(x).map(|w| w as i64),
+            Integer(x) => Some(x),
+            Uinteger(x) => x.try_into().ok(),
+            Float(x) => check_f64(x).map(|w| w as i64),
         }
     }
 
@@ -35,9 +38,9 @@ impl Constant {
 
     pub fn coerce_to_u64(self) -> Option<u64> {
         match self {
-            Constant::Integer(x) => x.try_into().ok(),
-            Constant::Uinteger(x) => Some(x),
-            Constant::Float(x) if x >= 0.0 => check_f64(x).map(|w| w as u64),
+            Integer(x) => x.try_into().ok(),
+            Uinteger(x) => Some(x),
+            Float(x) if x >= 0.0 => check_f64(x).map(|w| w as u64),
             _ => None,
         }
     }
@@ -48,9 +51,9 @@ impl Constant {
 
     pub fn coerce_to_f64(self) -> Option<f64> {
         match self {
-            Constant::Integer(x) if x > MIN_FLOAT && x < MAX_FLOAT => Some(x as f64),
-            Constant::Uinteger(x) if x < UMAX_FLOAT => Some(x as f64),
-            Constant::Float(x) => Some(x),
+            Integer(x) if x > MIN_FLOAT && x < MAX_FLOAT => Some(x as f64),
+            Uinteger(x) if x < UMAX_FLOAT => Some(x as f64),
+            Float(x) => Some(x),
             _ => None,
         }
     }
@@ -59,162 +62,154 @@ impl Constant {
         self.coerce_to_f64().and_then(f64_to_f32)
     }
 
-    pub fn coerce(self, right: Constant) -> Option<Constant> {
+    pub fn coerce(self, right: UntypedConstant) -> Option<UntypedConstant> {
         match right {
-            Constant::Integer(_) => self.coerce_to_i64().map(Constant::Integer),
-            Constant::Uinteger(_) => self.coerce_to_u64().map(Constant::Uinteger),
-            Constant::Float(_) => self.coerce_to_f64().map(Constant::Float),
+            Integer(_) => self.coerce_to_i64().map(Integer),
+            Uinteger(_) => self.coerce_to_u64().map(Uinteger),
+            Float(_) => self.coerce_to_f64().map(Float),
         }
     }
 
-    fn const_lt(self, right: Constant) -> Option<Constant> {
-        Some(Constant::Uinteger(u64::from(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => x < y,
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => x < y,
-            (Constant::Float(x), Constant::Float(y)) => x < y,
+    fn const_lt(self, right: UntypedConstant) -> Option<UntypedConstant> {
+        Some(Uinteger(u64::from(match (self, right) {
+            (Integer(x), Integer(y)) => x < y,
+            (Uinteger(x), Uinteger(y)) => x < y,
+            (Float(x), Float(y)) => x < y,
             _ => return None,
         })))
     }
 
-    fn const_le(self, right: Constant) -> Option<Constant> {
-        Some(Constant::Uinteger(u64::from(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => x <= y,
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => x <= y,
-            (Constant::Float(x), Constant::Float(y)) => x <= y,
+    fn const_le(self, right: UntypedConstant) -> Option<UntypedConstant> {
+        Some(Uinteger(u64::from(match (self, right) {
+            (Integer(x), Integer(y)) => x <= y,
+            (Uinteger(x), Uinteger(y)) => x <= y,
+            (Float(x), Float(y)) => x <= y,
             _ => return None,
         })))
     }
 
-    fn const_gt(self, right: Constant) -> Option<Constant> {
-        Some(Constant::Uinteger(u64::from(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => x > y,
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => x > y,
-            (Constant::Float(x), Constant::Float(y)) => x > y,
+    fn const_gt(self, right: UntypedConstant) -> Option<UntypedConstant> {
+        Some(Uinteger(u64::from(match (self, right) {
+            (Integer(x), Integer(y)) => x > y,
+            (Uinteger(x), Uinteger(y)) => x > y,
+            (Float(x), Float(y)) => x > y,
             _ => return None,
         })))
     }
 
-    fn const_ge(self, right: Constant) -> Option<Constant> {
-        Some(Constant::Uinteger(u64::from(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => x >= y,
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => x >= y,
-            (Constant::Float(x), Constant::Float(y)) => x >= y,
+    fn const_ge(self, right: UntypedConstant) -> Option<UntypedConstant> {
+        Some(Uinteger(u64::from(match (self, right) {
+            (Integer(x), Integer(y)) => x >= y,
+            (Uinteger(x), Uinteger(y)) => x >= y,
+            (Float(x), Float(y)) => x >= y,
             _ => return None,
         })))
     }
 
-    fn const_eq(self, right: Constant) -> Option<Constant> {
-        Some(Constant::Uinteger(u64::from(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => x == y,
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => x == y,
-            (Constant::Float(x), Constant::Float(y)) => x == y,
+    fn const_eq(self, right: UntypedConstant) -> Option<UntypedConstant> {
+        Some(Uinteger(u64::from(match (self, right) {
+            (Integer(x), Integer(y)) => x == y,
+            (Uinteger(x), Uinteger(y)) => x == y,
+            (Float(x), Float(y)) => x == y,
             _ => return None,
         })))
     }
 
-    fn const_neq(self, right: Constant) -> Option<Constant> {
-        Some(Constant::Uinteger(u64::from(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => x != y,
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => x != y,
-            (Constant::Float(x), Constant::Float(y)) => x != y,
+    fn const_neq(self, right: UntypedConstant) -> Option<UntypedConstant> {
+        Some(Uinteger(u64::from(match (self, right) {
+            (Integer(x), Integer(y)) => x != y,
+            (Uinteger(x), Uinteger(y)) => x != y,
+            (Float(x), Float(y)) => x != y,
             _ => return None,
         })))
     }
 
-    fn const_add(self, right: Constant) -> Option<Constant> {
+    fn const_add(self, right: UntypedConstant) -> Option<UntypedConstant> {
         Some(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => Constant::Integer(x.wrapping_add(y)),
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => Constant::Uinteger(x.wrapping_add(y)),
-            (Constant::Float(x), Constant::Float(y)) => Constant::Float(x + y),
+            (Integer(x), Integer(y)) => Integer(x.wrapping_add(y)),
+            (Uinteger(x), Uinteger(y)) => Uinteger(x.wrapping_add(y)),
+            (Float(x), Float(y)) => Float(x + y),
             _ => return None,
         })
     }
 
-    fn const_sub(self, right: Constant) -> Option<Constant> {
+    fn const_sub(self, right: UntypedConstant) -> Option<UntypedConstant> {
         Some(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => Constant::Integer(x.wrapping_sub(y)),
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => Constant::Uinteger(x.wrapping_sub(y)),
-            (Constant::Float(x), Constant::Float(y)) => Constant::Float(x - y),
+            (Integer(x), Integer(y)) => Integer(x.wrapping_sub(y)),
+            (Uinteger(x), Uinteger(y)) => Uinteger(x.wrapping_sub(y)),
+            (Float(x), Float(y)) => Float(x - y),
             _ => return None,
         })
     }
 
-    fn const_mul(self, right: Constant) -> Option<Constant> {
+    fn const_mul(self, right: UntypedConstant) -> Option<UntypedConstant> {
         Some(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => Constant::Integer(x.wrapping_mul(y)),
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => Constant::Uinteger(x.wrapping_mul(y)),
-            (Constant::Float(x), Constant::Float(y)) => Constant::Float(x * y),
+            (Integer(x), Integer(y)) => Integer(x.wrapping_mul(y)),
+            (Uinteger(x), Uinteger(y)) => Uinteger(x.wrapping_mul(y)),
+            (Float(x), Float(y)) => Float(x * y),
             _ => return None,
         })
     }
 
-    fn const_div(self, right: Constant) -> Option<Constant> {
+    fn const_div(self, right: UntypedConstant) -> Option<UntypedConstant> {
         match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => x.checked_div(y).map(Constant::Integer),
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => {
-                x.checked_div(y).map(Constant::Uinteger)
-            }
-            (Constant::Float(x), Constant::Float(y)) => Some(Constant::Float(x / y)),
+            (Integer(x), Integer(y)) => x.checked_div(y).map(Integer),
+            (Uinteger(x), Uinteger(y)) => x.checked_div(y).map(Uinteger),
+            (Float(x), Float(y)) => Some(Float(x / y)),
             _ => return None,
         }
     }
 
-    fn const_mod(self, right: Constant) -> Option<Constant> {
+    fn const_mod(self, right: UntypedConstant) -> Option<UntypedConstant> {
         match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => x.checked_rem(y).map(Constant::Integer),
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => {
-                x.checked_rem(y).map(Constant::Uinteger)
-            }
-            (Constant::Float(x), Constant::Float(y)) => Some(Constant::Float(x % y)),
+            (Integer(x), Integer(y)) => x.checked_rem(y).map(Integer),
+            (Uinteger(x), Uinteger(y)) => x.checked_rem(y).map(Uinteger),
+            (Float(x), Float(y)) => Some(Float(x % y)),
             _ => return None,
         }
     }
 
-    fn const_and(self, right: Constant) -> Option<Constant> {
+    fn const_and(self, right: UntypedConstant) -> Option<UntypedConstant> {
         Some(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => Constant::Integer(x & y),
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => Constant::Uinteger(x & y),
+            (Integer(x), Integer(y)) => Integer(x & y),
+            (Uinteger(x), Uinteger(y)) => Uinteger(x & y),
             _ => return None,
         })
     }
 
-    fn const_or(self, right: Constant) -> Option<Constant> {
+    fn const_or(self, right: UntypedConstant) -> Option<UntypedConstant> {
         Some(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => Constant::Integer(x | y),
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => Constant::Uinteger(x | y),
+            (Integer(x), Integer(y)) => Integer(x | y),
+            (Uinteger(x), Uinteger(y)) => Uinteger(x | y),
             _ => return None,
         })
     }
 
-    fn const_xor(self, right: Constant) -> Option<Constant> {
+    fn const_xor(self, right: UntypedConstant) -> Option<UntypedConstant> {
         Some(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) => Constant::Integer(x ^ y),
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => Constant::Uinteger(x ^ y),
+            (Integer(x), Integer(y)) => Integer(x ^ y),
+            (Uinteger(x), Uinteger(y)) => Uinteger(x ^ y),
             _ => return None,
         })
     }
 
-    fn const_shl(self, right: Constant) -> Option<Constant> {
+    fn const_shl(self, right: UntypedConstant) -> Option<UntypedConstant> {
         Some(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) if y > 0 => {
-                Constant::Integer(x << (y as u64))
-            }
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => Constant::Uinteger(x << y),
+            (Integer(x), Integer(y)) if y > 0 => Integer(x << (y as u64)),
+            (Uinteger(x), Uinteger(y)) => Uinteger(x << y),
             _ => return None,
         })
     }
 
-    fn const_shr(self, right: Constant) -> Option<Constant> {
+    fn const_shr(self, right: UntypedConstant) -> Option<UntypedConstant> {
         Some(match (self, right) {
-            (Constant::Integer(x), Constant::Integer(y)) if y > 0 => {
-                Constant::Integer(x >> (y as u64))
-            }
-            (Constant::Uinteger(x), Constant::Uinteger(y)) => Constant::Uinteger(x >> y),
+            (Integer(x), Integer(y)) if y > 0 => Integer(x >> (y as u64)),
+            (Uinteger(x), Uinteger(y)) => Uinteger(x >> y),
             _ => return None,
         })
     }
 
-    pub fn operate(self, right: Constant, op: BinOp) -> Option<Constant> {
+    pub fn operate(self, right: UntypedConstant, op: BinOp) -> Option<UntypedConstant> {
         if op.0 {
             return None;
         }
@@ -243,48 +238,104 @@ impl Constant {
         }
     }
 
+    /// does not typecheck
+    pub fn is_true(self) -> bool {
+        match self {
+            Integer(x) => x != 0,
+            Uinteger(x) => x != 0,
+            Float(x) => x != 0.0,
+        }
+    }
+}
+#[derive(Clone, Copy)]
+pub struct Constant {
+    meta: Meta,
+    constant: UntypedConstant,
+}
+
+impl Constant {
     pub fn compile<S: Serializer>(
         self,
         module: &mut S,
         contextual_type: Type,
     ) -> Option<Expression<S>> {
-        if contextual_type.is_reference() || !contextual_type.is_number() {
+        if self.meta != contextual_type.meta {
             return None;
         }
 
-        if contextual_type.eq_naked(F64) {
-            self.coerce_to_f64()
-                .map(|x| Expression(module.f64_const(x), F64))
-        } else if contextual_type.eq_naked(I64) {
-            self.coerce_to_i64()
-                .map(|x| Expression(module.i64_const(x), I64))
-        } else if contextual_type.eq_naked(U64) {
-            self.coerce_to_u64()
-                .map(|x| Expression(module.i64_const(reinterpret_u64(x)), U64))
-        } else if contextual_type.eq_naked(F32) {
-            self.coerce_to_f64().map(|x| match f64_to_f32(x) {
-                Some(x) => Expression(module.f32_const(x), F32),
-                None => Expression(module.f64_const(x), F64),
-            })
-        } else if contextual_type.eq_naked(I32) {
-            self.coerce_to_i64().map(|x| match x.try_into() {
-                Ok(x) => Expression(module.i32_const(x), I32),
-                _ => Expression(module.i64_const(x), I64),
-            })
+        if self.meta.len() > 0 {
+            // MUST be i32 (when in wasm32)
+            return self
+                .constant
+                .coerce_to_i64()
+                .and_then(|x| x.try_into().ok())
+                .map(|x| Expression(module.i32_const(x), contextual_type));
+        }
+
+        if let ItemRef::StackType(x) = contextual_type.item {
+            match x {
+                StackType::I32 => self
+                    .constant
+                    .coerce_to_i64()
+                    .and_then(|x| x.try_into().ok())
+                    .map(|x| module.i32_const(x)),
+                StackType::U32 => self
+                    .constant
+                    .coerce_to_u64()
+                    .and_then(|x| x.try_into().ok())
+                    .map(|x| module.i32_const(reinterpret_u32(x))),
+                StackType::I64 => self.constant.coerce_to_i64().map(|x| module.i64_const(x)),
+                StackType::U64 => self
+                    .constant
+                    .coerce_to_u64()
+                    .map(|x| module.i64_const(reinterpret_u64(x))),
+                StackType::F32 => self
+                    .constant
+                    .coerce_to_f64()
+                    .and_then(f64_to_f32)
+                    .map(|x| module.f32_const(x)),
+                StackType::F64 => self.constant.coerce_to_f64().map(|x| module.f64_const(x)),
+            }
+            .map(|x| Expression(x, contextual_type))
         } else {
-            self.coerce_to_u64().map(|x| match x.try_into() {
-                Ok(x) => Expression(module.i32_const(reinterpret_u32(x)), U32),
-                _ => Expression(module.i64_const(reinterpret_u64(x)), U64),
-            })
+            None
         }
     }
 
-    /// does not typecheck
-    pub fn is_true(self) -> bool {
-        match self {
-            Constant::Integer(x) => x != 0,
-            Constant::Uinteger(x) => x != 0,
-            Constant::Float(x) => x != 0.0,
+    fn operate_ptr(self, offset: Constant, op: BinOp) -> Option<Constant> {
+        // only pointer addition is allowed on pointers
+        if let BinOp(_, BinOpVariant::Add) = op {
+            self.constant
+                .const_add(offset.constant)
+                .map(|constant| Constant {
+                    meta: self.meta,
+                    constant,
+                })
+        } else {
+            None
+        }
+    }
+
+    pub fn operate(self, right: Constant, op: BinOp) -> Option<Constant> {
+        if op.0 {
+            return None;
+        }
+
+        if self.meta.is_reference() || right.meta.is_reference() {
+            return None;
+        }
+
+        if self.meta.len() > 0 && right.meta.len() == 0 {
+            self.operate_ptr(right, op)
+        } else if self.meta.len() == 0 && right.meta.len() > 0 {
+            right.operate_ptr(self, op)
+        } else {
+            self.constant
+                .operate(right.constant, op)
+                .map(|constant| Constant {
+                    meta: self.meta,
+                    constant,
+                })
         }
     }
 }

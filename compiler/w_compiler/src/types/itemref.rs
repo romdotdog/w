@@ -1,4 +1,4 @@
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum HeapType {
     I8,
     U8,
@@ -6,7 +6,7 @@ pub enum HeapType {
     U16,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum StackType {
     I32,
     U32,
@@ -16,7 +16,7 @@ pub enum StackType {
     F64,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ItemRef {
     Void,
     Unreachable,

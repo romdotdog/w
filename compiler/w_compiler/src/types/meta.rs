@@ -25,7 +25,7 @@ impl Meta {
             return None;
         }
 
-        let a = 0b0010_0000 << self.len();
+        let a = 0b1000_0000 << self.len();
         self = if self.0 & a != 0 {
             self.set_mutable()
         } else {
@@ -33,7 +33,7 @@ impl Meta {
         };
 
         self.0 -= 1;
-        self.0 &= a - 1; // TODO: audit
+        self.0 &= (a - 1) | IS_MUTABLE | IS_REFERENCE; // TODO: audit
         return Some(self);
     }
 
