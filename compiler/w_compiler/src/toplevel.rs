@@ -399,6 +399,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             //    self.panic_top_level();
             //}
         }
+
+        self.session.finish(self.src_ref);
         self.module
     }
 }

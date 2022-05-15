@@ -1,6 +1,6 @@
 use appendlist::AppendList;
-use w_ast::Span;
 use w_errors::Message;
+use w_utils::span::Span;
 
 use crate::source_map::source::Source;
 

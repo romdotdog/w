@@ -1,5 +1,5 @@
 use appendlist::AppendList;
-use w_utils::LineColResult;
+use w_utils::linecol::LineColResult;
 
 use super::Diagnostic;
 

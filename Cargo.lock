@@ -78,6 +78,7 @@ name = "w_session"
 version = "0.0.0"
 dependencies = [
  "appendlist",
+ "w_codegen",
  "w_compiler",
  "w_errors",
  "w_lexer",

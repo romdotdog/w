@@ -110,5 +110,5 @@ fn main() {
         None => todo!(),
     };
 
-    session.parse(src);
+    session.compile(src);
 }

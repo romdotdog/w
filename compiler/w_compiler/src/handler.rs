@@ -19,6 +19,7 @@ pub trait Handler<'ast> {
         path: &'ast str,
     ) -> Option<(&'ast Self::SourceRef, Status)>;
     fn get_source(&self, src_ref: &'ast Self::SourceRef) -> &'ast str;
+    fn finish(&self, src_ref: &'ast Self::SourceRef);
 }
 
 // vv helpers vv
@@ -47,6 +48,10 @@ impl<'ast, I: ImportlessHandler<'ast>> Handler<'ast> for ImportlessHandlerHandle
     }
 
     fn get_source(&self, _src_ref: &'ast Self::SourceRef) -> &'ast str {
+        panic!("inappropriate use of ImportlessHandler");
+    }
+
+    fn finish(&self, src_ref: &'ast Self::SourceRef) {
         panic!("inappropriate use of ImportlessHandler");
     }
 }

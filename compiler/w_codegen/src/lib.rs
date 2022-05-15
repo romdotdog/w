@@ -1,5 +1,7 @@
 use std::fmt::{Display, Formatter};
 
+pub mod nop;
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum WASMType {
     I32,

@@ -1,6 +1,6 @@
 use std::{cell::Cell, hash::Hash, path::PathBuf};
-use w_parser::handler::Status;
-use w_utils::{LineCol, LineColResult};
+use w_compiler::handler::Status;
+use w_utils::linecol::{LineCol, LineColResult};
 
 #[derive(Clone)]
 pub struct Source {

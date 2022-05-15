@@ -9,5 +9,5 @@ fn include_already_parsed() {
         .source_map()
         .load_source(PathBuf::from("tests/main.w"))
         .unwrap();
-    sess.parse(src);
+    sess.compile(src);
 }
