@@ -65,8 +65,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         contents.push(x);
                         typ = Some(xt);
                     }
-                    Value::Constant(x) => {
-                        self.error(Message::UselessConstant, self.span());
+                    Value::Constant(_) => {
+                        self.error(Message::NeedType, self.span());
                     }
                 },
             }

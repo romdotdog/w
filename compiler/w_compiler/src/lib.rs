@@ -52,7 +52,7 @@ use Take::{Fill, Next, NoFill};
 use w_utils::span::Span;
 
 impl<'ast, H: ImportlessHandler<'ast>, S: Serializer> Compiler<'ast, ImportlessHandlerHandler<'ast, H>, S> {
-    pub fn compile_string(session: &'ast ImportlessHandlerHandler<'ast, H>, module: S, src: &'ast str) -> Self {
+    pub fn compile_string(session: &'ast ImportlessHandlerHandler<'ast, H>, module: S, src: &'ast str) -> S {
         let lex = Lexer::from_str(src);
 
         let mut compiler = Compiler {
@@ -71,7 +71,7 @@ impl<'ast, H: ImportlessHandler<'ast>, S: Serializer> Compiler<'ast, ImportlessH
         };
 
         compiler.next();
-        compiler
+        compiler.parse(false)
     }
 }
 
@@ -121,7 +121,9 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         };
 
         compiler.next();
-        compiler.parse()
+        let res = compiler.parse(true);
+        
+        res
     }
 
     fn next(&mut self) {

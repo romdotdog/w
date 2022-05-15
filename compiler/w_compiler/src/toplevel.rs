@@ -388,7 +388,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
     // main
 
-    pub fn parse(mut self) -> S {
+    pub fn parse(mut self, report_finish: bool) -> S {
         loop {
             if self.tk.is_none() {
                 break;
@@ -399,8 +399,9 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             //    self.panic_top_level();
             //}
         }
-
-        self.session.finish(self.src_ref);
+        if report_finish {
+            self.session.finish(self.src_ref);
+        }
         self.module
     }
 }
