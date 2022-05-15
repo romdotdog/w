@@ -1,5 +1,5 @@
 use crate::{types::constant::Constant, Type};
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Clone, Copy)]
 pub enum Binding {
@@ -35,5 +35,15 @@ impl<'ast> SymbolStack<'ast> {
         } else {
             v.pop();
         }
+    }
+
+    pub fn push(&mut self, name: &'ast str, binding: Binding) {
+        self.stack.push(name);
+        match self.table.entry(name) {
+            Entry::Occupied(x) => x.get_mut().push(binding),
+            Entry::Vacant(x) => {
+                x.insert(vec![binding]);
+            }
+        };
     }
 }

@@ -2,7 +2,8 @@ use crate::{
     registry::Item,
     types::{
         constant::Constant,
-        typ::{Type, UNREACHABLE, VOID},
+        itemref::ItemRef,
+        typ::{Type, I32, UNREACHABLE, VOID},
     },
     Expression, Value,
 };
@@ -42,8 +43,12 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 };
             }
 
-            if self.can_begin_toplevel() && !self.parse_toplevel() {
-                panic_block!();
+            //if self.can_begin_toplevel() && !self.parse_toplevel() {
+            //    panic_block!();
+            //}
+
+            if self.can_begin_toplevel() {
+                self.parse_toplevel();
             }
 
             match self.tk {
@@ -142,7 +147,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
         let cond = match cond {
             Value::Expression(x @ Expression(_, xt)) => {
-                if xt.is_number() && !xt.is_high() && !xt.is_float() {
+                if xt == I32 {
                     x
                 } else {
                     self.error(Message::TypeMismatch, self.span());
@@ -150,13 +155,17 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 }
             }
             Value::Constant(x) => {
-                if x.is_true() {
-                    // TODO: fix?
-                    self.error(Message::ConditionTrue, self.span());
-                } else {
+                if let Some(b) = x.is_true() {
+                    if b {
+                        // TODO: fix?
+                        self.error(Message::ConditionTrue, self.span());
+                        return true_branch;
+                    }
                     self.error(Message::ConditionFalse, self.span());
+                    return false_branch.unwrap();
                 }
-                self.unreachable_expr()
+                self.error(Message::TypeMismatch, self.span());
+                todo!()
             }
         };
 
@@ -252,7 +261,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
                 Some(Token::LeftSqBracket) => {
                     self.next();
-                    let atom = self.atom()?;
+                    let atom = self.atom();
 
                     match self.tk {
                         Some(Token::RightSqBracket) => {
@@ -275,15 +284,20 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     // typecheck lhs
                     let item = match lhs {
                         Value::Expression(Expression(x, xt)) => {
-                            if let Some(item) = self.registry.get(xt.ref_index()) {
-                                item
+                            if let ItemRef::ItemRef(itemref) = xt.item {
+                                if let Some(item) = self.registry.get(itemref) {
+                                    item
+                                } else {
+                                    todo!();
+                                }
                             } else {
-                                return self.unreachable();
+                                self.error(Message::TypeMismatch, self.span());
+                                todo!();
                             }
                         }
                         Value::Constant(x) => {
                             self.error(Message::TypeMismatch, self.span());
-                            return self.unreachable();
+                            todo!();
                         }
                     };
 
@@ -360,7 +374,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 }
 
                 self.next();
-                let t = self.parse_type()?;
+                let t = self.parse_type().unwrap(); // TODO
 
                 if self.tk != Some(Token::RightParen) {
                     self.error(Message::MissingClosingParen, self.span());
@@ -378,9 +392,9 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             }
             _ => {
                 self.take(|this, t| match t {
-                    Some(Token::Integer(n)) => Next(Value::Constant(Constant::Integer(n))),
-                    Some(Token::Uinteger(n)) => Next(Value::Constant(Constant::Uinteger(n))),
-                    Some(Token::Float(n)) => Next(Value::Constant(Constant::Float(n))),
+                    Some(Token::Integer(n)) => Next(Value::Constant(Constant::i64(n))),
+                    Some(Token::Uinteger(n)) => Next(Value::Constant(Constant::u64(n))),
+                    Some(Token::Float(n)) => Next(Value::Constant(Constant::f64(n))),
                     Some(Token::String(s)) => todo!(),
                     Some(Token::Char(s)) => todo!(),
                     Some(Token::Ident(s)) => {

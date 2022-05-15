@@ -1,6 +1,7 @@
 
-use locals::Locals;
+use locals::Flow;
 use registry::Registry;
+use types::itemref::{ItemRef, HeapType, StackType};
 use types::{IdentPair, Value};
 use types::expression::Expression;
 use types::typ::{VOID, Type, UNREACHABLE, I32, U32, I8, U8, U16, I16, U64, I64};
@@ -35,7 +36,7 @@ pub struct Compiler<'ast, H: Handler<'ast>, S: Serializer> {
 
 	module: &'ast mut S,
 	symbols: SymbolStack<'ast>,
-    locals: Locals,
+    flow: Flow,
     registry: Registry<'ast>
 }
 
@@ -65,7 +66,7 @@ impl<'ast, H: ImportlessHandler<'ast>, S: Serializer> Compiler<'ast, ImportlessH
 
 			module,
 			symbols: SymbolStack::default(),
-            locals: Locals::default(),
+            flow: Flow::default(),
             registry: Registry::default()
         };
 
@@ -115,7 +116,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
 			module,
 			symbols: SymbolStack::default(),
-            locals: Locals::default(),
+            flow: Flow::default(),
             registry: Registry::default()
         };
 
@@ -208,22 +209,26 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
     pub fn make_load(&mut self, ptr: Expression<S>) -> Value<S> {
         let Expression(ptr, typ) = ptr;
-        Value::Expression(if let Some(typ) = typ.deref() { // TODO: 64 bit loads
-            Expression(self.module.i32_load(0, ptr), typ)
-        } else if typ.eq_naked(I8) {
-            Expression(self.module.i32_load8_s(0, ptr), I32)
-        } else if typ.eq_naked(I16) {
-            Expression(self.module.i32_load16_s(0, ptr), I32)
-        } else if typ.eq_naked(U8) {
-            Expression(self.module.i32_load8_u(0, ptr), U32)
-        } else if typ.eq_naked(U16) {
-            Expression(self.module.i32_load16_u(0, ptr), U32)
-        } else if typ.eq_naked(I32) || typ.eq_naked(U32) {
-            Expression(self.module.i32_load(0, ptr), typ)
-        } else if typ.eq_naked(I64) || typ.eq_naked(U64) {
-            Expression(self.module.i64_load(0, ptr), typ)
+        Value::Expression(if let Some(meta) = typ.meta.deref() { // TODO: 64 bit loads
+            Expression(self.module.i32_load(0, ptr), Type { meta, item: typ.item })
         } else {
-            todo!() // struct loads?
+            match typ.item {
+                ItemRef::Void => todo!(),
+                ItemRef::Unreachable => todo!(),
+                ItemRef::HeapType(t) => match t {
+                    HeapType::I8 => Expression(self.module.i32_load8_s(0, ptr), typ),
+                    HeapType::U8 => Expression(self.module.i32_load8_u(0, ptr), typ),
+                    HeapType::I16 => Expression(self.module.i32_load16_s(0, ptr), typ),
+                    HeapType::U16 => Expression(self.module.i32_load16_u(0, ptr), typ),
+                },
+                ItemRef::StackType(t) => match t {
+                    StackType::I32 | StackType::U32 => Expression(self.module.i32_load(0, ptr), typ),
+                    StackType::I64 | StackType::U64 => Expression(self.module.i64_load(0, ptr), typ),
+                    StackType::F32 => Expression(self.module.f32_load(0, ptr), typ),
+                    StackType::F64 => Expression(self.module.f64_load(0, ptr), typ),
+                },
+                ItemRef::ItemRef(_) => todo!(), // struct loads?
+            }
         })
     }
 
@@ -317,7 +322,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
         if let Some(Token::AmbiguousOp(AmbiguousOp::Ampersand)) = self.tk {
             self.next();
-            typ.set_reference(true);
+            typ.meta = typ.meta.set_reference();
             if let Some(Token::Mut) = self.tk {
                 self.next();
             } else {
@@ -337,8 +342,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         _ => false,
                     };
 
-                    if let Some(t) = typ.ref_(mutable) {
-                        typ = t;
+                    if let Some(meta) = typ.meta.ref_(mutable) {
+                        typ.meta = meta;
                     } else {
                         // *******type
                         //      ^^
@@ -361,8 +366,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 Some(ref ch @ (Token::Union | Token::Struct)) => {
                     let is_struct = ch == &Token::Struct;
                     self.next();
-                    let body = self.type_body(true)?;
-                    let end = body.1.end;
+                    let body = self.type_body(true);
+                    //let end = body.1.end;
                     /*return Some(Spanned(
                         Type::with_indir(
                             if is_struct {
@@ -381,15 +386,15 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     return self.take(|this, t| match t {
                         Some(Token::Ident(s)) => {
                             let end = this.end;
-                            let index = if let Some(t) = Type::from_str(s) {
-                                t.get_ref()
+                            let item_ref = if let Some(t) = ItemRef::from_str(s) {
+                                t
                             } else if let Some(index) = self.registry.resolve(s) {
-                                index
+                                ItemRef::ItemRef(index)
                             } else {
                                 this.error(Message::UnresolvedType, this.span());
                                 return Next(None)
                             };
-                            Next(Some(typ.set_ref(index)))
+                            Next(Some(Type { meta: typ.meta, item: item_ref }))
                         }
                         t => {
                             this.error(Message::MalformedType, this.span());
@@ -411,7 +416,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         }
     }
 
-    fn parse_decl(&mut self) -> Option<(IdentPair<'ast>, Option<Value<S>>)> {
+    fn parse_decl(&mut self) -> Option<(&'ast str, Value<S>)> {
         let start = self.start;
         let mutable = self.mutable();
         let ident = self.expect_ident(&Some(Token::Colon))?;
@@ -423,15 +428,31 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             _ => None
         };
 
-        let rhs = match self.tk {
+        match self.tk {
             Some(Token::BinOp(BinOp(true, BinOpVariant::Id))) => {
                 self.next();
-                self.atom()
-            }
-            _ => None,
-        };
+                let v = self.atom();
+                if let Some(typ) = typ {
+                    match v {
+                        Value::Expression(Expression(_, ref mut xt)) => {
+                            if *xt != typ {
+                                self.error(Message::TypeMismatch, self.span())
+                            }
 
-        Some((rhs, rhs))
+                            if mutable {
+                                xt.meta = xt.meta.set_mutable();
+                            } else {
+                                xt.meta = xt.meta.unset_mutable();
+                            }
+                        },
+                        Value::Constant(_) => todo!(),
+                    }
+                }
+
+                Some((ident, v))
+            }
+            _ => todo!(),
+        }
     }
 
     fn ident_type_pair(&mut self) -> Option<IdentPair<'ast>> {
@@ -450,7 +471,10 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             }
         };
 
-        t.set_mutable(mutable);
+        if mutable {
+            t.meta = t.meta.set_mutable();
+        }
+
         Some(IdentPair { ident, typ: t })
     }
 

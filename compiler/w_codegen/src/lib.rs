@@ -98,6 +98,7 @@ pub trait Serializer {
     fn i64_ge_s(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     fn i64_ge_u(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
 
+    fn f32_load(&mut self, offset: i32, ptr: Self::ExpressionRef) -> Self::ExpressionRef;
     fn f32_const(&mut self, value: f32) -> Self::ExpressionRef;
     fn f32_add(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     fn f32_sub(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
@@ -111,6 +112,7 @@ pub trait Serializer {
     fn f32_gt(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     fn f32_ge(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
 
+    fn f64_load(&mut self, offset: i32, ptr: Self::ExpressionRef) -> Self::ExpressionRef;
     fn f64_const(&mut self, value: f64) -> Self::ExpressionRef;
     fn f64_add(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     fn f64_sub(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
@@ -131,7 +133,7 @@ pub trait Serializer {
         &mut self,
         name: &str,
         params: Vec<(&str, WASMType)>,
-        results: Vec<(&str, WASMType)>,
+        results: Vec<WASMType>,
         vars: Vec<(&str, WASMType)>,
         body: Self::ExpressionRef,
     );

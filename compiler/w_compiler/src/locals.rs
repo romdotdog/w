@@ -1,15 +1,18 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    mem,
+};
 
 use w_codegen::{Serializer, WASMType};
 
 use crate::types::typ::Type;
 
 #[derive(Default)]
-pub struct Locals(Vec<String>, HashMap<WASMType, Vec<bool>>);
+pub struct Flow(Vec<(String, WASMType)>, HashMap<WASMType, Vec<bool>>); // TODO: &'ast str?
 
-impl Locals {
-    pub fn register_local(&mut self, x: String) {
-        self.0.push(x)
+impl Flow {
+    pub fn register_local(&mut self, s: String, t: Type) {
+        self.0.push((s, t.resolve()))
     }
 
     pub fn get_temp_local(&mut self, t: Type) -> (String, usize) {
@@ -34,5 +37,17 @@ impl Locals {
 
     pub fn free_temp_local<S: Serializer>(&mut self, module: &mut S, t: Type, index: usize) {
         self.1.get_mut(&t.resolve()).unwrap()[index] = true;
+    }
+
+    // clears the struct
+    pub fn vars(&mut self) -> Vec<(String, WASMType)> {
+        let res = mem::take(&mut self.0);
+        for (t, v) in self.1.drain() {
+            for n in 0..v.len() {
+                res.push((format!("~{}{}", t, n), t))
+            }
+        }
+        self.1.clear();
+        res
     }
 }

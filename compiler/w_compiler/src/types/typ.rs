@@ -1,3 +1,5 @@
+use w_codegen::WASMType;
+
 use super::{
     itemref::{HeapType, ItemRef, StackType},
     meta::{Meta, VALUE},
@@ -24,4 +26,25 @@ const fn from_item(item: ItemRef) -> Type {
 pub struct Type {
     pub meta: Meta,
     pub item: ItemRef,
+}
+
+impl Type {
+    pub fn resolve(self) -> WASMType {
+        if self.meta.len() > 0 {
+            WASMType::I32
+        } else {
+            match self.item {
+                ItemRef::Void => todo!(),
+                ItemRef::Unreachable => todo!(),
+                ItemRef::HeapType(_) => todo!(),
+                ItemRef::ItemRef(_) => todo!(),
+                ItemRef::StackType(t) => match t {
+                    StackType::I32 | StackType::U32 => WASMType::I32,
+                    StackType::I64 | StackType::U64 => WASMType::I64,
+                    StackType::F32 => WASMType::F32,
+                    StackType::F64 => WASMType::F64,
+                },
+            }
+        }
+    }
 }

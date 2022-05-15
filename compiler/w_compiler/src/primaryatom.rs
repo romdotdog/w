@@ -1,4 +1,11 @@
-use crate::{types::typ::Type, Value};
+use crate::{
+    symbol_stack::Binding,
+    types::{
+        expression::Expression,
+        typ::{Type, VOID},
+    },
+    Value,
+};
 
 use super::{Compiler, Fill, Handler, Next};
 use w_codegen::Serializer;
@@ -7,12 +14,21 @@ use w_lexer::token::{BinOp, BinOpVariant, Token, UnOp};
 
 impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     pub(crate) fn parse_let(&mut self) -> Value<S> {
-        let start = self.start;
         matches!(self.tk, Some(Token::Let));
         self.next();
 
-        let (ident, init) = self.parse_decl()?;
-        self.locals.register_local(ident)
+        let (ident, init) = self.parse_decl().unwrap();
+        match init {
+            Value::Expression(Expression(x, xt)) => {
+                self.flow.register_local(ident.to_owned(), xt); // TODO: &'ast str?
+                self.symbols.push(ident, Binding::Type(xt));
+                Value::Expression(Expression(self.module.local_tee(ident, x), xt))
+            }
+            Value::Constant(x) => {
+                self.symbols.push(ident, Binding::Constant(x));
+                Value::Constant(x)
+            }
+        }
     }
 
     fn parse_cast(&mut self) -> Value<S> {
@@ -20,7 +36,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         assert_eq!(self.tk, Some(Token::BinOp(BinOp(false, BinOpVariant::Lt))));
         self.next();
 
-        let t = self.parse_type()?;
+        let t = self.parse_type().unwrap(); // TODO
         let is_reinterpret = match self.tk {
             Some(Token::BinOp(BinOp(false, BinOpVariant::Gt))) => {
                 self.next();
@@ -42,7 +58,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         };
 
         let atom = self.primaryatom();
-        let end = atom.1.end;
+        //let end = atom.1.end;
         /*Some(Spanned(
             if is_reinterpret {
                 Atom::Reinterpret(t, Box::new(atom))
@@ -55,44 +71,29 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     }
 
     fn parse_br(&mut self) -> Value<S> {
-        let start = self.start;
         assert_eq!(self.tk, Some(Token::Br));
-        let mut end = self.end;
         self.next();
 
         // TODO: refactor double arrow check
         let ret = match self.tk {
             Some(Token::Arrow | Token::If) => None,
-            _ => {
-                let a = self.atom()?;
-                end = a.1.end;
-                Some(Box::new(a))
-            }
+            _ => Some(self.atom()),
         };
 
         let label = match self.tk {
             Some(Token::Arrow) => {
                 self.next();
-                Some(self.take(|this, t| match t {
-                    Some(Token::Label(x)) => {
-                        end = this.end;
-                        let span = this.span();
-                        Next(Spanned(x, span))
-                    }
+                self.take(|this, t| match t {
+                    Some(Token::Label(x)) => Next(Some(x)),
                     Some(Token::Ident(_)) => {
-                        end = this.end;
-                        let span = this.span();
-                        this.error(Message::IdentifierIsNotLabel, span);
-                        Next(Spanned("<unknown>", span))
+                        this.error(Message::IdentifierIsNotLabel, this.span());
+                        Next(None)
                     }
                     tk => {
-                        // br -> if ...
-                        //      ^
-                        let span = this.span();
-                        this.error(Message::MissingLabel, span);
-                        Fill(Spanned("<unknown>", span), tk)
+                        this.error(Message::MissingLabel, this.span());
+                        Fill(None, tk)
                     }
-                }))
+                })
             }
             _ => None,
         };
@@ -100,9 +101,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         let cond = match self.tk {
             Some(Token::If) => {
                 self.next();
-                let atom = self.atom()?;
-                end = atom.1.end;
-                Some(Box::new(atom))
+                Some(self.atom())
             }
             _ => None,
         };
@@ -122,9 +121,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         self.next();
 
         let a = if self.can_begin_atom() {
-            let a_ = self.atom()?;
-            end = a_.1.end;
-            Some(Box::new(a_))
+            Some(self.atom())
         } else {
             None
         };
@@ -138,7 +135,6 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         self.next();
 
         let a = self.primaryatom();
-        let end = a.1.end;
         //Some(Spanned(Atom::UnOp(u, Box::new(a)), Span::new(start, end)))
         todo!()
     }

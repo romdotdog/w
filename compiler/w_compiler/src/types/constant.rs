@@ -6,7 +6,7 @@ use w_lexer::token::{BinOp, BinOpVariant};
 use super::{
     expression::Expression,
     itemref::{ItemRef, StackType},
-    meta::Meta,
+    meta::{Meta, VALUE},
     typ::*,
 };
 
@@ -217,6 +217,7 @@ impl UntypedConstant {
         let left = self.coerce(right).unwrap_or(self);
         let right = right.coerce(self).unwrap_or(right);
 
+        // TODO: have binop inside
         match op.1 {
             BinOpVariant::Id => None,
             BinOpVariant::Lt => left.const_lt(right),
@@ -237,16 +238,8 @@ impl UntypedConstant {
             BinOpVariant::Shr => left.const_shr(right),
         }
     }
-
-    /// does not typecheck
-    pub fn is_true(self) -> bool {
-        match self {
-            Integer(x) => x != 0,
-            Uinteger(x) => x != 0,
-            Float(x) => x != 0.0,
-        }
-    }
 }
+
 #[derive(Clone, Copy)]
 pub struct Constant {
     meta: Meta,
@@ -254,6 +247,27 @@ pub struct Constant {
 }
 
 impl Constant {
+    pub fn i64(x: i64) -> Constant {
+        Constant {
+            meta: VALUE,
+            constant: Integer(x),
+        }
+    }
+
+    pub fn u64(x: u64) -> Constant {
+        Constant {
+            meta: VALUE,
+            constant: Uinteger(x),
+        }
+    }
+
+    pub fn f64(x: f64) -> Constant {
+        Constant {
+            meta: VALUE,
+            constant: Float(x),
+        }
+    }
+
     pub fn compile<S: Serializer>(
         self,
         module: &mut S,
@@ -336,6 +350,40 @@ impl Constant {
                     meta: self.meta,
                     constant,
                 })
+        }
+    }
+
+    pub fn coerce(self, right: Constant) -> Option<Constant> {
+        if self.meta != right.meta || self.meta.len() > 0 || self.meta.is_reference() {
+            None
+        } else {
+            match right.constant {
+                Integer(_) => self.constant.coerce_to_i64().map(|x| Constant {
+                    meta: right.meta,
+                    constant: Integer(x),
+                }),
+                Uinteger(_) => self.constant.coerce_to_u64().map(|x| Constant {
+                    meta: right.meta,
+                    constant: Uinteger(x),
+                }),
+                Float(_) => self.constant.coerce_to_f64().map(|x| Constant {
+                    meta: right.meta,
+                    constant: Float(x),
+                }),
+            }
+        }
+    }
+
+    /// does not typecheck
+    pub fn is_true(self) -> Option<bool> {
+        if self.meta.len() > 0 || self.meta.is_reference() {
+            None
+        } else {
+            Some(match self.constant {
+                Integer(x) => x != 0,
+                Uinteger(x) => x != 0,
+                Float(x) => x != 0.0,
+            })
         }
     }
 }
