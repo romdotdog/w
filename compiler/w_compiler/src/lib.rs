@@ -1,8 +1,10 @@
 
+use locals::Locals;
+use registry::Registry;
 use types::{IdentPair, Value};
 use types::expression::Expression;
-use types::typ::{VOID, Type};
-use w_codegen::Serializer;
+use types::typ::{VOID, Type, UNREACHABLE, I32, U32, I8, U8, U16, I16, U64, I64};
+use w_codegen::{Serializer, WASMType};
 use w_errors::Message;
 use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token};
 use w_lexer::Lexer;
@@ -13,6 +15,8 @@ mod simpleatom;
 mod toplevel;
 mod types;
 mod symbol_stack;
+mod locals;
+mod registry;
 
 use handler::{Handler, Status, ImportlessHandler, ImportlessHandlerHandler};
 use symbol_stack::SymbolStack;
@@ -30,7 +34,9 @@ pub struct Compiler<'ast, H: Handler<'ast>, S: Serializer> {
 	//
 
 	module: &'ast mut S,
-	symbols: SymbolStack<'ast>
+	symbols: SymbolStack<'ast>,
+    locals: Locals,
+    registry: Registry<'ast>
 }
 
 enum Take<'ast, T> {
@@ -58,7 +64,9 @@ impl<'ast, H: ImportlessHandler<'ast>, S: Serializer> Compiler<'ast, ImportlessH
             tk: None,
 
 			module,
-			symbols: SymbolStack::default()
+			symbols: SymbolStack::default(),
+            locals: Locals::default(),
+            registry: Registry::default()
         };
 
         compiler.next();
@@ -106,7 +114,9 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             tk: None,
 
 			module,
-			symbols: SymbolStack::default()
+			symbols: SymbolStack::default(),
+            locals: Locals::default(),
+            registry: Registry::default()
         };
 
         compiler.next();
@@ -169,6 +179,14 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         self.session.error(self.src_ref, msg, span);
     }
 
+    pub(crate) fn unreachable_expr(&mut self) -> Expression<S> {
+        Expression(self.module.unreachable(), UNREACHABLE)
+    }
+
+    pub(crate) fn unreachable(&mut self) -> Value<S> {
+        Value::Expression(self.unreachable_expr())
+    }
+
     /// for owning enum fields
     fn take<T, F>(&mut self, f: F) -> T
     where
@@ -188,6 +206,27 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         }
     }
 
+    pub fn make_load(&mut self, ptr: Expression<S>) -> Value<S> {
+        let Expression(ptr, typ) = ptr;
+        Value::Expression(if let Some(typ) = typ.deref() { // TODO: 64 bit loads
+            Expression(self.module.i32_load(0, ptr), typ)
+        } else if typ.eq_naked(I8) {
+            Expression(self.module.i32_load8_s(0, ptr), I32)
+        } else if typ.eq_naked(I16) {
+            Expression(self.module.i32_load16_s(0, ptr), I32)
+        } else if typ.eq_naked(U8) {
+            Expression(self.module.i32_load8_u(0, ptr), U32)
+        } else if typ.eq_naked(U16) {
+            Expression(self.module.i32_load16_u(0, ptr), U32)
+        } else if typ.eq_naked(I32) || typ.eq_naked(U32) {
+            Expression(self.module.i32_load(0, ptr), typ)
+        } else if typ.eq_naked(I64) || typ.eq_naked(U64) {
+            Expression(self.module.i64_load(0, ptr), typ)
+        } else {
+            todo!() // struct loads?
+        })
+    }
+
     pub fn operate_values(&mut self, lhs: Value<S>, rhs: Value<S>, op: BinOp) -> Value<S> {
         match (lhs, rhs) {
             (Value::Constant(l), Value::Expression(Expression(_, t))) => {
@@ -199,7 +238,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     )
                 } else {
                     self.error(Message::NeedType, self.span());
-                    Value::Unreachable
+                    self.unreachable()
                 }
             },
             (Value::Expression(Expression(_, t)), Value::Constant(r)) => {
@@ -211,16 +250,18 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     )
                 } else {
                     self.error(Message::NeedType, self.span());
-                    Value::Unreachable
+                    self.unreachable()
                 }
             },
-            (Value::Unreachable, _) | (_, Value::Unreachable) => Value::Unreachable,
             (Value::Expression(l), Value::Expression(r)) => {
+                if l.1 == UNREACHABLE || r.1 == UNREACHABLE {
+                    return self.unreachable();
+                }
                 match l.operate(self.module, r, op) {
                     Some(x) => Value::Expression(x),
                     None => {
                         self.error(Message::InvalidOperation, self.span());
-                        Value::Unreachable
+                        self.unreachable()
                     },
                 }
             }
@@ -229,7 +270,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     Some(x) => Value::Constant(x),
                     None => {
                         self.error(Message::InvalidOperation, self.span());
-                        Value::Unreachable
+                        self.unreachable()
                     },
                 }
             },
@@ -279,7 +320,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             typ.set_reference(true);
             if let Some(Token::Mut) = self.tk {
                 self.next();
-                typ.set_mutable_reference(true);
+            } else {
+                self.error(Message::MustBeMut, self.span())
             }
         }
 
@@ -287,32 +329,33 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         loop {
             match self.tk {
                 Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => {
-                    match typ.add_pointer(match self.tk {
+                    let mutable = match self.tk {
                         Some(Token::Mut) => {
                             self.next();
                             true
                         }
                         _ => false,
-                    }) {
-                        Some(t) => t = t,
-                        None =>  {
-                            // *******type
-                            //      ^^
-                            if asterisk_overflow_start.is_none() {
-                                asterisk_overflow_start = Some(self.start);
-                            }
+                    };
 
-                            let end = self.end;
-                            self.next();
+                    if let Some(t) = typ.ref_(mutable) {
+                        typ = t;
+                    } else {
+                        // *******type
+                        //      ^^
+                        if asterisk_overflow_start.is_none() {
+                            asterisk_overflow_start = Some(self.start);
+                        }
 
-                            match self.tk {
-                                Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => {}
-                                _ => self.error(
-                                    Message::TooMuchIndirection,
-                                    Span::new(asterisk_overflow_start.unwrap(), end),
-                                ),
-                            }
-                        },
+                        let end = self.end;
+                        self.next();
+
+                        match self.tk {
+                            Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => {}
+                            _ => self.error(
+                                Message::TooMuchIndirection,
+                                Span::new(asterisk_overflow_start.unwrap(), end),
+                            ),
+                        }
                     }
                 }
                 Some(ref ch @ (Token::Union | Token::Struct)) => {
@@ -338,7 +381,15 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     return self.take(|this, t| match t {
                         Some(Token::Ident(s)) => {
                             let end = this.end;
-                            Next(Some(typ))
+                            let index = if let Some(t) = Type::from_str(s) {
+                                t.get_ref()
+                            } else if let Some(index) = self.registry.resolve(s) {
+                                index
+                            } else {
+                                this.error(Message::UnresolvedType, this.span());
+                                return Next(None)
+                            };
+                            Next(Some(typ.set_ref(index)))
                         }
                         t => {
                             this.error(Message::MalformedType, this.span());
@@ -350,14 +401,32 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         }
     }
 
+    fn mutable(&mut self) -> bool {
+        match self.tk {
+            Some(Token::Mut) => {
+                self.next();
+                true
+            }
+            _ => false,
+        }
+    }
+
     fn parse_decl(&mut self) -> Option<(IdentPair<'ast>, Option<Value<S>>)> {
         let start = self.start;
+        let mutable = self.mutable();
+        let ident = self.expect_ident(&Some(Token::Colon))?;
+        let typ = match self.tk {
+            Some(Token::Colon) => {
+                self.next();
+                self.parse_type()          
+            }
+            _ => None
+        };
 
-        let pair = self.ident_type_pair(false)?;
         let rhs = match self.tk {
             Some(Token::BinOp(BinOp(true, BinOpVariant::Id))) => {
                 self.next();
-                Some(self.atom())
+                self.atom()
             }
             _ => None,
         };
@@ -365,38 +434,24 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         Some((pair, rhs))
     }
 
-    fn ident_type_pair(&mut self, require_type: bool) -> Option<IdentPair<'ast>> {
-        let start = self.start;
-
-        // mut ident: type
-        // ^^^
-        let mutable = match self.tk {
-            Some(Token::Mut) => {
-                self.next();
-                true
-            }
-            _ => false,
-        };
-
+    fn ident_type_pair(&mut self) -> Option<IdentPair<'ast>> {
+        let mutable = self.mutable();
         let ident = self.expect_ident(&Some(Token::Colon))?;
         let t = match self.tk {
             Some(Token::Colon) => {
                 self.next();
-                Some(self.parse_type()?)
+                self.parse_type()?
             }
             _ => {
-                if require_type {
-                    // mut ident ...
-                    //          ^
-                    self.error(Message::MissingType, self.span());
-                }
-                None
+                // mut ident ...
+                //          ^
+                self.error(Message::MissingType, self.span());
+                return None;
             }
         };
 
-        Some(
-            IdentPair { mutable, ident, t },
-        )
+        t.set_mutable(mutable);
+        Some(IdentPair { ident, typ: t })
     }
 
     fn subatom(

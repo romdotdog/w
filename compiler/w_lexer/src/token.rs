@@ -113,10 +113,10 @@ pub enum UnOp {
     Inc,
     Dec,
 
-    /// shorthand for -1 - x
+    /// shorthand for x ^ -1
     BNot,
 
-    /// shorthand for x ^ 1
+    /// shorthand for x == 0
     LNot,
 }
 

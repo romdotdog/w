@@ -1,3 +1,6 @@
+use std::fmt::{Display, Formatter};
+
+#[derive(PartialEq, Eq, Hash)]
 pub enum WASMType {
     I32,
     I64,
@@ -5,16 +8,40 @@ pub enum WASMType {
     F64,
 }
 
+impl Display for WASMType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WASMType::I32 => write!(f, "i32"),
+            WASMType::I64 => write!(f, "i64"),
+            WASMType::F32 => write!(f, "f32"),
+            WASMType::F64 => write!(f, "f64"),
+        }
+    }
+}
+
 #[rustfmt::skip]
 pub trait Serializer {
     type ExpressionRef;
 
+    fn block(&mut self, label: Option<&str>, children: &[Self::ExpressionRef], result_type: Option<WASMType>) -> Self::ExpressionRef;
     fn if_(
         &mut self,
         condition: Self::ExpressionRef,
         if_true: Self::ExpressionRef,
         if_false: Option<Self::ExpressionRef>,
     ) -> Self::ExpressionRef;
+    fn loop_(&mut self, label: Option<&str>, body: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn call(&mut self, target: Self::ExpressionRef, operands: &[Self::ExpressionRef]) -> Self::ExpressionRef;
+
+    fn local_get(&mut self, index: &str) -> Self::ExpressionRef;
+    fn local_set(&mut self, index: &str, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn local_tee(&mut self, index: &str, value: Self::ExpressionRef) -> Self::ExpressionRef;
+
+    fn i32_load(&mut self, offset: i32, ptr: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn i32_load8_s(&mut self, offset: i32, ptr: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn i32_load8_u(&mut self, offset: i32, ptr: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn i32_load16_s(&mut self, offset: i32, ptr: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn i32_load16_u(&mut self, offset: i32, ptr: Self::ExpressionRef) -> Self::ExpressionRef;
 
     fn i32_const(&mut self, value: i32) -> Self::ExpressionRef;
     fn i32_add(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
@@ -44,6 +71,7 @@ pub trait Serializer {
     fn i32_ge_u(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     
 
+    fn i64_load(&mut self, offset: i32, ptr: Self::ExpressionRef) -> Self::ExpressionRef;
     fn i64_const(&mut self, value: i64) -> Self::ExpressionRef;
     fn i64_add(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     fn i64_sub(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;

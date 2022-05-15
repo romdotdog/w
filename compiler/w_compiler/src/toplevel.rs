@@ -321,7 +321,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             name,
             params
                 .iter()
-                .map(|p| (p.ident, p.t.unwrap().resolve()))
+                .map(|p| (p.ident, p.typ.unwrap().resolve()))
                 .collect(),
             match t {
                 Some(t) if t.v != TypeVariant::Void => vec![t],

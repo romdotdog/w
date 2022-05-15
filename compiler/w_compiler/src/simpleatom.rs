@@ -1,7 +1,9 @@
-use std::convert::TryInto;
-
 use crate::{
-    types::{Constant, Type, TypeVariant},
+    registry::Item,
+    types::{
+        constant::Constant,
+        typ::{Type, UNREACHABLE, VOID},
+    },
     Expression, Value,
 };
 
@@ -9,15 +11,16 @@ use super::{Compiler, Fill, Handler, Next, NoFill};
 use w_codegen::Serializer;
 use w_errors::Message;
 use w_lexer::token::{Token, UnOp};
+use w_utils::span::Span;
 
 impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
-    pub(crate) fn parse_block(&mut self, label: Option<Spanned<&'ast str>>) -> Spanned<Atom<'ast>> {
+    pub(crate) fn parse_block(&mut self, label: Option<&'ast str>) -> Value<S> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::LeftBracket));
         self.next();
 
         let mut contents = Vec::new();
-        let mut last = None;
+        let typ = None;
 
         let end = 'm: loop {
             macro_rules! panic_block {
@@ -39,17 +42,13 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 };
             }
 
-            if let Some(t) = last.take() {
-                contents.push(t);
-            }
-
             if self.can_begin_toplevel() && !self.parse_toplevel() {
                 panic_block!();
             }
 
             match self.tk {
                 Some(Token::RightBracket) => {
-                    last = None;
+                    typ = None;
 
                     let end_ = self.end;
                     self.next();
@@ -57,8 +56,13 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 }
                 None => {}
                 _ => match self.atom() {
-                    Some(a) => last = Some(a),
-                    None => panic_block!(),
+                    Value::Expression(Expression(x, xt)) => {
+                        contents.push(x);
+                        typ = Some(xt);
+                    }
+                    Value::Constant(x) => {
+                        self.error(Message::UselessConstant, self.span());
+                    }
                 },
             }
 
@@ -89,45 +93,114 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             },
             Span::new(start, end),
         )*/
-        todo!()
+        Value::Expression(Expression(
+            self.module.block(label, &contents, typ.map(Type::resolve)),
+            typ.unwrap_or(VOID),
+        ))
     }
 
-    pub(crate) fn parse_loop(
-        &mut self,
-        label: Option<Spanned<&'ast str>>,
-    ) -> Option<Spanned<Atom<'ast>>> {
+    pub(crate) fn parse_loop(&mut self, label: Option<&'ast str>) -> Value<S> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::Loop));
         self.next();
 
         let binding = match self.tk {
-            Some(Token::Let) => Some(Box::new(self.parse_let()?)),
+            Some(Token::Let) => Some(Box::new(self.parse_let())),
             _ => None,
         };
 
-        let block = {
-            let a = self.atom()?;
-            match a.0 {
-                Atom::Block { .. } => {}
-                _ => self.error(Message::LoopBodyBlock, a.1),
-            }
-            Box::new(a)
-        };
-
-        /*let end = block.1.end;
-        Some(Spanned(
-            Atom::Loop {
+        // TODO: results
+        Value::Expression(Expression(
+            self.module.loop_(
                 label,
-                binding,
-                block,
-            },
-            Span::new(start, end),
-        ))*/
-        todo!()
+                match self.atom() {
+                    Value::Expression(Expression(x, _)) => x,
+                    Value::Constant(_) => {
+                        self.error(Message::UselessConstant, self.span());
+                        return self.unreachable();
+                    }
+                },
+            ),
+            VOID,
+        ))
     }
 
-    fn postfixatom(&mut self, mut lhs: (S::ExpressionRef, Type)) -> (S::ExpressionRef, Type) {
-        let start = lhs.1.start;
+    fn parse_if(&mut self) -> Value<S> {
+        let start = self.start;
+        debug_assert_eq!(self.tk, Some(Token::If));
+        self.next();
+
+        let cond = self.atom();
+        let true_branch = self.atom();
+        let false_branch = match self.tk {
+            Some(Token::Else) => {
+                self.next();
+                Some(self.atom())
+            }
+            _ => None,
+        };
+
+        let cond = match cond {
+            Value::Expression(x @ Expression(_, xt)) => {
+                if xt.is_number() && !xt.is_high() && !xt.is_float() {
+                    x
+                } else {
+                    self.error(Message::TypeMismatch, self.span());
+                    self.unreachable_expr()
+                }
+            }
+            Value::Constant(x) => {
+                if x.is_true() {
+                    // TODO: fix?
+                    self.error(Message::ConditionTrue, self.span());
+                } else {
+                    self.error(Message::ConditionFalse, self.span());
+                }
+                self.unreachable_expr()
+            }
+        };
+
+        if let Some(false_branch) = false_branch {
+            if let Some((true_branch, false_branch)) = true_branch.coerce(self.module, false_branch)
+            {
+                let true_branch = match true_branch.compile(self.module, None) {
+                    Some(x) => x,
+                    None => {
+                        self.error(Message::NeedType, self.span());
+                        self.unreachable_expr()
+                    }
+                };
+
+                let false_branch = match false_branch.compile(self.module, None) {
+                    Some(x) => x,
+                    None => {
+                        self.error(Message::NeedType, self.span());
+                        self.unreachable_expr()
+                    }
+                };
+
+                Value::Expression(Expression(
+                    self.module.if_(cond.0, true_branch.0, Some(false_branch.0)),
+                    true_branch.1,
+                ))
+            } else {
+                self.error(Message::IfCannotReturn, self.span());
+                return self.unreachable();
+            }
+        } else {
+            match true_branch {
+                Value::Expression(Expression(x, xt)) if xt == UNREACHABLE || xt == VOID => {
+                    Value::Expression(Expression(self.module.if_(cond.0, x, None), VOID))
+                }
+                _ => {
+                    self.error(Message::IfCannotReturn, self.span());
+                    return self.unreachable();
+                }
+            }
+        }
+    }
+
+    fn postfixatom(&mut self, mut lhs: Value<S>) -> Value<S> {
         loop {
             match self.tk {
                 Some(Token::UnOp(UnOp::Dec)) => {
@@ -199,26 +272,63 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
                 Some(Token::LeftParen) => {
                     self.next();
-                    let mut args = Vec::new();
-
-                    match self.tk {
-                        Some(Token::RightParen) => break,
-                        _ => loop {
-                            args.push(self.atom()?);
-
-                            match self.tk {
-                                Some(Token::Comma) => self.next(),
-                                Some(Token::RightParen) => break,
-                                _ => {
-                                    self.error(Message::MissingClosingParen, self.span());
-                                    return None;
-                                }
+                    // typecheck lhs
+                    let item = match lhs {
+                        Value::Expression(Expression(x, xt)) => {
+                            if let Some(item) = self.registry.get(xt.ref_index()) {
+                                item
+                            } else {
+                                return self.unreachable();
                             }
-                        },
+                        }
+                        Value::Constant(x) => {
+                            self.error(Message::TypeMismatch, self.span());
+                            return self.unreachable();
+                        }
                     };
 
-                    //lhs = Spanned(Atom::Call(Box::new(lhs), args), Span::new(start, self.end));
-                    self.next(); // skip paren
+                    if let Item::Fn(name, params, ret) = item {
+                        let mut args = Vec::new();
+
+                        let mut i = 0;
+                        match self.tk {
+                            Some(Token::RightParen) => break,
+                            _ => loop {
+                                let t = if let Some(p) = params.get(i) {
+                                    p.typ
+                                } else {
+                                    self.error(Message::TooManyArgs, self.span());
+                                    return self.unreachable();
+                                };
+
+                                if let Some(Expression(x, xt)) =
+                                    self.atom().compile(self.module, Some(t))
+                                {
+                                    args.push(x);
+                                } else {
+                                    self.error(Message::NeedType, self.span());
+                                    return self.unreachable();
+                                }
+
+                                match self.tk {
+                                    Some(Token::Comma) => self.next(),
+                                    Some(Token::RightParen) => break,
+                                    _ => {
+                                        self.error(Message::MissingClosingParen, self.span());
+                                        return self.unreachable();
+                                    }
+                                }
+
+                                i += 1;
+                            },
+                        };
+
+                        //lhs = Spanned(Atom::Call(Box::new(lhs), args), Span::new(start, self.end));
+                        self.next(); // skip paren
+                    } else {
+                        self.error(Message::TypeMismatch, self.span());
+                        return self.unreachable();
+                    }
                 }
 
                 _ => break,
@@ -226,48 +336,6 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         }
 
         lhs
-    }
-
-    fn parse_if(&mut self) -> Value<S> {
-        let start = self.start;
-        debug_assert_eq!(self.tk, Some(Token::If));
-        self.next();
-
-        let cond = self.atom(None);
-        let true_branch = self.atom(None);
-        let false_branch = match self.tk {
-            Some(Token::Else) => {
-                self.next();
-                self.atom(Some(true_branch.1))
-            }
-            _ => None,
-        };
-
-        // TODO: merge
-        if let Some(branch_expr) = false_branch {
-            if false_branch.1 == true_branch.1 {
-                (
-                    self.module.if_(cond.0, true_branch.0, false_branch.0),
-                    false_branch.1,
-                )
-            } else {
-                self.error(Message::IfCannotReturn, self.span());
-                return Value::Expression(Expression(
-                    self.module.unreachable(),
-                    TypeVariant::Unreachable.into(),
-                ));
-            }
-        } else if true_branch.1 != TypeVariant::Void.into() {
-            self.error(Message::IfCannotReturn, self.span());
-            return Value::Expression(Expression(
-                self.module.unreachable(),
-                TypeVariant::Unreachable.into(),
-            ));
-        }
-        Value::Expression(Expression(
-            self.module.if_(cond.0, true_branch.0, false_branch.0),
-            TypeVariant::Void.into(),
-        ))
     }
 
     pub(crate) fn simpleatom(&mut self) -> Value<S> {
@@ -303,19 +371,16 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             }
             Some(Token::If) => self.parse_if(),
             Some(Token::LeftBracket) => self.parse_block(None),
-            Some(Token::Loop) => self.parse_loop(None)?,
+            Some(Token::Loop) => self.parse_loop(None),
             Some(Token::Overflown) => {
                 self.error(Message::LiteralTooLarge, self.span());
-                Value::Expression(Expression(
-                    self.module.unreachable(),
-                    TypeVariant::Unreachable.into(),
-                ))
+                return self.unreachable();
             }
             _ => {
                 self.take(|this, t| match t {
-                    Some(Token::Integer(n)) => Next(Value::Constant(Constant::from_i64(n))),
-                    Some(Token::Uinteger(n)) => Next(Value::Constant(Constant::from_u64(n))),
-                    Some(Token::Float(n)) => Next(Value::Constant(Constant::from_f64(n))),
+                    Some(Token::Integer(n)) => Next(Value::Constant(Constant::Integer(n))),
+                    Some(Token::Uinteger(n)) => Next(Value::Constant(Constant::Uinteger(n))),
+                    Some(Token::Float(n)) => Next(Value::Constant(Constant::Float(n))),
                     Some(Token::String(s)) => todo!(),
                     Some(Token::Char(s)) => todo!(),
                     Some(Token::Ident(s)) => {
@@ -340,22 +405,13 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                             _ => {
                                 // TODO: parse atom?
                                 this.error(Message::CannotFollowLabel, this.span());
-                                Value::Expression(Expression(
-                                    self.module.unreachable(),
-                                    Type::from(TypeVariant::Unreachable),
-                                ))
+                                self.unreachable()
                             }
                         })
                     }
                     tk => {
                         this.error(Message::UnexpectedToken, this.span());
-                        Fill(
-                            (
-                                self.module.unreachable(),
-                                Type::from(TypeVariant::Unreachable),
-                            ),
-                            tk,
-                        )
+                        Fill(self.unreachable(), tk)
                     }
                 })
             }

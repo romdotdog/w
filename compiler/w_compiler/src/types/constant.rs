@@ -3,10 +3,7 @@ use std::convert::TryInto;
 use w_codegen::Serializer;
 use w_lexer::token::{BinOp, BinOpVariant};
 
-use super::{
-    expression::Expression,
-    typ::{Type, F32, F64, I32, I64, U32, U64},
-};
+use super::{expression::Expression, meta::Meta, typ::Type};
 
 // arbitrary bounds
 const MIN_FLOAT: i64 = -(2i64.pow(53));
@@ -14,23 +11,16 @@ const MAX_FLOAT: i64 = 2i64.pow(53);
 const UMAX_FLOAT: u64 = 2u64.pow(53);
 
 #[derive(Clone, Copy)]
-pub enum Constant {
+enum UntypedConstant {
     Integer(i64),
     Uinteger(u64),
     Float(f64),
 }
 
-fn check_f64(x: f64) -> Option<f64> {
-    let w = x.round();
-    if (x - w).abs() < f64::EPSILON {
-        Some(w)
-    } else {
-        None
-    }
-}
+pub struct Constant(Meta, UntypedConstant);
 
 impl Constant {
-    fn coerce_to_i64(self) -> Option<i64> {
+    pub fn coerce_to_i64(self) -> Option<i64> {
         match self {
             Constant::Integer(x) => Some(x),
             Constant::Uinteger(x) => x.try_into().ok(),
@@ -38,7 +28,11 @@ impl Constant {
         }
     }
 
-    fn coerce_to_u64(self) -> Option<u64> {
+    pub fn coerce_to_i32(self) -> Option<i64> {
+        self.coerce_to_i64().and_then(|x| x.try_into().ok())
+    }
+
+    pub fn coerce_to_u64(self) -> Option<u64> {
         match self {
             Constant::Integer(x) => x.try_into().ok(),
             Constant::Uinteger(x) => Some(x),
@@ -47,13 +41,21 @@ impl Constant {
         }
     }
 
-    fn coerce_to_f64(self) -> Option<f64> {
+    pub fn coerce_to_u32(self) -> Option<u32> {
+        self.coerce_to_u64().and_then(|x| x.try_into().ok())
+    }
+
+    pub fn coerce_to_f64(self) -> Option<f64> {
         match self {
             Constant::Integer(x) if x > MIN_FLOAT && x < MAX_FLOAT => Some(x as f64),
             Constant::Uinteger(x) if x < UMAX_FLOAT => Some(x as f64),
             Constant::Float(x) => Some(x),
             _ => None,
         }
+    }
+
+    pub fn coerce_to_f32(self) -> Option<f32> {
+        self.coerce_to_f64().and_then(f64_to_f32)
     }
 
     pub fn coerce(self, right: Constant) -> Option<Constant> {
@@ -249,23 +251,21 @@ impl Constant {
             return None;
         }
 
-        if contextual_type.is_high() {
-            if contextual_type.is_float() {
-                self.coerce_to_f64()
-                    .map(|x| Expression(module.f64_const(x), F64))
-            } else if contextual_type.is_signed() {
-                self.coerce_to_i64()
-                    .map(|x| Expression(module.i64_const(x), I64))
-            } else {
-                self.coerce_to_u64()
-                    .map(|x| Expression(module.i64_const(reinterpret_u64(x)), U64))
-            }
-        } else if contextual_type.is_float() {
+        if contextual_type.eq_naked(F64) {
+            self.coerce_to_f64()
+                .map(|x| Expression(module.f64_const(x), F64))
+        } else if contextual_type.eq_naked(I64) {
+            self.coerce_to_i64()
+                .map(|x| Expression(module.i64_const(x), I64))
+        } else if contextual_type.eq_naked(U64) {
+            self.coerce_to_u64()
+                .map(|x| Expression(module.i64_const(reinterpret_u64(x)), U64))
+        } else if contextual_type.eq_naked(F32) {
             self.coerce_to_f64().map(|x| match f64_to_f32(x) {
                 Some(x) => Expression(module.f32_const(x), F32),
                 None => Expression(module.f64_const(x), F64),
             })
-        } else if contextual_type.is_signed() {
+        } else if contextual_type.eq_naked(I32) {
             self.coerce_to_i64().map(|x| match x.try_into() {
                 Ok(x) => Expression(module.i32_const(x), I32),
                 _ => Expression(module.i64_const(x), I64),
@@ -275,6 +275,15 @@ impl Constant {
                 Ok(x) => Expression(module.i32_const(reinterpret_u32(x)), U32),
                 _ => Expression(module.i64_const(reinterpret_u64(x)), U64),
             })
+        }
+    }
+
+    /// does not typecheck
+    pub fn is_true(self) -> bool {
+        match self {
+            Constant::Integer(x) => x != 0,
+            Constant::Uinteger(x) => x != 0,
+            Constant::Float(x) => x != 0.0,
         }
     }
 }
@@ -293,6 +302,15 @@ fn f64_to_f32(r64: f64) -> Option<f32> {
         }
     }
     return None;
+}
+
+fn check_f64(x: f64) -> Option<f64> {
+    let w = x.round();
+    if (x - w).abs() < f64::EPSILON {
+        Some(w)
+    } else {
+        None
+    }
 }
 
 fn reinterpret_u32(n: u32) -> i32 {

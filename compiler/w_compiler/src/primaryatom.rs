@@ -11,10 +11,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         matches!(self.tk, Some(Token::Let));
         self.next();
 
-        let decl = self.parse_decl()?;
-        let end = decl.1.end;
-        //Some(Spanned(Atom::Let(decl.0), Span::new(start, end)))
-        todo!()
+        let (ident, init) = self.parse_decl()?;
+        self.locals.register_local(ident)
     }
 
     fn parse_cast(&mut self) -> Value<S> {
@@ -43,7 +41,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             }
         };
 
-        let atom = self.primaryatom()?;
+        let atom = self.primaryatom();
         let end = atom.1.end;
         /*Some(Spanned(
             if is_reinterpret {

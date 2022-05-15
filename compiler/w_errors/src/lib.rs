@@ -45,12 +45,19 @@ errors!(
     MissingClosingSqBracket => "']' expected here",
     MissingColon => "':' expected here",
     InvalidTopLevel => "only functions, globals and directives are allowed here",
-    TooMuchIndirection => "at most only 5 levels of indirection are allowed",
+    TooMuchIndirection => "at most only 25 levels of indirection are allowed",
     LoopBodyBlock => "loop body may only be a block",
+    MustBeMut => "must be &mut",
+    TypeMismatch => "type mismatch",
+    UselessConstant => "useless constant",
+    TooManyArgs => "too many arguments",
+    UnresolvedType => "unresolved type",
     InvalidCoercion => "invalid coercion",
     InvalidOperation => "invalid operation",
     ReferenceCoercion => "cannot coerce to reference",
     NeedType => "need type here",
     BranchesSameTypes => "branches must return the same types",
-    IfCannotReturn => "if statement cannot have a result"
+    IfCannotReturn => "if statement cannot have a result",
+    ConditionTrue => "condition evaluates to true",
+    ConditionFalse => "condition evaluates to false"
 );
