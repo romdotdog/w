@@ -441,7 +441,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         let span = this.span();
                         this.next(); // fill
                         if let Some(Token::Colon) = this.tk {
-                            this.error(Message::IdentifierIsNotLabel, this.span());
+                            this.error(Message::IdentifierIsNotLabel, span);
                             // TODO: not label behavior
                         };
                         if let Some(binding) = this.symbols.find(s) {
@@ -453,7 +453,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                                 Binding::Constant(c) => NoFill(Value::Constant(c)),
                             }
                         } else {
-                            this.error(Message::UnresolvedIdentifier, this.span());
+                            this.error(Message::UnresolvedIdentifier, span);
                             NoFill(this.unreachable())
                         }
                     }

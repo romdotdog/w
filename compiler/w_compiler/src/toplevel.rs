@@ -1,5 +1,6 @@
 use crate::{
     registry::Item,
+    spanned,
     symbol_stack::Binding,
     types::{typ::VOID, IdentPair},
 };
@@ -307,12 +308,12 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             }
         }
 
-        let return_type = match self.tk {
+        let (return_type, return_type_span) = match self.tk {
             Some(Token::Colon) => {
                 self.next();
-                self.parse_type().unwrap()
+                spanned!(self, { self.parse_type().unwrap() })
             }
-            _ => VOID,
+            _ => (VOID, Span::new(self.end, self.end + 1)),
         };
 
         let top = self.symbols.get_top();
@@ -326,7 +327,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         let ret = atom
             .compile(&mut self.module, Some(return_type))
             .unwrap_or_else(|| {
-                self.error(Message::TypeMismatch, self.span());
+                self.error(Message::TypeMismatch, return_type_span);
                 self.unreachable_expr()
             });
 

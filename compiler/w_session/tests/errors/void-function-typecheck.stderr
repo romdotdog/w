@@ -1,0 +1,6 @@
+tests/errors/void-function-typecheck.w:1:18: error: type mismatch
+fn main()    { 1 }
+                 ^
+tests/errors/void-function-typecheck.w:1:10: error: type mismatch
+fn main()    { 1 }
+         ^

@@ -1,3 +1,3 @@
-tests/errors/function-typecheck.w:1:17: error: type mismatch
+tests/errors/function-typecheck.w:1:12: error: type mismatch
 fn main(): u32 {}
-                ^
+           ^^^
