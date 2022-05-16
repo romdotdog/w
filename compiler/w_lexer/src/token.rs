@@ -35,14 +35,9 @@ pub enum Token<'ast> {
     UnOp(UnOp),
     AmbiguousOp(AmbiguousOp),
 
-    U31(u32),
-    U63(u64),
-    Fxx(f32),
-    I32(i32),
-    I64(i64),
-    U32(u32),
-    U64(u64),
-    F64(f64),
+    Integer(i64),
+    Uinteger(u64),
+    Float(f64),
     Overflown,
 
     Char(char),
@@ -52,18 +47,14 @@ pub enum Token<'ast> {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum BinOp {
-    Compound(BinOpVariant),
-    Regular(BinOpVariant),
-}
+pub struct BinOp(pub bool, pub BinOpVariant);
 
 impl BinOp {
     pub fn prec(self) -> u8 {
-        match self {
-            BinOp::Compound(_) => return 20,
-            BinOp::Regular(t) => t,
+        if self.0 {
+            return 20;
         }
-        .prec()
+        self.1.prec()
     }
 }
 
@@ -89,11 +80,11 @@ pub enum BinOpVariant {
     Div,
     Mod,
 
-    Xor,
     And,
     Or,
-    Rsh,
-    Lsh,
+    Xor,
+    Shl,
+    Shr,
 }
 
 impl BinOpVariant {
@@ -101,7 +92,7 @@ impl BinOpVariant {
         match self {
             BinOpVariant::Mul | BinOpVariant::Div | BinOpVariant::Mod => 10,
             BinOpVariant::Add | BinOpVariant::Sub => 11,
-            BinOpVariant::Lsh | BinOpVariant::Rsh => 12,
+            BinOpVariant::Shl | BinOpVariant::Shr => 12,
             BinOpVariant::Gt | BinOpVariant::Ge | BinOpVariant::Lt | BinOpVariant::Le => 13,
             BinOpVariant::EqC | BinOpVariant::Neq => 14,
             BinOpVariant::And => 15,
@@ -122,10 +113,10 @@ pub enum UnOp {
     Inc,
     Dec,
 
-    /// shorthand for -1 - x
+    /// shorthand for x ^ -1
     BNot,
 
-    /// shorthand for x ^ 1
+    /// shorthand for x == 0
     LNot,
 }
 
@@ -166,9 +157,9 @@ ambiguous! {
 impl Display for BinOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BinOp::Compound(BinOpVariant::Id) => write!(f, "="),
-            BinOp::Compound(v) => write!(f, "{}=", v),
-            BinOp::Regular(v) => write!(f, "{}", v),
+            BinOp(true, BinOpVariant::Id) => write!(f, "="),
+            BinOp(true, v) => write!(f, "{}=", v),
+            BinOp(false, v) => write!(f, "{}", v),
         }
     }
 }
@@ -191,8 +182,8 @@ impl Display for BinOpVariant {
             BinOpVariant::Xor => write!(f, "^"),
             BinOpVariant::And => write!(f, "&"),
             BinOpVariant::Or => write!(f, "|"),
-            BinOpVariant::Rsh => write!(f, ">>"),
-            BinOpVariant::Lsh => write!(f, "<<"),
+            BinOpVariant::Shr => write!(f, ">>"),
+            BinOpVariant::Shl => write!(f, "<<"),
         }
     }
 }

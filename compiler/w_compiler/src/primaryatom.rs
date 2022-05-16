@@ -1,0 +1,157 @@
+use crate::{
+    symbol_stack::Binding,
+    types::{
+        expression::Expression,
+        typ::{Type, VOID},
+    },
+    Value,
+};
+
+use super::{Compiler, Fill, Handler, Next};
+use w_codegen::Serializer;
+use w_errors::Message;
+use w_lexer::token::{BinOp, BinOpVariant, Token, UnOp};
+
+impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
+    pub(crate) fn parse_let(&mut self) -> Value<S> {
+        matches!(self.tk, Some(Token::Let));
+        self.next();
+
+        let (ident, init) = self.parse_decl().unwrap();
+        match init {
+            Value::Expression(Expression(x, xt)) => {
+                self.flow.register_local(ident.to_owned(), xt); // TODO: &'ast str?
+                self.symbols.push(ident, Binding::Type(xt));
+                Value::Expression(Expression(self.module.local_tee(ident, x), xt))
+            }
+            Value::Constant(x) => {
+                self.symbols.push(ident, Binding::Constant(x));
+                Value::Constant(x)
+            }
+        }
+    }
+
+    fn parse_cast(&mut self) -> Value<S> {
+        let start = self.start;
+        assert_eq!(self.tk, Some(Token::BinOp(BinOp(false, BinOpVariant::Lt))));
+        self.next();
+
+        let t = self.parse_type().unwrap(); // TODO
+        let is_reinterpret = match self.tk {
+            Some(Token::BinOp(BinOp(false, BinOpVariant::Gt))) => {
+                self.next();
+                false
+            }
+            Some(Token::UnOp(UnOp::LNot)) => {
+                self.next();
+                match self.tk {
+                    Some(Token::BinOp(BinOp(false, BinOpVariant::Gt))) => self.next(),
+                    _ => self.error(Message::MissingClosingAngleBracket, self.span()),
+                }
+
+                true
+            }
+            _ => {
+                self.error(Message::MissingClosingAngleBracket, self.span());
+                false
+            }
+        };
+
+        let atom = self.primaryatom();
+        //let end = atom.1.end;
+        /*Some(Spanned(
+            if is_reinterpret {
+                Atom::Reinterpret(t, Box::new(atom))
+            } else {
+                Atom::Cast(t, Box::new(atom))
+            },
+            Span::new(start, end),
+        ))*/
+        todo!()
+    }
+
+    fn parse_br(&mut self) -> Value<S> {
+        assert_eq!(self.tk, Some(Token::Br));
+        self.next();
+
+        // TODO: refactor double arrow check
+        let ret = match self.tk {
+            Some(Token::Arrow | Token::If) => None,
+            _ => Some(self.atom()),
+        };
+
+        let label = match self.tk {
+            Some(Token::Arrow) => {
+                self.next();
+                self.take(|this, t| match t {
+                    Some(Token::Label(x)) => Next(Some(x)),
+                    Some(Token::Ident(_)) => {
+                        this.error(Message::IdentifierIsNotLabel, this.span());
+                        Next(None)
+                    }
+                    tk => {
+                        this.error(Message::MissingLabel, this.span());
+                        Fill(None, tk)
+                    }
+                })
+            }
+            _ => None,
+        };
+
+        let cond = match self.tk {
+            Some(Token::If) => {
+                self.next();
+                Some(self.atom())
+            }
+            _ => None,
+        };
+
+        //Some(Spanned(
+        //    Atom::Br { ret, label, cond },
+        //    Span::new(start, end),
+        //))
+
+        todo!()
+    }
+
+    fn parse_ret(&mut self) -> Value<S> {
+        let start = self.start;
+        let mut end = self.end;
+        debug_assert_eq!(self.tk, Some(Token::Return));
+        self.next();
+
+        let a = if self.can_begin_atom() {
+            Some(self.atom())
+        } else {
+            None
+        };
+
+        //Some(Spanned(Atom::Return(a), Span::new(start, end)))
+        todo!()
+    }
+
+    fn unop(&mut self, u: UnOp) -> Value<S> {
+        let start = self.start;
+        self.next();
+
+        let a = self.primaryatom();
+        //Some(Spanned(Atom::UnOp(u, Box::new(a)), Span::new(start, end)))
+        todo!()
+    }
+
+    pub(crate) fn primaryatom(&mut self) -> Value<S> {
+        match self.tk {
+            Some(Token::Let) => self.parse_let(),
+            Some(Token::BinOp(BinOp(false, BinOpVariant::Lt))) => self.parse_cast(),
+
+            Some(Token::Br) => self.parse_br(),
+            Some(Token::Return) => self.parse_ret(),
+
+            // any ambiguous ops here become unary
+            Some(Token::AmbiguousOp(o)) => self.unop(o.unary()),
+            Some(Token::UnOp(u)) => self.unop(u),
+
+            _ => self.simpleatom(),
+        }
+    }
+}

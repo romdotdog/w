@@ -3,39 +3,34 @@
 pub mod diag;
 pub mod source_map;
 
-use std::cell::RefCell;
 use std::path::Path;
 
 use diag::emitter::Emitter;
 use diag::Diagnostic;
 use diag::Diagnostics;
 use source_map::{loader::Loader, source::Source, SourceMap};
-use w_ast::Span;
-use w_ast::AST;
+use w_codegen::nop::NopSerializer;
+use w_compiler::handler::Handler;
+use w_compiler::handler::Status;
+use w_compiler::Compiler;
 use w_errors::Message;
-use w_parser::handler::Handler;
-use w_parser::handler::Status;
-use w_parser::Parser;
+use w_utils::span::Span;
 
-type Program<'a> = Vec<(&'a Source, AST<'a>)>;
-pub struct Session<'src, L: Loader, E: Emitter> {
+pub struct Session<L: Loader, E: Emitter> {
     source_map: SourceMap<L>,
-    diags: Diagnostics<'src, E>,
-    prog: RefCell<Program<'src>>,
+    diags: Diagnostics<E>,
 }
 
-impl<'ast, L: Loader, E: Emitter> Session<'ast, L, E> {
+impl<L: Loader, E: Emitter> Session<L, E> {
     pub fn new(loader: L, emitter: E) -> Self {
         Session {
             diags: Diagnostics::new(emitter),
             source_map: SourceMap::new(loader),
-            prog: RefCell::new(Vec::new()),
         }
     }
 
-    pub fn parse(&'ast self, src: &'ast Source) -> Program<'ast> {
-        Parser::full_parse(self, src);
-        self.prog.replace(Vec::new())
+    pub fn compile(&self, src: &Source) {
+        Compiler::compile(self, NopSerializer, src);
     }
 
     pub fn source_map(&self) -> &SourceMap<L> {
@@ -43,7 +38,7 @@ impl<'ast, L: Loader, E: Emitter> Session<'ast, L, E> {
     }
 }
 
-impl<'ast, L: Loader, E: Emitter> Handler<'ast> for Session<'ast, L, E> {
+impl<'ast, L: Loader, E: Emitter> Handler<'ast> for Session<L, E> {
     type SourceRef = Source;
 
     fn error(&self, src_ref: &'ast Source, msg: Message, span: Span) {
@@ -73,9 +68,8 @@ impl<'ast, L: Loader, E: Emitter> Handler<'ast> for Session<'ast, L, E> {
         src_ref.src()
     }
 
-    fn set_ast(&self, src_ref: &'ast Self::SourceRef, prog: AST<'ast>) {
+    fn finish(&self, src_ref: &'ast Self::SourceRef) {
         src_ref.set_status(Status::AlreadyParsed);
-        self.prog.borrow_mut().push((src_ref, prog));
     }
 }
 

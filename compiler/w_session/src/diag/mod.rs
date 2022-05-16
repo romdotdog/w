@@ -1,6 +1,7 @@
-use appendlist::AppendList;
-use w_ast::Span;
+use std::cell::RefCell;
+
 use w_errors::Message;
+use w_utils::span::Span;
 
 use crate::source_map::source::Source;
 
@@ -12,24 +13,18 @@ pub struct Diagnostic<'ast> {
     pub msg: Message,
 }
 
-pub struct Diagnostics<'ast, E: emitter::Emitter> {
-    emitter: E,
-    errors: AppendList<Diagnostic<'ast>>,
+pub struct Diagnostics<E: emitter::Emitter> {
+    emitter: RefCell<E>,
 }
 
-impl<'ast, E: emitter::Emitter> Diagnostics<'ast, E> {
+impl<E: emitter::Emitter> Diagnostics<E> {
     pub fn new(emitter: E) -> Self {
         Self {
-            emitter,
-            errors: AppendList::new(),
+            emitter: RefCell::new(emitter),
         }
     }
 
-    pub fn error(&self, diagnostic: Diagnostic<'ast>) {
-        self.errors.push(diagnostic);
-    }
-
-    pub fn emit_errors(self) {
-        self.emitter.emit_errors(self.errors);
+    pub fn error(&self, diagnostic: Diagnostic) {
+        self.emitter.borrow_mut().emit_error(diagnostic);
     }
 }

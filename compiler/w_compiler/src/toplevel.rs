@@ -1,10 +1,19 @@
-use super::{Fill, Handler, Next, Parser};
-use std::collections::{hash_map::Entry, HashMap};
-use w_ast::{Span, Spanned, TopLevel, TypeBody, AST};
+use crate::{
+    registry::Item,
+    types::{typ::VOID, IdentPair},
+};
+
+use super::{Compiler, Fill, Handler, Next};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    convert::TryInto,
+};
+use w_codegen::{Serializer, WASMType};
 use w_errors::Message;
 use w_lexer::token::{BinOp, BinOpVariant, Token};
+use w_utils::span::Span;
 
-impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
+impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     pub fn can_begin_toplevel(&self) -> bool {
         matches!(
             self.tk,
@@ -21,7 +30,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
 
     // static
 
-    pub(crate) fn parse_static(&mut self) -> Option<Spanned<TopLevel<'ast>>> {
+    pub(crate) fn parse_static(&mut self) {
         let start = self.start;
         assert_eq!(self.tk, Some(Token::Static));
         self.next();
@@ -30,8 +39,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             return self.function(false, true);
         }
 
-        let decl = self.parse_decl()?;
-        let end = decl.1.end;
+        let decl = self.parse_decl().unwrap();
 
         if let Some(Token::Semicolon) = self.tk {
             self.next();
@@ -39,12 +47,13 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             self.error(Message::MissingSemicolon, self.span());
         }
 
-        Some(Spanned(TopLevel::Static(decl.0), Span::new(start, end)))
+        // Some(Spanned(TopLevel::Static(decl.0), Span::new(start, end)))
+        todo!()
     }
 
     // enums
 
-    fn enum_body(&mut self) -> Option<Spanned<HashMap<&'ast str, i64>>> {
+    fn enum_body(&mut self) -> Option<HashMap<&'ast str, i64>> {
         let mut discriminant = 0;
         let start = self.start;
         let mut h = HashMap::new();
@@ -109,30 +118,28 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                 }
             );
 
-            if let Some(Token::BinOp(BinOp::Compound(BinOpVariant::Id))) = self.tk {
+            if let Some(Token::BinOp(BinOp(true, BinOpVariant::Id))) = self.tk {
                 self.next();
                 discriminant = self.take(|this, t| {
                     // take
                     let i = match t {
-                        Some(Token::I32(n)) => i64::from(n),
-                        Some(Token::U32(n) | Token::U31(n)) => i64::from(n),
-
-                        #[allow(clippy::cast_possible_wrap)]
-                        Some(Token::U63(n)) => n as i64, // invariant
-                        Some(Token::I64(n)) => n,
-
-                        Some(Token::U64(_)) => {
-                            match h.entry(s) {
-                                Entry::Vacant(e) => {
-                                    e.insert(discriminant);
+                        Some(Token::Integer(n)) => n,
+                        Some(Token::Uinteger(n)) => {
+                            if let Ok(n) = n.try_into() {
+                                n
+                            } else {
+                                match h.entry(s) {
+                                    Entry::Vacant(e) => {
+                                        e.insert(discriminant);
+                                    }
+                                    Entry::Occupied(_) => {
+                                        this.error(Message::DuplicateEnumField, sident);
+                                    }
                                 }
-                                Entry::Occupied(_) => {
-                                    this.error(Message::DuplicateEnumField, sident);
-                                }
+
+                                this.error(Message::IntegerNoFit, this.span());
+                                return Next(discriminant + 1);
                             }
-
-                            this.error(Message::IntegerNoFit, this.span());
-                            return Next(discriminant + 1);
                         }
                         t => {
                             this.error(Message::MissingInteger, this.span());
@@ -159,34 +166,27 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             return None;
         };
 
-        Some(Spanned(h, Span::new(start, end)))
+        Some(h)
     }
 
-    pub fn parse_enum(&mut self) -> Option<Spanned<TopLevel<'ast>>> {
+    pub fn parse_enum(&mut self) {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::Enum));
         self.next();
 
-        let name = self.expect_ident(&Some(Token::LeftBracket));
+        let name = self.expect_ident(&Some(Token::LeftBracket)).unwrap(); // TODO
         if let Some(Token::LeftBracket) = self.tk {
-            let fields = self.enum_body()?;
-            let end = fields.1.end;
-            Some(Spanned(
-                TopLevel::Enum { name, fields },
-                Span::new(start, end),
-            ))
+            let fields = self.enum_body().unwrap(); // TODO
+            self.registry.push(name, Item::Enum(fields));
         } else {
             self.error(Message::MissingOpeningBracket, self.span());
-            None
+            todo!()
         }
     }
 
     // structs
 
-    pub(crate) fn type_body(
-        &mut self,
-        allow_no_trailing_semi: bool,
-    ) -> Option<Spanned<TypeBody<'ast>>> {
+    pub(crate) fn type_body(&mut self, allow_no_trailing_semi: bool) -> Vec<IdentPair> {
         let start = self.start;
         if let Some(Token::LeftBracket) = self.tk {
             let mut v = Vec::new();
@@ -200,7 +200,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                 }
 
                 // TODO: add panic behavior
-                let pair = self.ident_type_pair(true)?;
+                let pair = self.ident_type_pair().unwrap(); // TODO
                 v.push(pair);
 
                 match self.tk {
@@ -212,34 +212,35 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                     }
                     None => {
                         self.error(Message::MissingClosingBracket, Span::new(start, self.end));
-                        return None;
+                        todo!();
                     }
                     _ => {
                         // mut ident: type }
                         //                ^
                         // mut ident: type}
                         //                ^
-                        let last_pos = v.last().unwrap().1.end + 1;
-                        self.error(Message::MissingSemicolon, Span::new(last_pos, last_pos + 1));
+                        //let last_pos = v.last().unwrap().1.end + 1;
+                        //self.error(Message::MissingSemicolon, Span::new(last_pos, last_pos + 1));
+                        todo!();
                     }
                 }
             };
 
-            Some(Spanned(TypeBody(v), Span::new(start, end)))
+            v
         } else {
             self.error(Message::MissingOpeningBracket, self.span());
-            None
+            todo!()
         }
     }
 
-    pub fn struct_or_union(&mut self, is_struct: bool) -> Option<Spanned<TopLevel<'ast>>> {
+    pub fn struct_or_union(&mut self, is_struct: bool) {
         let start = self.start;
         debug_assert!(matches!(self.tk, Some(Token::Struct | Token::Union)));
         self.next();
 
         let name = self.expect_ident(&Some(Token::LeftBracket));
-        let fields = self.type_body(false)?;
-        let end = fields.1.end;
+        let fields = self.type_body(false);
+        /*let end = fields.1.end;
         Some(Spanned(
             if is_struct {
                 TopLevel::Struct(name, fields)
@@ -247,17 +248,20 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                 TopLevel::Union(name, fields)
             },
             Span::new(start, end),
-        ))
+        ))*/
+        todo!()
     }
 
     // functions
 
-    pub fn function(&mut self, exported: bool, static_: bool) -> Option<Spanned<TopLevel<'ast>>> {
+    pub fn function(&mut self, exported: bool, static_: bool) {
+        // TODO: lambda lifting
+
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::Fn));
         self.next();
 
-        let name = self.expect_ident(&Some(Token::LeftParen));
+        let name = self.expect_ident(&Some(Token::LeftParen)).unwrap(); // TODO
         let paren_end = match self.tk {
             Some(Token::LeftParen) => {
                 self.next();
@@ -265,7 +269,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
             }
             _ => {
                 self.error(Message::MissingOpeningParen, self.span());
-                return None;
+                todo!();
             }
         };
 
@@ -274,7 +278,7 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         match self.tk {
             Some(Token::RightParen) => self.next(),
             Some(Token::Ident(_) | Token::Mut) => loop {
-                params.push(self.ident_type_pair(true)?);
+                params.push(self.ident_type_pair().unwrap()); // TODO
                 match self.tk {
                     Some(Token::Comma) => self.next(),
                     Some(Token::RightParen) => {
@@ -284,45 +288,54 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
                     _ => {
                         // fn ident(mut ident: type
                         //                         ^
-                        // TODO: refactor
-                        let pos = params[params.len() - 1].1.end;
-                        self.error(Message::MissingClosingParen, Span::new(pos, pos + 1));
-                        return None;
+                        //let pos = params[params.len() - 1].1.end;
+                        //self.error(Message::MissingClosingParen, Span::new(pos, pos + 1));
+                        todo!();
                     }
                 }
             },
             _ => {
                 // fn ident(
                 //          ^
-                self.error(
-                    Message::MissingClosingParen,
-                    Span::new(paren_end, paren_end + 1),
-                );
-                return None;
+                //self.error(
+                //    Message::MissingClosingParen,
+                //    Span::new(paren_end, paren_end + 1),
+                //);
+                //return None;
+                todo!();
             }
         }
 
-        let t = match self.tk {
+        let return_type = match self.tk {
             Some(Token::Colon) => {
                 self.next();
-                Some(self.parse_type()?)
+                self.parse_type().unwrap()
             }
-            _ => None,
+            _ => VOID,
         };
 
-        let atom = self.atom()?;
-        let end = atom.1.end;
-        Some(Spanned(
-            TopLevel::Fn {
-                name,
-                params,
-                atom,
-                t,
-                exported,
-                static_,
+        let atom = self.atom();
+        let ret = atom
+            .compile(&mut self.module, Some(return_type))
+            .unwrap_or_else(|| {
+                self.error(Message::TypeMismatch, self.span());
+                self.unreachable_expr()
+            });
+
+        let vars = self.flow.vars();
+        let vars_hack: Vec<(&str, WASMType)> = vars.iter().map(|(s, t)| (s.as_str(), *t)).collect(); // TODO
+
+        // TODO: exports, mangling
+        self.module.add_function(
+            name,
+            params.iter().map(|p| (p.ident, p.typ.resolve())).collect(),
+            match return_type {
+                t if t != VOID => vec![t.resolve()],
+                _ => Vec::new(),
             },
-            Span::new(start, end),
-        ))
+            vars_hack,
+            ret.0,
+        );
     }
 
     // panicking behavior
@@ -358,36 +371,37 @@ impl<'ast, H: Handler<'ast>> Parser<'ast, H> {
         }
     }
 
-    pub fn parse_toplevel(&mut self) -> Option<Spanned<TopLevel<'ast>>> {
+    pub fn parse_toplevel(&mut self) {
         match self.tk {
             Some(Token::Export) => {
                 self.next();
-                self.function(true, false)
+                self.function(true, false);
             }
             Some(Token::Fn) => self.function(false, false),
             Some(Token::Struct) => self.struct_or_union(true),
             Some(Token::Union) => self.struct_or_union(false),
             Some(Token::Enum) => self.parse_enum(),
             Some(Token::Static) => self.parse_static(),
-            _ => None,
+            _ => todo!(),
         }
     }
 
     // main
 
-    pub fn parse(mut self) -> AST<'ast> {
-        let mut toplevel = Vec::new();
+    pub fn parse(mut self, report_finish: bool) -> S {
         loop {
             if self.tk.is_none() {
                 break;
             }
 
-            match self.parse_toplevel() {
-                Some(t) => toplevel.push(t),
-                None => self.panic_top_level(),
-            }
+            self.parse_toplevel();
+            //if !self.parse_toplevel() {
+            //    self.panic_top_level();
+            //}
         }
-
-        AST(toplevel)
+        if report_finish {
+            self.session.finish(self.src_ref);
+        }
+        self.module
     }
 }

@@ -1,5 +1,5 @@
 [package]
-name = "w_ast"
+name = "w_codegen"
 version = "0.0.0"
 edition = "2018"
 
@@ -7,4 +7,3 @@ edition = "2018"
 doctest = false
 
 [dependencies]
-w_lexer = { path = "../w_lexer" }
