@@ -8,9 +8,21 @@ use w_codegen::{Serializer, WASMType};
 use crate::types::typ::Type;
 
 #[derive(Default)]
-pub struct Flow(Vec<(String, WASMType)>, HashMap<WASMType, Vec<bool>>); // TODO: &'ast str?
+pub struct Flow(
+    Vec<(String, WASMType)>,
+    HashMap<WASMType, Vec<bool>>,
+    Option<Type>,
+); // TODO: &'ast str?
 
 impl Flow {
+    pub fn set_return_type(&mut self, t: Type) {
+        self.2 = Some(t);
+    }
+
+    pub fn get_return_type(&self) -> Option<Type> {
+        self.2
+    }
+
     pub fn register_local(&mut self, s: String, t: Type) {
         self.0.push((s, t.resolve()));
     }

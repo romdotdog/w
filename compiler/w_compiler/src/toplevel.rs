@@ -320,7 +320,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             self.symbols.push(param.ident, Binding::Type(param.typ))
         }
 
-        let atom = self.atom();
+        let atom = self.atom(Some(return_type));
         self.symbols.free_frame(top);
 
         let ret = atom

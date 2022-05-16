@@ -4,7 +4,7 @@ use crate::{
     types::{
         constant::Constant,
         itemref::ItemRef,
-        typ::{Type, I32, UNREACHABLE, VOID},
+        typ::{Type, I32, U32, UNREACHABLE, VOID},
     },
     Expression, Value,
 };
@@ -16,13 +16,17 @@ use w_lexer::token::{Token, UnOp};
 use w_utils::span::Span;
 
 impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
-    pub(crate) fn parse_block(&mut self, label: Option<&'ast str>) -> Value<S> {
+    pub(crate) fn parse_block(
+        &mut self,
+        label: Option<&'ast str>,
+        contextual_type: Option<Type>,
+    ) -> Value<S> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::LeftBracket));
         self.next();
 
         let mut contents = Vec::new();
-        let mut typ = None;
+        let mut typ = VOID;
 
         let end = 'm: loop {
             macro_rules! panic_block {
@@ -52,33 +56,59 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 self.parse_toplevel();
             }
 
-            match self.tk {
+            let atom = match self.tk {
                 Some(Token::RightBracket) => {
-                    typ = None;
+                    typ = VOID;
 
                     let end_ = self.end;
                     self.next();
                     break end_;
                 }
-                None => {}
-                _ => match self.atom() {
-                    Value::Expression(Expression(x, xt)) => {
+                None => {
+                    let end_ = self.end;
+                    self.error(Message::MissingClosingBracket, Span::new(start, end_));
+                    break end_;
+                }
+                _ => self.atom(None),
+            };
+
+            match self.tk {
+                Some(Token::RightBracket) => {
+                    match atom {
+                        Value::Expression(Expression(x, xt)) => {
+                            contents.push(x);
+                            typ = xt;
+                        }
+                        Value::Constant(x) => {
+                            if let Some(contextual_type) = contextual_type {
+                                if let Some(Expression(x, xt)) =
+                                    x.compile(&mut self.module, contextual_type)
+                                {
+                                    contents.push(x);
+                                    typ = xt;
+                                } else {
+                                    self.error(Message::TypeMismatch, self.span());
+                                    contents.push(self.module.unreachable());
+                                    typ = UNREACHABLE;
+                                }
+                            } else {
+                                self.error(Message::NeedType, self.span());
+                                contents.push(self.module.unreachable());
+                                typ = UNREACHABLE;
+                            }
+                        }
+                    }
+
+                    let end_ = self.end;
+                    self.next();
+                    break end_;
+                }
+                Some(Token::Semicolon) => {
+                    if let Value::Expression(Expression(x, _)) = atom {
                         contents.push(x);
-                        typ = Some(xt);
                     }
-                    Value::Constant(_) => {
-                        self.error(Message::NeedType, self.span());
-                    }
-                },
-            }
-
-            match self.tk {
-                Some(Token::RightBracket) => {
-                    let end_ = self.end;
-                    self.next();
-                    break end_;
+                    self.next()
                 }
-                Some(Token::Semicolon) => self.next(),
                 None => {
                     let end_ = self.end;
                     self.error(Message::MissingClosingBracket, Span::new(start, end_));
@@ -99,19 +129,21 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             },
             Span::new(start, end),
         )*/
-        if let Some(typ) = typ {
-            if typ != VOID {
-                return Value::Expression(Expression(
-                    self.module.block(label, &contents, Some(typ.resolve())),
-                    typ,
-                ));
-            }
+        if typ != VOID {
+            Value::Expression(Expression(
+                self.module.block(label, &contents, Some(typ.resolve())),
+                typ,
+            ))
+        } else {
+            Value::Expression(Expression(self.module.block(label, &contents, None), VOID))
         }
-
-        Value::Expression(Expression(self.module.block(label, &contents, None), VOID))
     }
 
-    pub(crate) fn parse_loop(&mut self, label: Option<&'ast str>) -> Value<S> {
+    pub(crate) fn parse_loop(
+        &mut self,
+        label: Option<&'ast str>,
+        contextual_type: Option<Type>,
+    ) -> Value<S> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::Loop));
         self.next();
@@ -121,7 +153,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             _ => None,
         };
 
-        let body = match self.atom() {
+        // TODO: results
+        let body = match self.atom(contextual_type) {
             Value::Expression(Expression(x, _)) => x,
             Value::Constant(_) => {
                 self.error(Message::UselessConstant, self.span());
@@ -129,21 +162,29 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             }
         };
 
-        // TODO: results
         Value::Expression(Expression(self.module.loop_(label, body), VOID))
     }
 
-    fn parse_if(&mut self) -> Value<S> {
+    fn parse_if(&mut self, contextual_type: Option<Type>) -> Value<S> {
         let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::If));
         self.next();
 
-        let cond = self.atom();
-        let true_branch = self.atom();
+        let cond = self.atom(Some(U32));
+        let true_branch = self.atom(contextual_type);
         let false_branch = match self.tk {
             Some(Token::Else) => {
                 self.next();
-                Some(self.atom())
+
+                let contextual_type = contextual_type.or_else(|| {
+                    if let Value::Expression(Expression(_, t)) = true_branch {
+                        Some(t)
+                    } else {
+                        None
+                    }
+                });
+
+                Some(self.atom(contextual_type))
             }
             _ => None,
         };
@@ -265,7 +306,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
                 Some(Token::LeftSqBracket) => {
                     self.next();
-                    let atom = self.atom();
+                    let atom = self.atom(Some(U32));
 
                     match self.tk {
                         Some(Token::RightSqBracket) => {
@@ -318,7 +359,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                                     todo!()
                                 });
 
-                                let atom = self.atom();
+                                let atom = self.atom(Some(t));
                                 if let Some(Expression(x, _)) =
                                     atom.compile(&mut self.module, Some(t))
                                 {
@@ -356,12 +397,12 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         lhs
     }
 
-    pub(crate) fn simpleatom(&mut self) -> Value<S> {
+    pub(crate) fn simpleatom(&mut self, contextual_type: Option<Type>) -> Value<S> {
         let lhs: Value<S> = match self.tk {
             Some(Token::LeftParen) => {
                 self.next();
 
-                let e = self.atom();
+                let e = self.atom(contextual_type);
 
                 if self.tk != Some(Token::RightParen) {
                     self.error(Message::MissingClosingParen, self.span());
@@ -387,9 +428,9 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 self.next();
                 todo!()
             }
-            Some(Token::If) => self.parse_if(),
-            Some(Token::LeftBracket) => self.parse_block(None),
-            Some(Token::Loop) => self.parse_loop(None),
+            Some(Token::If) => self.parse_if(contextual_type),
+            Some(Token::LeftBracket) => self.parse_block(None, contextual_type),
+            Some(Token::Loop) => self.parse_loop(None, contextual_type),
             Some(Token::Overflown) => {
                 self.error(Message::LiteralTooLarge, self.span());
                 return self.unreachable();
@@ -429,8 +470,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         };
 
                         NoFill(match this.tk {
-                            Some(Token::LeftBracket) => this.parse_block(Some(x)),
-                            Some(Token::Loop) => this.parse_loop(Some(x)),
+                            Some(Token::LeftBracket) => this.parse_block(Some(x), contextual_type),
+                            Some(Token::Loop) => this.parse_loop(Some(x), contextual_type),
                             _ => {
                                 // TODO: parse atom?
                                 this.error(Message::CannotFollowLabel, this.span());

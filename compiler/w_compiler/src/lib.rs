@@ -430,7 +430,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         match self.tk {
             Some(Token::BinOp(BinOp(true, BinOpVariant::Id))) => {
                 self.next();
-                let mut v = self.atom();
+                let mut v = self.atom(typ);
                 if let Some(typ) = typ {
                     match v {
                         Value::Expression(Expression(_, ref mut xt)) => {
@@ -481,6 +481,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         &mut self,
         mut lhs: Value<S>,
         min_prec: u8,
+        contextual_type: Option<Type>
     ) -> Value<S> {
         // https://en.wikipedia.org/wiki/Operator-precedence_parser
 
@@ -497,7 +498,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             let current_prec = t.prec();
             if t.prec() >= min_prec {
                 self.next();
-                let mut rhs = self.primaryatom();
+                let mut rhs = self.primaryatom(contextual_type);
                 loop {
                     let (right_associative, next_prec) = match self.tk {
                         Some(Token::BinOp(BinOp(true, v))) => (true, v.prec()),
@@ -507,9 +508,9 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     };
 
                     if next_prec > current_prec {
-                        rhs = self.subatom(rhs, current_prec + 1);
+                        rhs = self.subatom(rhs, current_prec + 1, contextual_type);
                     } else if right_associative && next_prec == current_prec {
-                        rhs = self.subatom(rhs, current_prec);
+                        rhs = self.subatom(rhs, current_prec, contextual_type);
                     } else {
                         break;
                     }
@@ -523,8 +524,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         lhs
     }
 
-    pub fn atom(&mut self) -> Value<S> {
-        let lhs = self.primaryatom();
-        self.subatom(lhs, 0)
+    pub fn atom(&mut self, contextual_type: Option<Type>) -> Value<S> {
+        let lhs = self.primaryatom(contextual_type);
+        self.subatom(lhs, 0, contextual_type)
     }
 }

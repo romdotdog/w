@@ -2,7 +2,7 @@ use crate::{
     symbol_stack::Binding,
     types::{
         expression::Expression,
-        typ::{Type, VOID},
+        typ::{Type, U32},
     },
     Value,
 };
@@ -57,7 +57,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             }
         };
 
-        let atom = self.primaryatom();
+        let atom = self.primaryatom(Some(t));
         //let end = atom.1.end;
         /*Some(Spanned(
             if is_reinterpret {
@@ -77,7 +77,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         // TODO: refactor double arrow check
         let ret = match self.tk {
             Some(Token::Arrow | Token::If) => None,
-            _ => Some(self.atom()),
+            _ => Some(self.atom(None)), // TODO: br contextual type
         };
 
         let label = match self.tk {
@@ -101,7 +101,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         let cond = match self.tk {
             Some(Token::If) => {
                 self.next();
-                Some(self.atom())
+                Some(self.atom(Some(U32)))
             }
             _ => None,
         };
@@ -121,7 +121,9 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         self.next();
 
         let a = if self.can_begin_atom() {
-            Some(self.atom())
+            let typ = self.flow.get_return_type();
+            assert!(typ.is_some());
+            Some(self.atom(typ))
         } else {
             None
         };
@@ -130,16 +132,17 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         todo!()
     }
 
-    fn unop(&mut self, u: UnOp) -> Value<S> {
+    fn unop(&mut self, u: UnOp, contextual_type: Option<Type>) -> Value<S> {
         let start = self.start;
         self.next();
 
-        let a = self.primaryatom();
+        let a = self.primaryatom(None); // TODO: contextual type
+
         //Some(Spanned(Atom::UnOp(u, Box::new(a)), Span::new(start, end)))
         todo!()
     }
 
-    pub(crate) fn primaryatom(&mut self) -> Value<S> {
+    pub(crate) fn primaryatom(&mut self, contextual_type: Option<Type>) -> Value<S> {
         match self.tk {
             Some(Token::Let) => self.parse_let(),
             Some(Token::BinOp(BinOp(false, BinOpVariant::Lt))) => self.parse_cast(),
@@ -148,10 +151,10 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             Some(Token::Return) => self.parse_ret(),
 
             // any ambiguous ops here become unary
-            Some(Token::AmbiguousOp(o)) => self.unop(o.unary()),
-            Some(Token::UnOp(u)) => self.unop(u),
+            Some(Token::AmbiguousOp(o)) => self.unop(o.unary(), contextual_type),
+            Some(Token::UnOp(u)) => self.unop(u, contextual_type),
 
-            _ => self.simpleatom(),
+            _ => self.simpleatom(contextual_type),
         }
     }
 }
