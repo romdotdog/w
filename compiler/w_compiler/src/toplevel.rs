@@ -1,5 +1,6 @@
 use crate::{
     registry::Item,
+    symbol_stack::Binding,
     types::{typ::VOID, IdentPair},
 };
 
@@ -314,7 +315,14 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             _ => VOID,
         };
 
+        let top = self.symbols.get_top();
+        for param in params.iter() {
+            self.symbols.push(param.ident, Binding::Type(param.typ))
+        }
+
         let atom = self.atom();
+        self.symbols.free_frame(top);
+
         let ret = atom
             .compile(&mut self.module, Some(return_type))
             .unwrap_or_else(|| {

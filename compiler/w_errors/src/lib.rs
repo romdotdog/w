@@ -52,6 +52,7 @@ errors!(
     UselessConstant => "useless constant",
     TooManyArgs => "too many arguments",
     UnresolvedType => "unresolved type",
+    UnresolvedIdentifier => "identifier does not exist",
     InvalidCoercion => "invalid coercion",
     InvalidOperation => "invalid operation",
     ReferenceCoercion => "cannot coerce to reference",

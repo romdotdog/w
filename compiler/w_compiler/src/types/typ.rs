@@ -35,7 +35,7 @@ impl Type {
         } else {
             match self.item {
                 ItemRef::Void => todo!(),
-                ItemRef::Unreachable => todo!(),
+                ItemRef::Unreachable => WASMType::I32, // maybe?
                 ItemRef::HeapType(_) => todo!(),
                 ItemRef::Ref(_) => todo!(),
                 ItemRef::StackType(t) => match t {

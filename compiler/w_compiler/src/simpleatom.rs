@@ -1,5 +1,6 @@
 use crate::{
     registry::Item,
+    symbol_stack::Binding,
     types::{
         constant::Constant,
         itemref::ItemRef,
@@ -98,10 +99,16 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             },
             Span::new(start, end),
         )*/
-        Value::Expression(Expression(
-            self.module.block(label, &contents, typ.map(Type::resolve)),
-            typ.unwrap_or(VOID),
-        ))
+        if let Some(typ) = typ {
+            if typ != VOID {
+                return Value::Expression(Expression(
+                    self.module.block(label, &contents, Some(typ.resolve())),
+                    typ,
+                ));
+            }
+        }
+
+        Value::Expression(Expression(self.module.block(label, &contents, None), VOID))
     }
 
     pub(crate) fn parse_loop(&mut self, label: Option<&'ast str>) -> Value<S> {
@@ -401,7 +408,18 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                             this.error(Message::IdentifierIsNotLabel, this.span());
                             // TODO: not label behavior
                         };
-                        todo!()
+                        if let Some(binding) = this.symbols.find(s) {
+                            match binding {
+                                Binding::Type(t) => NoFill(Value::Expression(Expression(
+                                    this.module.local_get(s),
+                                    t,
+                                ))),
+                                Binding::Constant(c) => NoFill(Value::Constant(c)),
+                            }
+                        } else {
+                            this.error(Message::UnresolvedIdentifier, this.span());
+                            NoFill(this.unreachable())
+                        }
                     }
                     Some(Token::Label(x)) => {
                         this.next(); // fill
