@@ -320,7 +320,10 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         let atom = self.atom();
         let ret = atom
             .compile(&mut self.module, Some(return_type))
-            .unwrap_or_else(|| self.unreachable_expr());
+            .unwrap_or_else(|| {
+                self.error(Message::TypeMismatch, self.span());
+                self.unreachable_expr()
+            });
 
         let vars = self.flow.vars();
         let vars_hack: Vec<(&str, WASMType)> = vars.iter().map(|(s, t)| (s.as_str(), *t)).collect(); // TODO

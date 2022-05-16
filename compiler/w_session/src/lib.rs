@@ -17,12 +17,12 @@ use w_compiler::Compiler;
 use w_errors::Message;
 use w_utils::span::Span;
 
-pub struct Session<'src, L: Loader, E: Emitter> {
+pub struct Session<L: Loader, E: Emitter> {
     source_map: SourceMap<L>,
-    diags: Diagnostics<'src, E>,
+    diags: Diagnostics<E>,
 }
 
-impl<'ast, L: Loader, E: Emitter> Session<'ast, L, E> {
+impl<L: Loader, E: Emitter> Session<L, E> {
     pub fn new(loader: L, emitter: E) -> Self {
         Session {
             diags: Diagnostics::new(emitter),
@@ -30,7 +30,7 @@ impl<'ast, L: Loader, E: Emitter> Session<'ast, L, E> {
         }
     }
 
-    pub fn compile(&'ast self, src: &'ast Source) {
+    pub fn compile(&self, src: &Source) {
         Compiler::compile(self, NopSerializer, src);
     }
 
@@ -39,7 +39,7 @@ impl<'ast, L: Loader, E: Emitter> Session<'ast, L, E> {
     }
 }
 
-impl<'ast, L: Loader, E: Emitter> Handler<'ast> for Session<'ast, L, E> {
+impl<'ast, L: Loader, E: Emitter> Handler<'ast> for Session<L, E> {
     type SourceRef = Source;
 
     fn error(&self, src_ref: &'ast Source, msg: Message, span: Span) {

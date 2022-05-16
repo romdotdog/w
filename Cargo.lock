@@ -55,7 +55,6 @@ version = "0.0.0"
 name = "w_compiler"
 version = "0.0.0"
 dependencies = [
- "similar",
  "w_codegen",
  "w_errors",
  "w_lexer",
@@ -78,6 +77,7 @@ name = "w_session"
 version = "0.0.0"
 dependencies = [
  "appendlist",
+ "similar",
  "w_codegen",
  "w_compiler",
  "w_errors",

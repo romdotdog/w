@@ -62,7 +62,17 @@ impl<S: Serializer> Value<S> {
     // TODO: refactor to match Constant::compile?
     pub fn compile(self, module: &mut S, contextual_type: Option<Type>) -> Option<Expression<S>> {
         match self {
-            Value::Expression(x) => Some(x),
+            Value::Expression(x) => {
+                if let Some(contextual_type) = contextual_type {
+                    if x.1 == contextual_type {
+                        Some(x)
+                    } else {
+                        None
+                    }
+                } else {
+                    Some(x)
+                }
+            }
             Value::Constant(x) => contextual_type.and_then(|typ| x.compile(module, typ)),
         }
     }
