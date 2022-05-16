@@ -241,7 +241,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     pub fn operate_values(&mut self, lhs: Value<S>, rhs: Value<S>, op: BinOp) -> Value<S> {
         match (lhs, rhs) {
             (Value::Constant(l), Value::Expression(r @ Expression(_, t))) => {
-                if let Some(l) = l.compile(&mut self.module, t) {
+                let l = l.compile(&mut self.module, Some(t));
+                if l.1 == t {
                     self.operate_values(
                         Value::Expression(l), 
                         Value::Expression(r),
@@ -253,7 +254,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 }
             },
             (Value::Expression(l @ Expression(_, t)), Value::Constant(r)) => {
-                if let Some(r) = r.compile(&mut self.module, t) {
+                let r = r.compile(&mut self.module, Some(t));
+                if r.1 == t {
                     self.operate_values(
                         Value::Expression(l), 
                         Value::Expression(r),
@@ -265,7 +267,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 }
             },
             (Value::Expression(l), Value::Expression(r)) => {
-                if l.1 == UNREACHABLE || r.1 == UNREACHABLE {
+                if l.1 == UNREACHABLE || r.1 == UNREACHABLE { // TODO: audit
                     return self.unreachable();
                 }
                 match l.operate(&mut self.module, r, op) {

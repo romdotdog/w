@@ -27,7 +27,14 @@ impl<S: Serializer> Value<S> {
         match self {
             Value::Expression(Expression(_, xt)) if xt == UNREACHABLE || xt == typ => Ok(self),
             Value::Expression(_) => Err(self),
-            Value::Constant(x) => x.compile(module, typ).map(Value::Expression).ok_or(self),
+            Value::Constant(x) => {
+                let comp = x.compile(module, Some(typ));
+                if comp.1 == typ {
+                    Ok(Value::Expression(comp))
+                } else {
+                    Err(self)
+                }
+            },
         }
     }
 
@@ -60,20 +67,10 @@ impl<S: Serializer> Value<S> {
     }
 
     // TODO: refactor to match Constant::compile?
-    pub fn compile(self, module: &mut S, contextual_type: Option<Type>) -> Option<Expression<S>> {
+    pub fn compile(self, module: &mut S, contextual_type: Option<Type>) -> Expression<S> {
         match self {
-            Value::Expression(x) => {
-                if let Some(contextual_type) = contextual_type {
-                    if x.1 == contextual_type {
-                        Some(x)
-                    } else {
-                        None
-                    }
-                } else {
-                    Some(x)
-                }
-            }
-            Value::Constant(x) => contextual_type.and_then(|typ| x.compile(module, typ)),
+            Value::Expression(x) => x,
+            Value::Constant(x) => x.compile(module, contextual_type),
         }
     }
 }

@@ -2,7 +2,7 @@ use crate::{
     registry::Item,
     spanned,
     symbol_stack::Binding,
-    types::{typ::VOID, IdentPair},
+    types::{typ::VOID, IdentPair, expression::Expression},
 };
 
 use super::{Compiler, Fill, Handler, Next};
@@ -308,7 +308,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             }
         }
 
-        let (return_type, return_type_span) = match self.tk {
+        let (return_signature, return_signature_span) = match self.tk {
             Some(Token::Colon) => {
                 self.next();
                 spanned!(self, { self.parse_type().unwrap() })
@@ -321,15 +321,14 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             self.symbols.push(param.ident, Binding::Type(param.typ))
         }
 
-        let atom = self.atom(Some(return_type));
+        let atom = self.atom(Some(return_signature));
         self.symbols.free_frame(top);
 
-        let ret = atom
-            .compile(&mut self.module, Some(return_type))
-            .unwrap_or_else(|| {
-                self.error(Message::TypeMismatch, return_type_span);
-                self.unreachable_expr()
-            });
+        let mut ret = atom.compile(&mut self.module, Some(return_signature));
+        if ret.1 != return_signature {
+            self.error(Message::TypeMismatch, return_signature_span);
+            ret = self.unreachable_expr();
+        }
 
         let vars = self.flow.vars();
         let vars_hack: Vec<(&str, WASMType)> = vars.iter().map(|(s, t)| (s.as_str(), *t)).collect(); // TODO
@@ -338,7 +337,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         self.module.add_function(
             name,
             params.iter().map(|p| (p.ident, p.typ.resolve())).collect(),
-            match return_type {
+            match return_signature {
                 t if t != VOID => vec![t.resolve()],
                 _ => Vec::new(),
             },

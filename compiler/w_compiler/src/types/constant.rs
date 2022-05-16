@@ -7,7 +7,7 @@ use super::{
     expression::Expression,
     itemref::{ItemRef, StackType},
     meta::{Meta, VALUE},
-    typ::Type,
+    typ::{Type, F64, I64, U64},
 };
 
 // arbitrary bounds
@@ -268,7 +268,7 @@ impl Constant {
         }
     }
 
-    pub fn compile<S: Serializer>(
+    fn compile_to_type<S: Serializer>(
         self,
         module: &mut S,
         contextual_type: Type,
@@ -305,6 +305,26 @@ impl Constant {
         } else {
             None
         }
+    }
+
+    pub fn compile<S: Serializer>(
+        self,
+        module: &mut S,
+        contextual_type: Option<Type>,
+    ) -> Expression<S> {
+        contextual_type
+            .and_then(|contextual_type| self.compile_to_type(module, contextual_type))
+            .unwrap_or_else(|| {
+                if self.meta.len() > 0 {
+                    todo!();
+                }
+
+                match self.constant {
+                    Integer(x) => Expression(module.i64_const(x), I64),
+                    Uinteger(x) => Expression(module.i64_const(reinterpret_u64(x)), U64),
+                    Float(x) => Expression(module.f64_const(x), F64),
+                }
+            })
     }
 
     fn operate_ptr(self, offset: Constant, op: BinOp) -> Option<Constant> {

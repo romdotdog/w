@@ -83,16 +83,9 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         }
                         Value::Constant(x) => {
                             if let Some(contextual_type) = contextual_type {
-                                if let Some(Expression(x, xt)) =
-                                    x.compile(&mut self.module, contextual_type)
-                                {
-                                    contents.push(x);
-                                    typ = xt;
-                                } else {
-                                    self.error(Message::TypeMismatch, self.span());
-                                    contents.push(self.module.unreachable());
-                                    typ = UNREACHABLE;
-                                }
+                                let Expression(x, xt) = x.compile(&mut self.module, Some(contextual_type));
+                                contents.push(x);
+                                typ = xt;
                             } else {
                                 self.error(Message::NeedType, self.span());
                                 contents.push(self.module.unreachable());
@@ -212,21 +205,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             if let Some((true_branch, false_branch)) =
                 true_branch.coerce(&mut self.module, false_branch)
             {
-                let true_branch = match true_branch.compile(&mut self.module, None) {
-                    Some(x) => x,
-                    None => {
-                        self.error(Message::NeedType, self.span());
-                        self.unreachable_expr()
-                    }
-                };
-
-                let false_branch = match false_branch.compile(&mut self.module, None) {
-                    Some(x) => x,
-                    None => {
-                        self.error(Message::NeedType, self.span());
-                        self.unreachable_expr()
-                    }
-                };
+                let true_branch = true_branch.compile(&mut self.module, contextual_type);
+                let false_branch = false_branch.compile(&mut self.module, contextual_type);
 
                 Value::Expression(Expression(
                     self.module.if_(cond.0, true_branch.0, Some(false_branch.0)),
@@ -355,12 +335,11 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                                 });
 
                                 let atom = self.atom(Some(t));
-                                if let Some(Expression(x, _)) =
-                                    atom.compile(&mut self.module, Some(t))
-                                {
-                                    args.push(x);
+                                let Expression(atom, atom_type) = atom.compile(&mut self.module, Some(t));
+                                if atom_type == t {
+                                    args.push(atom);
                                 } else {
-                                    self.error(Message::NeedType, self.span());
+                                    self.error(Message::TypeMismatch, self.span());
                                     todo!()
                                 }
 
