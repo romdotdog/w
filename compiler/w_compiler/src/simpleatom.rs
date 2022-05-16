@@ -1,5 +1,6 @@
 use crate::{
     registry::Item,
+    spanned,
     symbol_stack::Binding,
     types::{
         constant::Constant,
@@ -161,11 +162,10 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     }
 
     fn parse_if(&mut self, contextual_type: Option<Type>) -> Value<S> {
-        let start = self.start;
         debug_assert_eq!(self.tk, Some(Token::If));
         self.next();
 
-        let cond = self.atom(Some(U32));
+        let (cond, cond_span) = spanned!(self, { self.atom(Some(U32)) });
         let true_branch = self.atom(contextual_type);
         let false_branch = match self.tk {
             Some(Token::Else) => {
@@ -189,7 +189,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 if xt == I32 {
                     x
                 } else {
-                    self.error(Message::TypeMismatch, self.span());
+                    self.error(Message::TypeMismatch, cond_span);
                     self.unreachable_expr()
                 }
             }
@@ -197,13 +197,13 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 if let Some(b) = x.is_true() {
                     if b {
                         // TODO: fix?
-                        self.error(Message::ConditionTrue, self.span());
+                        self.error(Message::ConditionTrue, cond_span);
                         return true_branch;
                     }
-                    self.error(Message::ConditionFalse, self.span());
+                    self.error(Message::ConditionFalse, cond_span);
                     return false_branch.unwrap();
                 }
-                self.error(Message::TypeMismatch, self.span());
+                self.error(Message::TypeMismatch, cond_span);
                 todo!()
             }
         };

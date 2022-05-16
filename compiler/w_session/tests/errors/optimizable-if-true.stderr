@@ -1,0 +1,3 @@
+tests/errors/optimizable-if-true.w:2:8: error: condition evaluates to true
+    if 1 {
+       ^

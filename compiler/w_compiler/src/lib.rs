@@ -18,6 +18,7 @@ mod types;
 mod symbol_stack;
 mod locals;
 mod registry;
+mod spanned;
 
 use handler::{Handler, Status, ImportlessHandler, ImportlessHandlerHandler};
 use symbol_stack::SymbolStack;
@@ -29,6 +30,7 @@ pub struct Compiler<'ast, H: Handler<'ast>, S: Serializer> {
 	
     lex: Lexer<'ast>,
     start: usize,
+    real_end: usize,
     end: usize,
     tk: Option<Token<'ast>>,
 
@@ -61,6 +63,7 @@ impl<'ast, H: ImportlessHandler<'ast>, S: Serializer> Compiler<'ast, ImportlessH
             
 			lex,
             start: 0,
+            real_end: 0,
             end: 0,
             tk: None,
 
@@ -111,6 +114,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 			
             lex,
             start: 0,
+            real_end: 0,
             end: 0,
             tk: None,
 
@@ -129,7 +133,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             Some((tk, start, end)) => {
                 self.tk = Some(tk);
                 self.start = start;
-                self.end = end;
+                self.end = self.real_end;
+                self.real_end = end;
             }
             _ => {
                 self.tk = None;
@@ -174,7 +179,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     }
 
     fn span(&self) -> Span {
-        Span::new(self.start, self.end)
+        Span::new(self.start, self.real_end)
     }
 
     pub(crate) fn error(&self, msg: Message, span: Span) {
