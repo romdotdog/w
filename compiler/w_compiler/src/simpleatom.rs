@@ -25,6 +25,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         debug_assert_eq!(self.tk, Some(Token::LeftBracket));
         self.next();
 
+        let symbol_top = self.symbols.get_top();
         let mut contents = Vec::new();
         let mut typ = VOID;
 
@@ -121,21 +122,15 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             }
         };
 
-        /*Spanned(
-            Atom::Block {
-                label,
-                contents,
-                ret: last.map(Box::new),
-            },
-            Span::new(start, end),
-        )*/
-        if typ != VOID {
+        self.symbols.free_frame(symbol_top);
+
+        if typ == VOID {
+            Value::Expression(Expression(self.module.block(label, &contents, None), VOID))
+        } else {
             Value::Expression(Expression(
                 self.module.block(label, &contents, Some(typ.resolve())),
                 typ,
             ))
-        } else {
-            Value::Expression(Expression(self.module.block(label, &contents, None), VOID))
         }
     }
 

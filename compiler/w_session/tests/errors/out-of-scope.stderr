@@ -1,0 +1,6 @@
+tests/errors/out-of-scope.w:6:1: error: identifier does not exist
+}
+^
+tests/errors/out-of-scope.w:6:1: error: type mismatch
+}
+^
