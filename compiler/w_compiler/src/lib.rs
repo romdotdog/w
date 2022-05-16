@@ -4,7 +4,7 @@ use registry::Registry;
 use types::itemref::{ItemRef, HeapType, StackType};
 use types::{IdentPair, Value};
 use types::expression::Expression;
-use types::typ::{VOID, Type, UNREACHABLE, I32, U32, I8, U8, U16, I16, U64, I64};
+use types::typ::{VOID, Type, UNREACHABLE};
 use w_codegen::{Serializer};
 use w_errors::Message;
 use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token};
@@ -121,9 +121,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         };
 
         compiler.next();
-        let res = compiler.parse(true);
-        
-        res
+        compiler.parse(true)
     }
 
     fn next(&mut self) {
@@ -230,7 +228,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     StackType::F32 => Expression(self.module.f32_load(0, ptr), typ),
                     StackType::F64 => Expression(self.module.f64_load(0, ptr), typ),
                 },
-                ItemRef::ItemRef(_) => todo!(), // struct loads?
+                ItemRef::Ref(_) => todo!(), // struct loads?
             }
         })
     }
@@ -328,7 +326,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             if let Some(Token::Mut) = self.tk {
                 self.next();
             } else {
-                self.error(Message::MustBeMut, self.span())
+                self.error(Message::MustBeMut, self.span());
             }
         }
 
@@ -390,7 +388,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                             let item_ref = if let Some(t) = ItemRef::from_str(s) {
                                 t
                             } else if let Some(index) = this.registry.resolve(s) {
-                                ItemRef::ItemRef(index)
+                                ItemRef::Ref(index)
                             } else {
                                 this.error(Message::UnresolvedType, this.span());
                                 return Next(None)
@@ -437,7 +435,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     match v {
                         Value::Expression(Expression(_, ref mut xt)) => {
                             if *xt != typ {
-                                self.error(Message::TypeMismatch, self.span())
+                                self.error(Message::TypeMismatch, self.span());
                             }
 
                             if mutable {

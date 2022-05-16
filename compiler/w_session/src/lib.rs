@@ -3,7 +3,6 @@
 pub mod diag;
 pub mod source_map;
 
-use std::cell::RefCell;
 use std::path::Path;
 
 use diag::emitter::Emitter;

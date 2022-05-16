@@ -1,19 +1,11 @@
 use std::fmt::Write;
 
-use appendlist::AppendList;
 use w_utils::linecol::LineColResult;
 
 use super::Diagnostic;
 
 pub trait Emitter {
     fn emit_error(&mut self, error: Diagnostic);
-}
-
-pub struct DummyWriter;
-impl Write for DummyWriter {
-    fn write_str(&mut self, _s: &str) -> std::fmt::Result {
-        Ok(())
-    }
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -77,5 +69,20 @@ impl<O: Write> Emitter for DefaultEmitter<O> {
         if r.is_err() {
             println!("emitter could not write errors: {:?}", r);
         }
+    }
+}
+
+pub struct StdoutWriter;
+impl Write for StdoutWriter {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        print!("{}", s);
+        Ok(())
+    }
+}
+
+pub struct DummyWriter;
+impl Write for DummyWriter {
+    fn write_str(&mut self, _s: &str) -> std::fmt::Result {
+        Ok(())
     }
 }

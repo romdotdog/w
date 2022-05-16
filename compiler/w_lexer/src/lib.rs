@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use dec2flt::{
     load_number,
     number::Number,
@@ -555,8 +556,8 @@ impl<'ast> Iterator for Lexer<'ast> {
 
 fn convert_sign_and_mantissa<'ast>(negative: bool, mantissa: u64) -> Token<'ast> {
     if negative {
-        if mantissa <= i64::MAX as u64 {
-            Token::Integer(-(mantissa as i64))
+        if let Ok(res) = i64::try_from(mantissa) {
+            Token::Integer(res)
         } else if mantissa == 2_u64.pow(64) {
             Token::Integer(i64::MIN)
         } else {

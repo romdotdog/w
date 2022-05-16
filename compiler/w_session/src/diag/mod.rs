@@ -1,6 +1,5 @@
-use std::{cell::RefCell, slice::SliceIndex};
+use std::cell::RefCell;
 
-use appendlist::AppendList;
 use w_errors::Message;
 use w_utils::span::Span;
 

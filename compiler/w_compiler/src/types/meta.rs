@@ -17,7 +17,7 @@ impl Meta {
         meta += 1;
         meta |= u32::from(mutable) << 5 << self.len();
 
-        return Some(Meta(meta));
+        Some(Meta(meta))
     }
 
     #[must_use]
@@ -35,7 +35,7 @@ impl Meta {
 
         meta.0 -= 1;
         meta.0 &= (a - 1) | IS_MUTABLE | IS_REFERENCE; // TODO: audit
-        return Some(meta);
+        Some(meta)
     }
 
     #[must_use]

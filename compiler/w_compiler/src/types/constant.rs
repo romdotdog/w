@@ -7,7 +7,7 @@ use super::{
     expression::Expression,
     itemref::{ItemRef, StackType},
     meta::{Meta, VALUE},
-    typ::*,
+    typ::Type,
 };
 
 // arbitrary bounds
@@ -32,7 +32,7 @@ impl UntypedConstant {
         }
     }
 
-    pub fn coerce_to_i32(self) -> Option<i64> {
+    pub fn coerce_to_i32(self) -> Option<i32> {
         self.coerce_to_i64().and_then(|x| x.try_into().ok())
     }
 
@@ -156,7 +156,7 @@ impl UntypedConstant {
             (Integer(x), Integer(y)) => x.checked_div(y).map(Integer),
             (Uinteger(x), Uinteger(y)) => x.checked_div(y).map(Uinteger),
             (Float(x), Float(y)) => Some(Float(x / y)),
-            _ => return None,
+            _ => None,
         }
     }
 
@@ -165,7 +165,7 @@ impl UntypedConstant {
             (Integer(x), Integer(y)) => x.checked_rem(y).map(Integer),
             (Uinteger(x), Uinteger(y)) => x.checked_rem(y).map(Uinteger),
             (Float(x), Float(y)) => Some(Float(x % y)),
-            _ => return None,
+            _ => None,
         }
     }
 
@@ -288,26 +288,17 @@ impl Constant {
 
         if let ItemRef::StackType(x) = contextual_type.item {
             match x {
-                StackType::I32 => self
-                    .constant
-                    .coerce_to_i64()
-                    .and_then(|x| x.try_into().ok())
-                    .map(|x| module.i32_const(x)),
+                StackType::I32 => self.constant.coerce_to_i32().map(|x| module.i32_const(x)),
                 StackType::U32 => self
                     .constant
-                    .coerce_to_u64()
-                    .and_then(|x| x.try_into().ok())
+                    .coerce_to_u32()
                     .map(|x| module.i32_const(reinterpret_u32(x))),
                 StackType::I64 => self.constant.coerce_to_i64().map(|x| module.i64_const(x)),
                 StackType::U64 => self
                     .constant
                     .coerce_to_u64()
                     .map(|x| module.i64_const(reinterpret_u64(x))),
-                StackType::F32 => self
-                    .constant
-                    .coerce_to_f64()
-                    .and_then(f64_to_f32)
-                    .map(|x| module.f32_const(x)),
+                StackType::F32 => self.constant.coerce_to_f32().map(|x| module.f32_const(x)),
                 StackType::F64 => self.constant.coerce_to_f64().map(|x| module.f64_const(x)),
             }
             .map(|x| Expression(x, contextual_type))
@@ -401,7 +392,7 @@ fn f64_to_f32(r64: f64) -> Option<f32> {
             return Some(r32);
         }
     }
-    return None;
+    None
 }
 
 fn check_f64(x: f64) -> Option<f64> {

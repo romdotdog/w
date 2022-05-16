@@ -47,13 +47,12 @@ impl<S: Serializer> Expression<S> {
         match typ.item {
             ItemRef::Void => unreachable!(),
             ItemRef::Unreachable => Some(self),
-            ItemRef::HeapType(_) => None,
-            ItemRef::ItemRef(_) => None,
+            ItemRef::HeapType(_) | ItemRef::Ref(_) => None,
             ItemRef::StackType(x) => match x {
-                StackType::I32 => self.operate_i32(op, module, right),
-                StackType::U32 => self.operate_u32(op, module, right),
-                StackType::I64 => self.operate_i64(op, module, right),
-                StackType::U64 => self.operate_u64(op, module, right),
+                StackType::I32 => Some(self.operate_i32(op, module, right)),
+                StackType::U32 => Some(self.operate_u32(op, module, right)),
+                StackType::I64 => Some(self.operate_i64(op, module, right)),
+                StackType::U64 => Some(self.operate_u64(op, module, right)),
                 StackType::F32 => self.operate_f32(op, module, right),
                 StackType::F64 => self.operate_f64(op, module, right),
             },
@@ -94,8 +93,8 @@ impl<S: Serializer> Expression<S> {
         })
     }
 
-    fn operate_u64(self, op: BinOp, module: &mut S, right: Expression<S>) -> Option<Expression<S>> {
-        Some(match op.1 {
+    fn operate_u64(self, op: BinOp, module: &mut S, right: Expression<S>) -> Expression<S> {
+        match op.1 {
             BinOpVariant::Id => right,
             BinOpVariant::Lt => Expression(module.i64_lt_u(self.0, right.0), U32),
             BinOpVariant::Le => Expression(module.i64_le_u(self.0, right.0), U32),
@@ -113,11 +112,11 @@ impl<S: Serializer> Expression<S> {
             BinOpVariant::Xor => Expression(module.i64_xor(self.0, right.0), U64),
             BinOpVariant::Shl => Expression(module.i64_shl(self.0, right.0), U64),
             BinOpVariant::Shr => Expression(module.i64_shr_u(self.0, right.0), U64),
-        })
+        }
     }
 
-    fn operate_i64(self, op: BinOp, module: &mut S, right: Expression<S>) -> Option<Expression<S>> {
-        Some(match op.1 {
+    fn operate_i64(self, op: BinOp, module: &mut S, right: Expression<S>) -> Expression<S> {
+        match op.1 {
             BinOpVariant::Id => right,
             BinOpVariant::Lt => Expression(module.i64_lt_s(self.0, right.0), U32),
             BinOpVariant::Le => Expression(module.i64_le_s(self.0, right.0), U32),
@@ -135,11 +134,11 @@ impl<S: Serializer> Expression<S> {
             BinOpVariant::Xor => Expression(module.i64_xor(self.0, right.0), I64),
             BinOpVariant::Shl => Expression(module.i64_shl(self.0, right.0), I64),
             BinOpVariant::Shr => Expression(module.i64_shr_s(self.0, right.0), I64),
-        })
+        }
     }
 
-    fn operate_u32(self, op: BinOp, module: &mut S, right: Expression<S>) -> Option<Expression<S>> {
-        Some(match op.1 {
+    fn operate_u32(self, op: BinOp, module: &mut S, right: Expression<S>) -> Expression<S> {
+        match op.1 {
             BinOpVariant::Id => right,
             BinOpVariant::Lt => Expression(module.i32_lt_u(self.0, right.0), U32),
             BinOpVariant::Le => Expression(module.i32_le_u(self.0, right.0), U32),
@@ -157,11 +156,11 @@ impl<S: Serializer> Expression<S> {
             BinOpVariant::Xor => Expression(module.i32_xor(self.0, right.0), U32),
             BinOpVariant::Shl => Expression(module.i32_shl(self.0, right.0), U32),
             BinOpVariant::Shr => Expression(module.i32_shr_u(self.0, right.0), U32),
-        })
+        }
     }
 
-    fn operate_i32(self, op: BinOp, module: &mut S, right: Expression<S>) -> Option<Expression<S>> {
-        Some(match op.1 {
+    fn operate_i32(self, op: BinOp, module: &mut S, right: Expression<S>) -> Expression<S> {
+        match op.1 {
             BinOpVariant::Id => right,
             BinOpVariant::Lt => Expression(module.i32_lt_s(self.0, right.0), U32),
             BinOpVariant::Le => Expression(module.i32_le_s(self.0, right.0), U32),
@@ -179,6 +178,6 @@ impl<S: Serializer> Expression<S> {
             BinOpVariant::Xor => Expression(module.i32_xor(self.0, right.0), I32),
             BinOpVariant::Shl => Expression(module.i32_shl(self.0, right.0), I32),
             BinOpVariant::Shr => Expression(module.i32_shr_s(self.0, right.0), I32),
-        })
+        }
     }
 }

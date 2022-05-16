@@ -26,8 +26,8 @@ impl<S: Serializer> Value<S> {
     fn coerce_to_expr(self, module: &mut S, typ: Type) -> Result<Value<S>, Value<S>> {
         match self {
             Value::Expression(Expression(_, xt)) if xt == UNREACHABLE || xt == typ => Ok(self),
+            Value::Expression(_) => Err(self),
             Value::Constant(x) => x.compile(module, typ).map(Value::Expression).ok_or(self),
-            _ => Err(self),
         }
     }
 

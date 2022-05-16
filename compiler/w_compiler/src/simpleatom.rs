@@ -281,7 +281,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     // typecheck lhs
                     let item = match lhs {
                         Value::Expression(Expression(_, xt)) => {
-                            if let ItemRef::ItemRef(itemref) = xt.item {
+                            if let ItemRef::Ref(itemref) = xt.item {
                                 if let Some(item) = self.registry.get(itemref) {
                                     item
                                 } else {

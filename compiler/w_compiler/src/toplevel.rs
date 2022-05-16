@@ -1,9 +1,6 @@
 use crate::{
-    registry::{self, Item},
-    types::{
-        typ::{Type, VOID},
-        IdentPair,
-    },
+    registry::Item,
+    types::{typ::VOID, IdentPair},
 };
 
 use super::{Compiler, Fill, Handler, Next};
@@ -378,7 +375,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         match self.tk {
             Some(Token::Export) => {
                 self.next();
-                self.function(true, false)
+                self.function(true, false);
             }
             Some(Token::Fn) => self.function(false, false),
             Some(Token::Struct) => self.struct_or_union(true),

@@ -7,10 +7,10 @@ use super::{
 
 pub const VOID: Type = from_item(ItemRef::Void);
 pub const UNREACHABLE: Type = from_item(ItemRef::Unreachable);
-pub const I8: Type = from_item(ItemRef::HeapType(HeapType::I8));
-pub const U8: Type = from_item(ItemRef::HeapType(HeapType::U8));
-pub const I16: Type = from_item(ItemRef::HeapType(HeapType::I16));
-pub const U16: Type = from_item(ItemRef::HeapType(HeapType::U16));
+//pub const I8: Type = from_item(ItemRef::HeapType(HeapType::I8));
+//pub const U8: Type = from_item(ItemRef::HeapType(HeapType::U8));
+//pub const I16: Type = from_item(ItemRef::HeapType(HeapType::I16));
+//pub const U16: Type = from_item(ItemRef::HeapType(HeapType::U16));
 pub const I32: Type = from_item(ItemRef::StackType(StackType::I32));
 pub const U32: Type = from_item(ItemRef::StackType(StackType::U32));
 pub const I64: Type = from_item(ItemRef::StackType(StackType::I64));
@@ -37,7 +37,7 @@ impl Type {
                 ItemRef::Void => todo!(),
                 ItemRef::Unreachable => todo!(),
                 ItemRef::HeapType(_) => todo!(),
-                ItemRef::ItemRef(_) => todo!(),
+                ItemRef::Ref(_) => todo!(),
                 ItemRef::StackType(t) => match t {
                     StackType::I32 | StackType::U32 => WASMType::I32,
                     StackType::I64 | StackType::U64 => WASMType::I64,

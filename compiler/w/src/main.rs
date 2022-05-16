@@ -4,7 +4,11 @@ use std::{
     path::PathBuf,
 };
 
-use w_session::{diag::emitter::DefaultEmitter, source_map::loader::FileLoader, Session};
+use w_session::{
+    diag::emitter::{DefaultEmitter, StdoutWriter},
+    source_map::loader::FileLoader,
+    Session,
+};
 
 fn usage() {
     println!(
@@ -97,7 +101,13 @@ fn main() {
     };
 
     let entry = make_input(&matches.free);
-    let session = Session::new(FileLoader, DefaultEmitter);
+    let session = Session::new(
+        FileLoader,
+        DefaultEmitter {
+            stream: StdoutWriter,
+            color: true,
+        },
+    );
 
     let src = match entry {
         Some(SourcePath::Loader(name)) => session

@@ -22,7 +22,7 @@ pub enum ItemRef {
     Unreachable,
     HeapType(HeapType),
     StackType(StackType),
-    ItemRef(usize),
+    Ref(usize),
 }
 
 impl ItemRef {
