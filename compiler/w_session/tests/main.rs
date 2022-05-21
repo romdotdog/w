@@ -9,6 +9,8 @@ fn error_tests() {
         let path = path.unwrap().path();
         if let Some(ext) = path.extension() {
             if ext == "w" {
+                println!();
+                println!("testing {}", path.file_name().unwrap().to_str().unwrap());
                 test_file(path);
             }
         }

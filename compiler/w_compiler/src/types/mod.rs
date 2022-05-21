@@ -25,7 +25,7 @@ impl<S: Serializer> Value<S> {
     // result moves self back
     fn coerce_to_expr(self, module: &mut S, typ: Type) -> Result<Value<S>, Value<S>> {
         match self {
-            Value::Expression(Expression(_, xt)) if xt == UNREACHABLE || xt == typ => Ok(self),
+            Value::Expression(Expression(_, xt)) if xt == typ => Ok(self),
             Value::Expression(_) => Err(self),
             Value::Constant(x) => {
                 let comp = x.compile(module, Some(typ));
@@ -34,15 +34,14 @@ impl<S: Serializer> Value<S> {
                 } else {
                     Err(self)
                 }
-            },
+            }
         }
     }
 
     // result moves self back
     fn coerce_to_const(self, module: &mut S, y: Constant) -> Result<Value<S>, Value<S>> {
         match self {
-            Value::Expression(Expression(_, xt)) if xt == UNREACHABLE => Ok(unreachable(module)),
-            Value::Expression(_) => Err(self),
+            Value::Expression(_) => todo!(),
             Value::Constant(x) => x.coerce(y).map(Value::Constant).ok_or(self),
         }
     }
@@ -50,7 +49,6 @@ impl<S: Serializer> Value<S> {
     // result moves self back
     fn coerce_inner(self, module: &mut S, right: &Value<S>) -> Result<Value<S>, Value<S>> {
         match right {
-            Value::Expression(Expression(_, typ)) if *typ == UNREACHABLE => Ok(unreachable(module)),
             Value::Expression(Expression(_, typ)) => self.coerce_to_expr(module, *typ),
             Value::Constant(y) => self.coerce_to_const(module, *y),
         }

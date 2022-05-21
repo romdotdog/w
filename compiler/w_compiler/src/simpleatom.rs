@@ -83,7 +83,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         }
                         Value::Constant(x) => {
                             if let Some(contextual_type) = contextual_type {
-                                let Expression(x, xt) = x.compile(&mut self.module, Some(contextual_type));
+                                let Expression(x, xt) =
+                                    x.compile(&mut self.module, Some(contextual_type));
                                 contents.push(x);
                                 typ = xt;
                             } else {
@@ -118,7 +119,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
         self.symbols.free_frame(symbol_top);
 
-        if typ == VOID {
+        if typ.is_strict(VOID) {
             Value::Expression(Expression(self.module.block(label, &contents, None), VOID))
         } else {
             Value::Expression(Expression(
@@ -218,7 +219,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             }
         } else {
             match true_branch {
-                Value::Expression(Expression(x, xt)) if xt == UNREACHABLE || xt == VOID => {
+                Value::Expression(Expression(x, xt)) if xt == VOID => {
                     Value::Expression(Expression(self.module.if_(cond.0, x, None), VOID))
                 }
                 _ => {
@@ -335,7 +336,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                                 });
 
                                 let atom = self.atom(Some(t));
-                                let Expression(atom, atom_type) = atom.compile(&mut self.module, Some(t));
+                                let Expression(atom, atom_type) =
+                                    atom.compile(&mut self.module, Some(t));
                                 if atom_type == t {
                                     args.push(atom);
                                 } else {

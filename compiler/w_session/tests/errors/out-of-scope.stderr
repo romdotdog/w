@@ -1,6 +1,3 @@
 tests/errors/out-of-scope.w:5:5: error: identifier does not exist
     a
     ^
-tests/errors/out-of-scope.w:1:12: error: type mismatch
-fn main(): u32 {
-           ^^^

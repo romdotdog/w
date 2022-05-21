@@ -1,5 +1,7 @@
-const IS_MUTABLE: u32 = 1 << 30;
-const IS_REFERENCE: u32 = 1 << 31;
+use std::fmt::Display;
+
+const IS_MUTABLE: u32 = 1 << 6;
+const IS_REFERENCE: u32 = 1 << 7;
 
 pub const VALUE: Meta = Meta(0);
 
@@ -34,7 +36,7 @@ impl Meta {
         };
 
         meta.0 -= 1;
-        meta.0 &= (a - 1) | IS_MUTABLE | IS_REFERENCE; // TODO: audit
+        meta.0 &= a - 1;
         Some(meta)
     }
 
@@ -71,5 +73,28 @@ impl Meta {
     #[must_use]
     pub fn unset_reference(self) -> Meta {
         Meta(self.0 & !IS_REFERENCE)
+    }
+
+    pub fn assignable_to(self, other: Meta) -> bool {
+        self.0 & !IS_MUTABLE == other.0 & !IS_MUTABLE
+    }
+}
+
+impl Display for Meta {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_reference() {
+            write!(f, "&mut ")?;
+        }
+
+        for i in 0..self.len() {
+            let a = 0b1000_0000 << self.len();
+            if self.0 & a != 0 {
+                write!(f, "*mut ")?;
+            } else {
+                write!(f, "*")?;
+            }
+        }
+
+        Ok(())
     }
 }

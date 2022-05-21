@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum HeapType {
     I8,
@@ -40,6 +42,30 @@ impl ItemRef {
             "f32" => Some(ItemRef::StackType(StackType::F32)),
             "f64" => Some(ItemRef::StackType(StackType::F64)),
             _ => None,
+        }
+    }
+}
+
+impl Display for ItemRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ItemRef::Void => write!(f, "void"),
+            ItemRef::Unreachable => write!(f, "unreachable"),
+            ItemRef::HeapType(x) => match x {
+                HeapType::I8 => write!(f, "i8"),
+                HeapType::U8 => write!(f, "u8"),
+                HeapType::I16 => write!(f, "i16"),
+                HeapType::U16 => write!(f, "u16"),
+            },
+            ItemRef::StackType(x) => match x {
+                StackType::I32 => write!(f, "i32"),
+                StackType::U32 => write!(f, "u32"),
+                StackType::I64 => write!(f, "i64"),
+                StackType::U64 => write!(f, "u64"),
+                StackType::F32 => write!(f, "f32"),
+                StackType::F64 => write!(f, "f64"),
+            },
+            ItemRef::Ref(_) => write!(f, "<ref>"),
         }
     }
 }

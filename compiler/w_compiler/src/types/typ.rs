@@ -1,3 +1,5 @@
+use std::{fmt::Display, panic};
+
 use w_codegen::WASMType;
 
 use super::{
@@ -22,7 +24,7 @@ const fn from_item(item: ItemRef) -> Type {
     Type { meta: VALUE, item }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy)]
 pub struct Type {
     pub meta: Meta,
     pub item: ItemRef,
@@ -46,5 +48,26 @@ impl Type {
                 },
             }
         }
+    }
+
+    // cannot match mut with non mut var
+    pub fn is_strict(self, other: Type) -> bool {
+        self.item == other.item && self.meta == other.meta
+    }
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.meta.fmt(f)?;
+        self.item.fmt(f)
+    }
+}
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        println!("{} - {}", self, other);
+        self.item == other.item && self.meta.assignable_to(other.meta)
+            || self.item == ItemRef::Unreachable
+            || other.item == ItemRef::Unreachable
     }
 }

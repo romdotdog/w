@@ -267,9 +267,6 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 }
             },
             (Value::Expression(l), Value::Expression(r)) => {
-                if l.1 == UNREACHABLE || r.1 == UNREACHABLE { // TODO: audit
-                    return self.unreachable();
-                }
                 match l.operate(&mut self.module, r, op) {
                     Some(x) => Value::Expression(x),
                     None => {
