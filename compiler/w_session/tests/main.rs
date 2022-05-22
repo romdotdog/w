@@ -54,3 +54,45 @@ fn test_file(mut path: PathBuf) {
         fs::write(path, stderr).unwrap();
     }
 }
+
+#[test]
+fn include_already_parsed() {
+    let mut s = String::new();
+    let sess = Session::new(
+        FileLoader,
+        DefaultEmitter {
+            stream: &mut s,
+            color: false,
+        },
+    );
+    let src = sess
+        .source_map()
+        .load_source(PathBuf::from("tests/import/main.w"))
+        .unwrap();
+    sess.compile(src);
+    assert!(s.is_empty());
+}
+
+#[test]
+fn recursive_error() {
+    let mut s = String::new();
+    let sess = Session::new(
+        FileLoader,
+        DefaultEmitter {
+            stream: &mut s,
+            color: false,
+        },
+    );
+    let src = sess
+        .source_map()
+        .load_source(PathBuf::from("tests/recursion/main.w"))
+        .unwrap();
+    sess.compile(src);
+    assert_eq!(
+        s,
+        "tests/recursion/main.w:1:11: error: file not found
+#include <bar.w>
+          ^^^^^^
+"
+    );
+}
