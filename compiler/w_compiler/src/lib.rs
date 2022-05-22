@@ -1,3 +1,4 @@
+#![allow(clippy::missing_panics_doc)]
 
 use locals::Flow;
 use registry::Registry;
@@ -267,7 +268,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 }
             },
             (Value::Expression(l), Value::Expression(r)) => {
-                match l.operate(&mut self.module, r, op) {
+                match l.binop(&mut self.module, r, op) {
                     Some(x) => Value::Expression(x),
                     None => {
                         self.error(Message::InvalidOperation, self.span());
@@ -276,7 +277,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 }
             }
             (Value::Constant(left), Value::Constant(right)) => {
-                match left.operate(right, op) {
+                match left.binop(right, op) {
                     Some(x) => Value::Constant(x),
                     None => {
                         self.error(Message::InvalidOperation, self.span());

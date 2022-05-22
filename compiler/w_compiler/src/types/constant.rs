@@ -78,7 +78,7 @@ impl UntypedConstant {
         self.coerce_to_f64().and_then(f64_to_f32)
     }
 
-    pub fn operate_i64(x: i64, y: i64, op: BinOpVariant) -> UntypedConstant {
+    pub fn binop_i64(x: i64, y: i64, op: BinOpVariant) -> UntypedConstant {
         match op {
             BinOpVariant::Id => I64(y),
             BinOpVariant::Lt => U64(u64::from(x < y)),
@@ -100,7 +100,7 @@ impl UntypedConstant {
         }
     }
 
-    pub fn operate_i32(x: i32, y: i32, op: BinOpVariant) -> UntypedConstant {
+    pub fn binop_i32(x: i32, y: i32, op: BinOpVariant) -> UntypedConstant {
         match op {
             BinOpVariant::Id => I32(y),
             BinOpVariant::Lt => U64(u64::from(x < y)),
@@ -122,7 +122,7 @@ impl UntypedConstant {
         }
     }
 
-    pub fn operate_u64(x: u64, y: u64, op: BinOpVariant) -> UntypedConstant {
+    pub fn binop_u64(x: u64, y: u64, op: BinOpVariant) -> UntypedConstant {
         match op {
             BinOpVariant::Id => U64(y),
             BinOpVariant::Lt => U64(u64::from(x < y)),
@@ -144,7 +144,7 @@ impl UntypedConstant {
         }
     }
 
-    pub fn operate_u32(x: u32, y: u32, op: BinOpVariant) -> UntypedConstant {
+    pub fn binop_u32(x: u32, y: u32, op: BinOpVariant) -> UntypedConstant {
         match op {
             BinOpVariant::Id => U32(y),
             BinOpVariant::Lt => U64(u64::from(x < y)),
@@ -166,7 +166,7 @@ impl UntypedConstant {
         }
     }
 
-    pub fn operate_f64(x: f64, y: f64, op: BinOpVariant) -> Option<UntypedConstant> {
+    pub fn binop_f64(x: f64, y: f64, op: BinOpVariant) -> Option<UntypedConstant> {
         #[allow(clippy::float_cmp)]
         Some(match op {
             BinOpVariant::Id => F64(y),
@@ -184,7 +184,7 @@ impl UntypedConstant {
         })
     }
 
-    pub fn operate_f32(x: f32, y: f32, op: BinOpVariant) -> Option<UntypedConstant> {
+    pub fn binop_f32(x: f32, y: f32, op: BinOpVariant) -> Option<UntypedConstant> {
         #[allow(clippy::float_cmp)]
         Some(match op {
             BinOpVariant::Id => F32(y),
@@ -202,18 +202,18 @@ impl UntypedConstant {
         })
     }
 
-    pub fn operate(self, right: UntypedConstant, op: BinOp) -> Option<UntypedConstant> {
+    pub fn binop(self, right: UntypedConstant, op: BinOp) -> Option<UntypedConstant> {
         if op.0 {
             return None;
         }
 
         match (self, right) {
-            (I32(x), I32(y)) => Some(Self::operate_i32(x, y, op.1)),
-            (U32(x), U32(y)) => Some(Self::operate_u32(x, y, op.1)),
-            (F32(x), F32(y)) => Self::operate_f32(x, y, op.1),
-            (I64(x), I64(y)) => Some(Self::operate_i64(x, y, op.1)),
-            (U64(x), U64(y)) => Some(Self::operate_u64(x, y, op.1)),
-            (F64(x), F64(y)) => Self::operate_f64(x, y, op.1),
+            (I32(x), I32(y)) => Some(Self::binop_i32(x, y, op.1)),
+            (U32(x), U32(y)) => Some(Self::binop_u32(x, y, op.1)),
+            (F32(x), F32(y)) => Self::binop_f32(x, y, op.1),
+            (I64(x), I64(y)) => Some(Self::binop_i64(x, y, op.1)),
+            (U64(x), U64(y)) => Some(Self::binop_u64(x, y, op.1)),
+            (F64(x), F64(y)) => Self::binop_f64(x, y, op.1),
             _ => None,
         }
     }
@@ -346,11 +346,11 @@ impl Constant {
             })
     }
 
-    fn operate_ptr(self, offset: Constant, op: BinOp) -> Option<Constant> {
+    fn binop_ptr(self, offset: Constant, op: BinOp) -> Option<Constant> {
         // only pointer addition is allowed on pointers
         if let BinOp(_, BinOpVariant::Add) = op {
             self.constant
-                .operate(offset.constant, op) // TODO: improve?
+                .binop(offset.constant, op) // TODO: improve?
                 .map(|constant| Constant {
                     meta: self.meta,
                     constant,
@@ -360,7 +360,7 @@ impl Constant {
         }
     }
 
-    pub fn operate(self, right: Constant, op: BinOp) -> Option<Constant> {
+    pub fn binop(self, right: Constant, op: BinOp) -> Option<Constant> {
         if op.0 {
             return None;
         }
@@ -370,15 +370,15 @@ impl Constant {
         }
 
         if self.meta.len() > 0 && right.meta.len() == 0 {
-            self.operate_ptr(right, op)
+            self.binop_ptr(right, op)
         } else if self.meta.len() == 0 && right.meta.len() > 0 {
-            right.operate_ptr(self, op)
+            right.binop_ptr(self, op)
         } else {
             let left = self.coerce(right.to_type()).unwrap_or(self);
             let right = right.coerce(self.to_type()).unwrap_or(right);
 
             left.constant
-                .operate(right.constant, op)
+                .binop(right.constant, op)
                 .map(|constant| Constant {
                     meta: left.meta,
                     constant,

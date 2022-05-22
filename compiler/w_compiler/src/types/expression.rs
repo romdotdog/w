@@ -9,12 +9,7 @@ use super::{
 pub struct Expression<S: Serializer>(pub S::ExpressionRef, pub Type);
 
 impl<S: Serializer> Expression<S> {
-    fn operate_ptr(
-        self,
-        module: &mut S,
-        offset: Expression<S>,
-        op: BinOp,
-    ) -> Option<Expression<S>> {
+    fn binop_ptr(self, module: &mut S, offset: Expression<S>, op: BinOp) -> Option<Expression<S>> {
         // only pointer addition is allowed on pointers
         if let BinOp(_, BinOpVariant::Add) = op {
             if offset.1 == I32 {
@@ -27,7 +22,7 @@ impl<S: Serializer> Expression<S> {
         }
     }
 
-    pub fn operate(self, module: &mut S, right: Expression<S>, op: BinOp) -> Option<Expression<S>> {
+    pub fn binop(self, module: &mut S, right: Expression<S>, op: BinOp) -> Option<Expression<S>> {
         let typ = self.1;
         let right_typ = right.1;
         if typ.meta.is_reference() || right_typ.meta.is_reference() {
@@ -35,9 +30,9 @@ impl<S: Serializer> Expression<S> {
         }
 
         if typ.meta.len() > 0 && right_typ.meta.len() == 0 {
-            return self.operate_ptr(module, right, op);
+            return self.binop_ptr(module, right, op);
         } else if typ.meta.len() == 0 && right_typ.meta.len() > 0 {
-            return right.operate_ptr(module, self, op);
+            return right.binop_ptr(module, self, op);
         }
 
         if typ != right.1 {
@@ -49,17 +44,17 @@ impl<S: Serializer> Expression<S> {
             ItemRef::Unreachable => Some(self),
             ItemRef::HeapType(_) | ItemRef::Ref(_) => None,
             ItemRef::StackType(x) => match x {
-                StackType::I32 => Some(self.operate_i32(op, module, right)),
-                StackType::U32 => Some(self.operate_u32(op, module, right)),
-                StackType::I64 => Some(self.operate_i64(op, module, right)),
-                StackType::U64 => Some(self.operate_u64(op, module, right)),
-                StackType::F32 => self.operate_f32(op, module, right),
-                StackType::F64 => self.operate_f64(op, module, right),
+                StackType::I32 => Some(self.binop_i32(op, module, right)),
+                StackType::U32 => Some(self.binop_u32(op, module, right)),
+                StackType::I64 => Some(self.binop_i64(op, module, right)),
+                StackType::U64 => Some(self.binop_u64(op, module, right)),
+                StackType::F32 => self.binop_f32(op, module, right),
+                StackType::F64 => self.binop_f64(op, module, right),
             },
         }
     }
 
-    fn operate_f64(self, op: BinOp, module: &mut S, right: Expression<S>) -> Option<Expression<S>> {
+    fn binop_f64(self, op: BinOp, module: &mut S, right: Expression<S>) -> Option<Expression<S>> {
         Some(match op.1 {
             BinOpVariant::Id => right,
             BinOpVariant::Lt => Expression(module.f64_lt(self.0, right.0), U32),
@@ -76,7 +71,7 @@ impl<S: Serializer> Expression<S> {
         })
     }
 
-    fn operate_f32(self, op: BinOp, module: &mut S, right: Expression<S>) -> Option<Expression<S>> {
+    fn binop_f32(self, op: BinOp, module: &mut S, right: Expression<S>) -> Option<Expression<S>> {
         Some(match op.1 {
             BinOpVariant::Id => right,
             BinOpVariant::Lt => Expression(module.f32_lt(self.0, right.0), U32),
@@ -93,7 +88,7 @@ impl<S: Serializer> Expression<S> {
         })
     }
 
-    fn operate_u64(self, op: BinOp, module: &mut S, right: Expression<S>) -> Expression<S> {
+    fn binop_u64(self, op: BinOp, module: &mut S, right: Expression<S>) -> Expression<S> {
         match op.1 {
             BinOpVariant::Id => right,
             BinOpVariant::Lt => Expression(module.i64_lt_u(self.0, right.0), U32),
@@ -115,7 +110,7 @@ impl<S: Serializer> Expression<S> {
         }
     }
 
-    fn operate_i64(self, op: BinOp, module: &mut S, right: Expression<S>) -> Expression<S> {
+    fn binop_i64(self, op: BinOp, module: &mut S, right: Expression<S>) -> Expression<S> {
         match op.1 {
             BinOpVariant::Id => right,
             BinOpVariant::Lt => Expression(module.i64_lt_s(self.0, right.0), U32),
@@ -137,7 +132,7 @@ impl<S: Serializer> Expression<S> {
         }
     }
 
-    fn operate_u32(self, op: BinOp, module: &mut S, right: Expression<S>) -> Expression<S> {
+    fn binop_u32(self, op: BinOp, module: &mut S, right: Expression<S>) -> Expression<S> {
         match op.1 {
             BinOpVariant::Id => right,
             BinOpVariant::Lt => Expression(module.i32_lt_u(self.0, right.0), U32),
@@ -159,7 +154,7 @@ impl<S: Serializer> Expression<S> {
         }
     }
 
-    fn operate_i32(self, op: BinOp, module: &mut S, right: Expression<S>) -> Expression<S> {
+    fn binop_i32(self, op: BinOp, module: &mut S, right: Expression<S>) -> Expression<S> {
         match op.1 {
             BinOpVariant::Id => right,
             BinOpVariant::Lt => Expression(module.i32_lt_s(self.0, right.0), U32),
