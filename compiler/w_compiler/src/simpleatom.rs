@@ -233,19 +233,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     fn postfixatom(&mut self, mut lhs: Value<S>) -> Value<S> {
         loop {
             match self.tk {
-                Some(Token::UnOp(UnOp::Dec)) => {
-                    //lhs = Spanned(
-                    //    Atom::PostIncDec(Box::new(lhs), IncDec::Dec),
-                    //    Span::new(start, self.end),
-                    //);
-                    self.next();
-                }
-
-                Some(Token::UnOp(UnOp::Inc)) => {
-                    //lhs = Spanned(
-                    //    Atom::PostIncDec(Box::new(lhs), IncDec::Inc),
-                    //    Span::new(start, self.end),
-                    //);
+                Some(Token::UnOp(UnOp::Inc | UnOp::Dec)) => {
+                    self.error(Message::PostfixIncDec, self.span());
                     self.next();
                 }
 
@@ -254,22 +243,6 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     /*lhs = self.take(|this, t| match t {
                         Some(Token::Ident(s)) => Next(Some(Spanned(
                             Atom::Access(Box::new(lhs), Spanned(s, this.span())),
-                            Span::new(start, this.end),
-                        ))),
-                        tk => {
-                            // TODO: review
-                            this.error(Message::MissingIdentifier, this.span());
-                            Fill(None, tk)
-                        }
-                    })?;*/
-                }
-
-                // TODO: figure out syntax
-                Some(Token::Arrow) => {
-                    self.next();
-                    /*lhs = self.take(|this, t| match t {
-                        Some(Token::Ident(s)) => Next(Some(Spanned(
-                            Atom::Offsetof(Box::new(lhs), Spanned(s, this.span())),
                             Span::new(start, this.end),
                         ))),
                         tk => {

@@ -63,5 +63,6 @@ errors!(
     BranchesSameTypes => "branches must return the same types",
     BranchReturnVoid => "branch must return void",
     ConditionTrue => "condition evaluates to true",
-    ConditionFalse => "condition evaluates to false"
+    ConditionFalse => "condition evaluates to false",
+    PostfixIncDec => "`x++` and `x--` will not be implemented"
 );

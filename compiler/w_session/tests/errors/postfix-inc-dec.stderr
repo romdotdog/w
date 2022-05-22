@@ -1,0 +1,6 @@
+tests/errors/postfix-inc-dec.w:2:6: error: `x++` and `x--` will not be implemented
+    x++;
+     ^^
+tests/errors/postfix-inc-dec.w:3:6: error: `x++` and `x--` will not be implemented
+    x--;
+     ^^
