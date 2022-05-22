@@ -22,12 +22,14 @@ enum UntypedConstant {
     Float(f64),
 }
 
-use UntypedConstant::*;
+use UntypedConstant::{Float, Integer, Uinteger};
 impl UntypedConstant {
     pub fn coerce_to_i64(self) -> Option<i64> {
         match self {
             Integer(x) => Some(x),
             Uinteger(x) => x.try_into().ok(),
+
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             Float(x) => check_f64(x).map(|w| w as i64),
         }
     }
@@ -40,8 +42,10 @@ impl UntypedConstant {
         match self {
             Integer(x) => x.try_into().ok(),
             Uinteger(x) => Some(x),
+
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             Float(x) if x >= 0.0 => check_f64(x).map(|w| w as u64),
-            _ => None,
+            Float(_) => None,
         }
     }
 
@@ -50,6 +54,7 @@ impl UntypedConstant {
     }
 
     pub fn coerce_to_f64(self) -> Option<f64> {
+        #[allow(clippy::cast_precision_loss)]
         match self {
             Integer(x) if x > MIN_FLOAT && x < MAX_FLOAT => Some(x as f64),
             Uinteger(x) if x < UMAX_FLOAT => Some(x as f64),
@@ -70,141 +75,64 @@ impl UntypedConstant {
         }
     }
 
-    fn const_lt(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(Uinteger(u64::from(match (self, right) {
-            (Integer(x), Integer(y)) => x < y,
-            (Uinteger(x), Uinteger(y)) => x < y,
-            (Float(x), Float(y)) => x < y,
-            _ => return None,
-        })))
-    }
-
-    fn const_le(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(Uinteger(u64::from(match (self, right) {
-            (Integer(x), Integer(y)) => x <= y,
-            (Uinteger(x), Uinteger(y)) => x <= y,
-            (Float(x), Float(y)) => x <= y,
-            _ => return None,
-        })))
-    }
-
-    fn const_gt(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(Uinteger(u64::from(match (self, right) {
-            (Integer(x), Integer(y)) => x > y,
-            (Uinteger(x), Uinteger(y)) => x > y,
-            (Float(x), Float(y)) => x > y,
-            _ => return None,
-        })))
-    }
-
-    fn const_ge(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(Uinteger(u64::from(match (self, right) {
-            (Integer(x), Integer(y)) => x >= y,
-            (Uinteger(x), Uinteger(y)) => x >= y,
-            (Float(x), Float(y)) => x >= y,
-            _ => return None,
-        })))
-    }
-
-    fn const_eq(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(Uinteger(u64::from(match (self, right) {
-            (Integer(x), Integer(y)) => x == y,
-            (Uinteger(x), Uinteger(y)) => x == y,
-            (Float(x), Float(y)) => x == y,
-            _ => return None,
-        })))
-    }
-
-    fn const_neq(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(Uinteger(u64::from(match (self, right) {
-            (Integer(x), Integer(y)) => x != y,
-            (Uinteger(x), Uinteger(y)) => x != y,
-            (Float(x), Float(y)) => x != y,
-            _ => return None,
-        })))
-    }
-
-    fn const_add(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(match (self, right) {
-            (Integer(x), Integer(y)) => Integer(x.wrapping_add(y)),
-            (Uinteger(x), Uinteger(y)) => Uinteger(x.wrapping_add(y)),
-            (Float(x), Float(y)) => Float(x + y),
-            _ => return None,
-        })
-    }
-
-    fn const_sub(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(match (self, right) {
-            (Integer(x), Integer(y)) => Integer(x.wrapping_sub(y)),
-            (Uinteger(x), Uinteger(y)) => Uinteger(x.wrapping_sub(y)),
-            (Float(x), Float(y)) => Float(x - y),
-            _ => return None,
-        })
-    }
-
-    fn const_mul(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(match (self, right) {
-            (Integer(x), Integer(y)) => Integer(x.wrapping_mul(y)),
-            (Uinteger(x), Uinteger(y)) => Uinteger(x.wrapping_mul(y)),
-            (Float(x), Float(y)) => Float(x * y),
-            _ => return None,
-        })
-    }
-
-    fn const_div(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        match (self, right) {
-            (Integer(x), Integer(y)) => x.checked_div(y).map(Integer),
-            (Uinteger(x), Uinteger(y)) => x.checked_div(y).map(Uinteger),
-            (Float(x), Float(y)) => Some(Float(x / y)),
-            _ => None,
+    pub fn operate_int(x: i64, y: i64, op: BinOpVariant) -> UntypedConstant {
+        match op {
+            BinOpVariant::Id => Integer(y),
+            BinOpVariant::Lt => Uinteger(u64::from(x < y)),
+            BinOpVariant::Le => Uinteger(u64::from(x <= y)),
+            BinOpVariant::Gt => Uinteger(u64::from(x > y)),
+            BinOpVariant::Ge => Uinteger(u64::from(x >= y)),
+            BinOpVariant::EqC => Uinteger(u64::from(x == y)),
+            BinOpVariant::Neq => Uinteger(u64::from(x != y)),
+            BinOpVariant::Add => Integer(x.wrapping_add(y)),
+            BinOpVariant::Sub => Integer(x.wrapping_sub(y)),
+            BinOpVariant::Mul => Integer(x.wrapping_mul(y)),
+            BinOpVariant::Div => Integer(x.wrapping_div(y)),
+            BinOpVariant::Mod => Integer(x.wrapping_rem(y)),
+            BinOpVariant::And => Integer(x & y),
+            BinOpVariant::Or => Integer(x | y),
+            BinOpVariant::Xor => Integer(x ^ y),
+            BinOpVariant::Shl => Integer(x << y),
+            BinOpVariant::Shr => Integer(x >> y),
         }
     }
 
-    fn const_mod(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        match (self, right) {
-            (Integer(x), Integer(y)) => x.checked_rem(y).map(Integer),
-            (Uinteger(x), Uinteger(y)) => x.checked_rem(y).map(Uinteger),
-            (Float(x), Float(y)) => Some(Float(x % y)),
-            _ => None,
+    pub fn operate_uint(x: u64, y: u64, op: BinOpVariant) -> UntypedConstant {
+        match op {
+            BinOpVariant::Id => Uinteger(y),
+            BinOpVariant::Lt => Uinteger(u64::from(x < y)),
+            BinOpVariant::Le => Uinteger(u64::from(x <= y)),
+            BinOpVariant::Gt => Uinteger(u64::from(x > y)),
+            BinOpVariant::Ge => Uinteger(u64::from(x >= y)),
+            BinOpVariant::EqC => Uinteger(u64::from(x == y)),
+            BinOpVariant::Neq => Uinteger(u64::from(x != y)),
+            BinOpVariant::Add => Uinteger(x.wrapping_add(y)),
+            BinOpVariant::Sub => Uinteger(x.wrapping_sub(y)),
+            BinOpVariant::Mul => Uinteger(x.wrapping_mul(y)),
+            BinOpVariant::Div => Uinteger(x.wrapping_div(y)),
+            BinOpVariant::Mod => Uinteger(x.wrapping_rem(y)),
+            BinOpVariant::And => Uinteger(x & y),
+            BinOpVariant::Or => Uinteger(x | y),
+            BinOpVariant::Xor => Uinteger(x ^ y),
+            BinOpVariant::Shl => Uinteger(x << y),
+            BinOpVariant::Shr => Uinteger(x >> y),
         }
     }
 
-    fn const_and(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(match (self, right) {
-            (Integer(x), Integer(y)) => Integer(x & y),
-            (Uinteger(x), Uinteger(y)) => Uinteger(x & y),
-            _ => return None,
-        })
-    }
-
-    fn const_or(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(match (self, right) {
-            (Integer(x), Integer(y)) => Integer(x | y),
-            (Uinteger(x), Uinteger(y)) => Uinteger(x | y),
-            _ => return None,
-        })
-    }
-
-    fn const_xor(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(match (self, right) {
-            (Integer(x), Integer(y)) => Integer(x ^ y),
-            (Uinteger(x), Uinteger(y)) => Uinteger(x ^ y),
-            _ => return None,
-        })
-    }
-
-    fn const_shl(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(match (self, right) {
-            (Integer(x), Integer(y)) if y > 0 => Integer(x << (y as u64)),
-            (Uinteger(x), Uinteger(y)) => Uinteger(x << y),
-            _ => return None,
-        })
-    }
-
-    fn const_shr(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        Some(match (self, right) {
-            (Integer(x), Integer(y)) if y > 0 => Integer(x >> (y as u64)),
-            (Uinteger(x), Uinteger(y)) => Uinteger(x >> y),
+    pub fn operate_float(x: f64, y: f64, op: BinOpVariant) -> Option<UntypedConstant> {
+        #[allow(clippy::float_cmp)]
+        Some(match op {
+            BinOpVariant::Id => Float(y),
+            BinOpVariant::Lt => Uinteger(u64::from(x < y)),
+            BinOpVariant::Le => Uinteger(u64::from(x <= y)),
+            BinOpVariant::Gt => Uinteger(u64::from(x > y)),
+            BinOpVariant::Ge => Uinteger(u64::from(x >= y)),
+            BinOpVariant::EqC => Uinteger(u64::from(x == y)),
+            BinOpVariant::Neq => Uinteger(u64::from(x != y)),
+            BinOpVariant::Add => Float(x + y),
+            BinOpVariant::Sub => Float(x - y),
+            BinOpVariant::Mul => Float(x * y),
+            BinOpVariant::Div => Float(x / y),
             _ => return None,
         })
     }
@@ -217,25 +145,11 @@ impl UntypedConstant {
         let left = self.coerce(right).unwrap_or(self);
         let right = right.coerce(self).unwrap_or(right);
 
-        // TODO: have binop inside
-        match op.1 {
-            BinOpVariant::Id => None,
-            BinOpVariant::Lt => left.const_lt(right),
-            BinOpVariant::Le => left.const_le(right),
-            BinOpVariant::Gt => left.const_gt(right),
-            BinOpVariant::Ge => left.const_ge(right),
-            BinOpVariant::EqC => left.const_eq(right),
-            BinOpVariant::Neq => left.const_neq(right),
-            BinOpVariant::Add => left.const_add(right),
-            BinOpVariant::Sub => left.const_sub(right),
-            BinOpVariant::Mul => left.const_mul(right),
-            BinOpVariant::Div => left.const_div(right),
-            BinOpVariant::Mod => left.const_mod(right),
-            BinOpVariant::And => left.const_and(right),
-            BinOpVariant::Or => left.const_or(right),
-            BinOpVariant::Xor => left.const_xor(right),
-            BinOpVariant::Shl => left.const_shl(right),
-            BinOpVariant::Shr => left.const_shr(right),
+        match (left, right) {
+            (Integer(x), Integer(y)) => Some(Self::operate_int(x, y, op.1)),
+            (Uinteger(x), Uinteger(y)) => Some(Self::operate_uint(x, y, op.1)),
+            (Float(x), Float(y)) => Self::operate_float(x, y, op.1),
+            _ => None,
         }
     }
 }
@@ -331,7 +245,7 @@ impl Constant {
         // only pointer addition is allowed on pointers
         if let BinOp(_, BinOpVariant::Add) = op {
             self.constant
-                .const_add(offset.constant)
+                .operate(offset.constant, op) // TODO: improve?
                 .map(|constant| Constant {
                     meta: self.meta,
                     constant,
