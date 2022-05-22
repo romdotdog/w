@@ -180,7 +180,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
         let cond = match cond {
             Value::Expression(x @ Expression(_, xt)) => {
-                if xt == I32 {
+                if xt == I32 || xt == U32 {
                     x
                 } else {
                     self.error(Message::TypeMismatch, cond_span);
@@ -214,7 +214,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     true_branch.1,
                 ))
             } else {
-                self.error(Message::IfCannotReturn, self.span());
+                self.error(Message::IfCannotReturn, self.span()); // TODO: fix span
                 self.unreachable()
             }
         } else {
@@ -223,7 +223,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     Value::Expression(Expression(self.module.if_(cond.0, x, None), VOID))
                 }
                 _ => {
-                    self.error(Message::IfCannotReturn, self.span());
+                    self.error(Message::IfCannotReturn, self.span()); // TODO: fix span
                     self.unreachable()
                 }
             }

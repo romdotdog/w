@@ -1,3 +1,9 @@
-tests/errors/pointer-type.w:1:12: error: type mismatch
-fn main(): *i32 {}
-           ^^^^
+tests/errors/pointer-type.w:1:11: error: type mismatch
+fn foo(): *i32 {}
+          ^^^^
+tests/errors/pointer-type.w:2:36: error: at most only 25 levels of indirection are allowed
+fn bar(): **************************************************i32 {}
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/errors/pointer-type.w:2:11: error: type mismatch
+fn bar(): **************************************************i32 {}
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

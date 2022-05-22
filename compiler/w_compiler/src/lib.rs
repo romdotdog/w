@@ -349,25 +349,28 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
                     if let Some(meta) = typ.meta.ref_(mutable) {
                         typ.meta = meta;
+                        self.next();
                     } else {
                         // *******type
                         //      ^^
-                        if asterisk_overflow_start.is_none() {
+                        let asterisk_overflow_start = if let Some(start) = asterisk_overflow_start {
+                            start
+                        } else {
                             asterisk_overflow_start = Some(self.start);
-                        }
+                            self.start
+                        };
 
-                        let end = self.end;
+                        self.next();
 
+                        // TODO: return unreachable?
                         match self.tk {
                             Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => {}
                             _ => self.error(
                                 Message::TooMuchIndirection,
-                                Span::new(asterisk_overflow_start.unwrap(), end),
+                                Span::new(asterisk_overflow_start, self.end),
                             ),
                         }
                     }
-
-                    self.next();
                 }
                 Some(ref ch @ (Token::Union | Token::Struct)) => {
                     let is_struct = ch == &Token::Struct;

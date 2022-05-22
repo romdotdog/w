@@ -1,0 +1,3 @@
+tests/errors/if-branch-mismatch.w:7:1: error: if statement cannot have a result
+}
+^

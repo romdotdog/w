@@ -1,0 +1,3 @@
+tests/errors/optimizable-if-false.w:2:8: error: condition evaluates to false
+    if 0 {
+       ^
