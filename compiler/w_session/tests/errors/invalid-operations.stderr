@@ -1,0 +1,36 @@
+tests/errors/invalid-operations.w:2:10: error: invalid operation
+    a % b;
+         ^
+tests/errors/invalid-operations.w:3:10: error: invalid operation
+    a & b;
+         ^
+tests/errors/invalid-operations.w:4:10: error: invalid operation
+    a | b;
+         ^
+tests/errors/invalid-operations.w:5:10: error: invalid operation
+    a ^ b;
+         ^
+tests/errors/invalid-operations.w:6:11: error: invalid operation
+    a >> b;
+          ^
+tests/errors/invalid-operations.w:7:11: error: invalid operation
+    a << b;
+          ^
+tests/errors/invalid-operations.w:9:10: error: invalid operation
+    c % d;
+         ^
+tests/errors/invalid-operations.w:10:10: error: invalid operation
+    c & d;
+         ^
+tests/errors/invalid-operations.w:11:10: error: invalid operation
+    c | d;
+         ^
+tests/errors/invalid-operations.w:12:10: error: invalid operation
+    c ^ d;
+         ^
+tests/errors/invalid-operations.w:13:11: error: invalid operation
+    c >> d;
+          ^
+tests/errors/invalid-operations.w:14:11: error: invalid operation
+    c << d;
+          ^
