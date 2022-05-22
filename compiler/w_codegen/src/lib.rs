@@ -46,6 +46,11 @@ pub trait Serializer {
     fn i32_load16_u(&mut self, offset: i32, ptr: Self::ExpressionRef) -> Self::ExpressionRef;
 
     fn i32_const(&mut self, value: i32) -> Self::ExpressionRef;
+    fn i32_trunc_sat_f32_s(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn i32_trunc_sat_f64_s(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn i32_trunc_sat_f32_u(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn i32_trunc_sat_f64_u(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn i32_wrap(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
     fn i32_add(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     fn i32_sub(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     fn i32_mul(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
@@ -75,6 +80,12 @@ pub trait Serializer {
 
     fn i64_load(&mut self, offset: i32, ptr: Self::ExpressionRef) -> Self::ExpressionRef;
     fn i64_const(&mut self, value: i64) -> Self::ExpressionRef;
+    fn i64_trunc_sat_f32_s(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn i64_trunc_sat_f64_s(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn i64_trunc_sat_f32_u(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn i64_trunc_sat_f64_u(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn i64_extend_s(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn i64_extend_u(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
     fn i64_add(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     fn i64_sub(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     fn i64_mul(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
@@ -102,6 +113,11 @@ pub trait Serializer {
 
     fn f32_load(&mut self, offset: i32, ptr: Self::ExpressionRef) -> Self::ExpressionRef;
     fn f32_const(&mut self, value: f32) -> Self::ExpressionRef;
+    fn f32_convert_i32_s(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn f32_convert_i64_s(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn f32_convert_i32_u(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn f32_convert_i64_u(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn f32_demote(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
     fn f32_add(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     fn f32_sub(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     fn f32_mul(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
@@ -116,6 +132,11 @@ pub trait Serializer {
 
     fn f64_load(&mut self, offset: i32, ptr: Self::ExpressionRef) -> Self::ExpressionRef;
     fn f64_const(&mut self, value: f64) -> Self::ExpressionRef;
+    fn f64_convert_i32_s(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn f64_convert_i64_s(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn f64_convert_i32_u(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn f64_convert_i64_u(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
+    fn f64_promote(&mut self, value: Self::ExpressionRef) -> Self::ExpressionRef;
     fn f64_add(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     fn f64_sub(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
     fn f64_mul(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;

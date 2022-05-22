@@ -9,16 +9,129 @@ use super::{
 pub struct Expression<S: Serializer>(pub S::ExpressionRef, pub Type);
 
 impl<S: Serializer> Expression<S> {
-    fn binop_ptr(self, module: &mut S, offset: Expression<S>, op: BinOp) -> Option<Expression<S>> {
-        // only pointer addition is allowed on pointers
-        if let BinOp(_, BinOpVariant::Add) = op {
-            if offset.1 == I32 {
-                Some(Expression(module.i32_add(self.0, offset.0), self.1))
-            } else {
-                None
-            }
-        } else {
-            None
+    pub fn cast(self, module: &mut S, to: Type) -> Option<Expression<S>> {
+        let typ = self.1;
+        if typ.meta.is_reference() != to.meta.is_reference() {
+            return None;
+        }
+
+        if typ.meta.len() > 0 || to.meta.len() > 0 {
+            return None;
+        }
+
+        match to.item {
+            ItemRef::Void => todo!(),
+            ItemRef::Unreachable => todo!(),
+            ItemRef::HeapType(_) => todo!(),
+            ItemRef::StackType(x) => match x {
+                StackType::I32 => Some(self.cast_to_i32(module)),
+                StackType::U32 => Some(self.cast_to_u32(module)),
+                StackType::I64 => Some(self.cast_to_i64(module)),
+                StackType::U64 => Some(self.cast_to_u64(module)),
+                StackType::F32 => Some(self.cast_to_f32(module)),
+                StackType::F64 => Some(self.cast_to_f64(module)),
+            },
+            ItemRef::Ref(_) => todo!(),
+        }
+    }
+
+    fn cast_to_i32(self, module: &mut S) -> Expression<S> {
+        match self.1.item {
+            ItemRef::Void => todo!(),
+            ItemRef::Unreachable => todo!(),
+            ItemRef::HeapType(_) => todo!(),
+            ItemRef::StackType(x) => match x {
+                StackType::I32 => self,
+                StackType::U32 => Expression(self.0, I32),
+                StackType::I64 | StackType::U64 => Expression(module.i32_wrap(self.0), I32),
+                StackType::F32 => Expression(module.i32_trunc_sat_f32_s(self.0), I32),
+                StackType::F64 => Expression(module.i32_trunc_sat_f64_s(self.0), I32),
+            },
+            ItemRef::Ref(_) => todo!(),
+        }
+    }
+
+    fn cast_to_u32(self, module: &mut S) -> Expression<S> {
+        match self.1.item {
+            ItemRef::Void => todo!(),
+            ItemRef::Unreachable => todo!(),
+            ItemRef::HeapType(_) => todo!(),
+            ItemRef::StackType(x) => match x {
+                StackType::I32 => Expression(self.0, U32),
+                StackType::U32 => self,
+                StackType::I64 | StackType::U64 => Expression(module.i32_wrap(self.0), U32),
+                StackType::F32 => Expression(module.i32_trunc_sat_f32_u(self.0), U32),
+                StackType::F64 => Expression(module.i32_trunc_sat_f64_u(self.0), U32),
+            },
+            ItemRef::Ref(_) => todo!(),
+        }
+    }
+
+    fn cast_to_i64(self, module: &mut S) -> Expression<S> {
+        match self.1.item {
+            ItemRef::Void => todo!(),
+            ItemRef::Unreachable => todo!(),
+            ItemRef::HeapType(_) => todo!(),
+            ItemRef::StackType(x) => match x {
+                StackType::I32 => Expression(module.i64_extend_s(self.0), I64),
+                StackType::U32 => Expression(module.i64_extend_u(self.0), I64),
+                StackType::I64 => self,
+                StackType::U64 => Expression(self.0, I64),
+                StackType::F32 => Expression(module.i64_trunc_sat_f32_s(self.0), I64),
+                StackType::F64 => Expression(module.i64_trunc_sat_f64_s(self.0), I64),
+            },
+            ItemRef::Ref(_) => todo!(),
+        }
+    }
+
+    fn cast_to_u64(self, module: &mut S) -> Expression<S> {
+        match self.1.item {
+            ItemRef::Void => todo!(),
+            ItemRef::Unreachable => todo!(),
+            ItemRef::HeapType(_) => todo!(),
+            ItemRef::StackType(x) => match x {
+                StackType::I32 => Expression(module.i64_extend_s(self.0), U64),
+                StackType::U32 => Expression(module.i64_extend_u(self.0), U64),
+                StackType::I64 => Expression(self.0, U64),
+                StackType::U64 => self,
+                StackType::F32 => Expression(module.i64_trunc_sat_f32_u(self.0), U64),
+                StackType::F64 => Expression(module.i64_trunc_sat_f64_u(self.0), U64),
+            },
+            ItemRef::Ref(_) => todo!(),
+        }
+    }
+
+    fn cast_to_f32(self, module: &mut S) -> Expression<S> {
+        match self.1.item {
+            ItemRef::Void => todo!(),
+            ItemRef::Unreachable => todo!(),
+            ItemRef::HeapType(_) => todo!(),
+            ItemRef::StackType(x) => match x {
+                StackType::I32 => Expression(module.f32_convert_i32_s(self.0), F32),
+                StackType::U32 => Expression(module.f32_convert_i32_u(self.0), F32),
+                StackType::I64 => Expression(module.f32_convert_i64_s(self.0), F32),
+                StackType::U64 => Expression(module.f32_convert_i64_u(self.0), F32),
+                StackType::F32 => self,
+                StackType::F64 => Expression(module.f32_demote(self.0), F32),
+            },
+            ItemRef::Ref(_) => todo!(),
+        }
+    }
+
+    fn cast_to_f64(self, module: &mut S) -> Expression<S> {
+        match self.1.item {
+            ItemRef::Void => todo!(),
+            ItemRef::Unreachable => todo!(),
+            ItemRef::HeapType(_) => todo!(),
+            ItemRef::StackType(x) => match x {
+                StackType::I32 => Expression(module.f64_convert_i32_s(self.0), F64),
+                StackType::U32 => Expression(module.f64_convert_i32_u(self.0), F64),
+                StackType::I64 => Expression(module.f64_convert_i64_s(self.0), F64),
+                StackType::U64 => Expression(module.f64_convert_i64_u(self.0), F64),
+                StackType::F32 => Expression(module.f64_promote(self.0), F64),
+                StackType::F64 => self,
+            },
+            ItemRef::Ref(_) => todo!(),
         }
     }
 
@@ -51,6 +164,19 @@ impl<S: Serializer> Expression<S> {
                 StackType::F32 => self.binop_f32(op, module, right),
                 StackType::F64 => self.binop_f64(op, module, right),
             },
+        }
+    }
+
+    fn binop_ptr(self, module: &mut S, offset: Expression<S>, op: BinOp) -> Option<Expression<S>> {
+        // only pointer addition is allowed on pointers
+        if let BinOp(_, BinOpVariant::Add) = op {
+            if offset.1 == I32 {
+                Some(Expression(module.i32_add(self.0, offset.0), self.1))
+            } else {
+                None
+            }
+        } else {
+            None
         }
     }
 

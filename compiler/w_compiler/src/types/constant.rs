@@ -78,6 +78,72 @@ impl UntypedConstant {
         self.coerce_to_f64().and_then(f64_to_f32)
     }
 
+    fn cast_to_i32(self) -> i32 {
+        match self {
+            I32(x) => x as i32,
+            I64(x) => x as i32,
+            U32(x) => x as i32,
+            U64(x) => x as i32,
+            F32(x) => x as i32,
+            F64(x) => x as i32,
+        }
+    }
+
+    fn cast_to_i64(self) -> i64 {
+        match self {
+            I32(x) => x as i64,
+            I64(x) => x as i64,
+            U32(x) => x as i64,
+            U64(x) => x as i64,
+            F32(x) => x as i64,
+            F64(x) => x as i64,
+        }
+    }
+
+    fn cast_to_u32(self) -> u32 {
+        match self {
+            I32(x) => x as u32,
+            I64(x) => x as u32,
+            U32(x) => x as u32,
+            U64(x) => x as u32,
+            F32(x) => x as u32,
+            F64(x) => x as u32,
+        }
+    }
+
+    fn cast_to_u64(self) -> u64 {
+        match self {
+            I32(x) => x as u64,
+            I64(x) => x as u64,
+            U32(x) => x as u64,
+            U64(x) => x as u64,
+            F32(x) => x as u64,
+            F64(x) => x as u64,
+        }
+    }
+
+    fn cast_to_f32(self) -> f32 {
+        match self {
+            I32(x) => x as f32,
+            I64(x) => x as f32,
+            U32(x) => x as f32,
+            U64(x) => x as f32,
+            F32(x) => x as f32,
+            F64(x) => x as f32,
+        }
+    }
+
+    fn cast_to_f64(self) -> f64 {
+        match self {
+            I32(x) => x as f64,
+            I64(x) => x as f64,
+            U32(x) => x as f64,
+            U64(x) => x as f64,
+            F32(x) => x as f64,
+            F64(x) => x as f64,
+        }
+    }
+
     pub fn binop_i64(x: i64, y: i64, op: BinOpVariant) -> UntypedConstant {
         match op {
             BinOpVariant::Id => I64(y),
@@ -281,6 +347,34 @@ impl Constant {
             })
         } else {
             None
+        }
+    }
+
+    pub fn cast(self, to: typ::Type) -> Option<Constant> {
+        if self.meta.is_reference() != to.meta.is_reference() {
+            return None;
+        }
+
+        if self.meta.len() > 0 || to.meta.len() > 0 {
+            return None;
+        }
+
+        match to.item {
+            ItemRef::Void => todo!(),
+            ItemRef::Unreachable => todo!(),
+            ItemRef::HeapType(_) => todo!(),
+            ItemRef::StackType(x) => Some(Constant {
+                meta: self.meta,
+                constant: match x {
+                    StackType::I32 => I32(self.constant.cast_to_i32()),
+                    StackType::U32 => U32(self.constant.cast_to_u32()),
+                    StackType::I64 => I64(self.constant.cast_to_i64()),
+                    StackType::U64 => U64(self.constant.cast_to_u64()),
+                    StackType::F32 => F32(self.constant.cast_to_f32()),
+                    StackType::F64 => F64(self.constant.cast_to_f64()),
+                },
+            }),
+            ItemRef::Ref(_) => todo!(),
         }
     }
 

@@ -33,42 +33,45 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     }
 
     fn parse_cast(&mut self) -> Value<S> {
-        let start = self.start;
         assert_eq!(self.tk, Some(Token::BinOp(BinOp(false, BinOpVariant::Lt))));
-        self.next();
 
-        let t = self.parse_type().unwrap(); // TODO
-        let is_reinterpret = match self.tk {
-            Some(Token::BinOp(BinOp(false, BinOpVariant::Gt))) => {
-                self.next();
-                false
-            }
-            Some(Token::UnOp(UnOp::LNot)) => {
-                self.next();
-                match self.tk {
-                    Some(Token::BinOp(BinOp(false, BinOpVariant::Gt))) => self.next(),
-                    _ => self.error(Message::MissingClosingAngleBracket, self.span()),
+        let ((to, is_reinterpret), span) = spanned!(self, {
+            self.next();
+
+            let to = self.parse_type().unwrap(); // TODO
+            let is_reinterpret = match self.tk {
+                Some(Token::UnOp(UnOp::LNot)) => {
+                    self.next();
+                    true
                 }
+                _ => false,
+            };
 
-                true
-            }
-            _ => {
-                self.error(Message::MissingClosingAngleBracket, self.span());
-                false
-            }
-        };
+            match self.tk {
+                Some(Token::BinOp(BinOp(false, BinOpVariant::Gt))) => self.next(),
+                _ => self.error(Message::MissingClosingAngleBracket, self.span()),
+            };
 
-        let atom = self.primaryatom(Some(t));
-        //let end = atom.1.end;
-        /*Some(Spanned(
-            if is_reinterpret {
-                Atom::Reinterpret(t, Box::new(atom))
+            (to, is_reinterpret)
+        });
+
+        let atom = self.primaryatom(Some(to));
+        if is_reinterpret {
+            todo!()
+        } else {
+            let r = match atom {
+                Value::Expression(x) => x.cast(&mut self.module, to).map(Value::Expression),
+                Value::Constant(x) => x.cast(to).map(Value::Constant),
+            };
+
+            if let Some(r) = r {
+                r
             } else {
-                Atom::Cast(t, Box::new(atom))
-            },
-            Span::new(start, end),
-        ))*/
-        todo!()
+                println!("{:?}", span);
+                self.error(Message::ReinterpretNeeded, span);
+                self.unreachable()
+            }
+        }
     }
 
     fn parse_br(&mut self) -> Value<S> {

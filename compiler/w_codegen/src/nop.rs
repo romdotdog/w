@@ -16,6 +16,11 @@ impl Serializer for NopSerializer {
     fn i32_load16_s(&mut self, _offset: i32, _ptr: ()) {}
     fn i32_load16_u(&mut self, _offset: i32, _ptr: ()) {}
     fn i32_const(&mut self, _value: i32) {}
+    fn i32_trunc_sat_f32_s(&mut self, _value: ()) {}
+    fn i32_trunc_sat_f64_s(&mut self, _value: ()) {}
+    fn i32_trunc_sat_f32_u(&mut self, _value: ()) {}
+    fn i32_trunc_sat_f64_u(&mut self, _value: ()) {}
+    fn i32_wrap(&mut self, _value: ()) {}
     fn i32_add(&mut self, _left: (), _right: ()) {}
     fn i32_sub(&mut self, _left: (), _right: ()) {}
     fn i32_mul(&mut self, _left: (), _right: ()) {}
@@ -41,6 +46,12 @@ impl Serializer for NopSerializer {
     fn i32_ge_u(&mut self, _left: (), _right: ()) {}
     fn i64_load(&mut self, _offset: i32, _ptr: ()) {}
     fn i64_const(&mut self, _value: i64) {}
+    fn i64_trunc_sat_f32_s(&mut self, _value: ()) {}
+    fn i64_trunc_sat_f64_s(&mut self, _value: ()) {}
+    fn i64_trunc_sat_f32_u(&mut self, _value: ()) {}
+    fn i64_trunc_sat_f64_u(&mut self, _value: ()) {}
+    fn i64_extend_s(&mut self, _value: ()) {}
+    fn i64_extend_u(&mut self, _value: ()) {}
     fn i64_add(&mut self, _left: (), _right: ()) {}
     fn i64_sub(&mut self, _left: (), _right: ()) {}
     fn i64_mul(&mut self, _left: (), _right: ()) {}
@@ -66,6 +77,11 @@ impl Serializer for NopSerializer {
     fn i64_ge_u(&mut self, _left: (), _right: ()) {}
     fn f32_load(&mut self, _offset: i32, _ptr: ()) {}
     fn f32_const(&mut self, _value: f32) {}
+    fn f32_convert_i32_s(&mut self, _value: ()) {}
+    fn f32_convert_i64_s(&mut self, _value: ()) {}
+    fn f32_convert_i32_u(&mut self, _value: ()) {}
+    fn f32_convert_i64_u(&mut self, _value: ()) {}
+    fn f32_demote(&mut self, _value: ()) {}
     fn f32_add(&mut self, _left: (), _right: ()) {}
     fn f32_sub(&mut self, _left: (), _right: ()) {}
     fn f32_mul(&mut self, _left: (), _right: ()) {}
@@ -78,6 +94,11 @@ impl Serializer for NopSerializer {
     fn f32_ge(&mut self, _left: (), _right: ()) {}
     fn f64_load(&mut self, _offset: i32, _ptr: ()) {}
     fn f64_const(&mut self, _value: f64) {}
+    fn f64_convert_i32_s(&mut self, _value: ()) {}
+    fn f64_convert_i64_s(&mut self, _value: ()) {}
+    fn f64_convert_i32_u(&mut self, _value: ()) {}
+    fn f64_convert_i64_u(&mut self, _value: ()) {}
+    fn f64_promote(&mut self, _value: ()) {}
     fn f64_add(&mut self, _left: (), _right: ()) {}
     fn f64_sub(&mut self, _left: (), _right: ()) {}
     fn f64_mul(&mut self, _left: (), _right: ()) {}

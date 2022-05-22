@@ -1,0 +1,3 @@
+tests/errors/invalid-cast.w:2:15: error: check your cast or use reinterpret `<type!>x;`
+    let foo = <*i32>1;
+              ^^^^^^
