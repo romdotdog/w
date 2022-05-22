@@ -18,15 +18,20 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         matches!(self.tk, Some(Token::Let));
         self.next();
 
+        let ident_span = self.span();
         let (ident, init) = self.parse_decl().unwrap();
         match init {
             Value::Expression(Expression(x, xt)) => {
                 self.flow.register_local(ident.to_owned(), xt); // TODO: &'ast str?
-                self.symbols.push(ident, Binding::Type(xt));
+                if !self.symbols.push(ident, Binding::Type(xt)) {
+                    self.error(Message::AlreadyDefined, ident_span);
+                }
                 Value::Expression(Expression(self.module.local_tee(ident, x), xt))
             }
             Value::Constant(x) => {
-                self.symbols.push(ident, Binding::Constant(x));
+                if !self.symbols.push(ident, Binding::Constant(x)) {
+                    self.error(Message::AlreadyDefined, ident_span);
+                }
                 Value::Constant(x)
             }
         }

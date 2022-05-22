@@ -9,7 +9,7 @@ pub enum Binding {
 
 #[derive(Default)]
 pub struct SymbolStack<'ast> {
-    table: HashMap<&'ast str, Vec<Binding>>,
+    table: HashMap<&'ast str, Binding>,
     stack: Vec<&'ast str>,
 }
 
@@ -21,25 +21,22 @@ impl<'ast> SymbolStack<'ast> {
     pub fn free_frame(&mut self, top: usize) {
         for var in self.stack.drain(top..) {
             // free var
-            let v = self.table.get_mut(var).unwrap();
-            if v.len() == 1 {
-                self.table.remove(var);
-            } else {
-                v.pop();
-            }
+            self.table.remove(var);
         }
     }
 
     pub fn find(&mut self, name: &'ast str) -> Option<Binding> {
-        self.table.get(name).and_then(|s| s.last()).copied()
+        self.table.get(name).copied()
     }
 
-    pub fn push(&mut self, name: &'ast str, binding: Binding) {
+    #[must_use]
+    pub fn push(&mut self, name: &'ast str, binding: Binding) -> bool {
         self.stack.push(name);
         match self.table.entry(name) {
-            Entry::Occupied(mut x) => x.get_mut().push(binding),
+            Entry::Occupied(_) => false,
             Entry::Vacant(x) => {
-                x.insert(vec![binding]);
+                x.insert(binding);
+                true
             }
         }
     }

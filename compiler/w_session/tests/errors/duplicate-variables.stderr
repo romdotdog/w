@@ -1,0 +1,3 @@
+tests/errors/duplicate-variables.w:3:9: error: identifier already defined
+    let foo = 2;
+        ^^^
