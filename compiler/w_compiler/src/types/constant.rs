@@ -7,7 +7,7 @@ use super::{
     expression::Expression,
     itemref::{ItemRef, StackType},
     meta::{Meta, VALUE},
-    typ::{Type, F64, I64, U64},
+    typ,
 };
 
 // arbitrary bounds
@@ -16,21 +16,28 @@ const MAX_FLOAT: i64 = 2i64.pow(53);
 const UMAX_FLOAT: u64 = 2u64.pow(53);
 
 #[derive(Clone, Copy)]
-enum UntypedConstant {
-    Integer(i64),
-    Uinteger(u64),
-    Float(f64),
+pub enum UntypedConstant {
+    I32(i32),
+    I64(i64),
+    U32(u32),
+    U64(u64),
+    F32(f32),
+    F64(f64),
 }
 
-use UntypedConstant::{Float, Integer, Uinteger};
+use UntypedConstant::*;
 impl UntypedConstant {
     pub fn coerce_to_i64(self) -> Option<i64> {
         match self {
-            Integer(x) => Some(x),
-            Uinteger(x) => x.try_into().ok(),
+            I32(x) => Some(x as i64),
+            U32(x) => Some(x as i64),
+            F32(x) => check_f32(x).map(|w| w as i64),
+
+            I64(x) => Some(x),
+            U64(x) => x.try_into().ok(),
 
             #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-            Float(x) => check_f64(x).map(|w| w as i64),
+            F64(x) => check_f64(x).map(|w| w as i64),
         }
     }
 
@@ -40,12 +47,16 @@ impl UntypedConstant {
 
     pub fn coerce_to_u64(self) -> Option<u64> {
         match self {
-            Integer(x) => x.try_into().ok(),
-            Uinteger(x) => Some(x),
+            I32(x) => x.try_into().ok(),
+            U32(x) => Some(x as u64),
+            F32(x) if x >= 0.0 => check_f32(x).map(|w| w as u64),
+
+            I64(x) => x.try_into().ok(),
+            U64(x) => Some(x),
 
             #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-            Float(x) if x >= 0.0 => check_f64(x).map(|w| w as u64),
-            Float(_) => None,
+            F64(x) if x >= 0.0 => check_f64(x).map(|w| w as u64),
+            F64(_) | F32(_) => None,
         }
     }
 
@@ -56,9 +67,9 @@ impl UntypedConstant {
     pub fn coerce_to_f64(self) -> Option<f64> {
         #[allow(clippy::cast_precision_loss)]
         match self {
-            Integer(x) if x > MIN_FLOAT && x < MAX_FLOAT => Some(x as f64),
-            Uinteger(x) if x < UMAX_FLOAT => Some(x as f64),
-            Float(x) => Some(x),
+            I64(x) if x > MIN_FLOAT && x < MAX_FLOAT => Some(x as f64),
+            U64(x) if x < UMAX_FLOAT => Some(x as f64),
+            F64(x) => Some(x),
             _ => None,
         }
     }
@@ -67,72 +78,126 @@ impl UntypedConstant {
         self.coerce_to_f64().and_then(f64_to_f32)
     }
 
-    pub fn coerce(self, right: UntypedConstant) -> Option<UntypedConstant> {
-        match right {
-            Integer(_) => self.coerce_to_i64().map(Integer),
-            Uinteger(_) => self.coerce_to_u64().map(Uinteger),
-            Float(_) => self.coerce_to_f64().map(Float),
-        }
-    }
-
-    pub fn operate_int(x: i64, y: i64, op: BinOpVariant) -> UntypedConstant {
+    pub fn operate_i64(x: i64, y: i64, op: BinOpVariant) -> UntypedConstant {
         match op {
-            BinOpVariant::Id => Integer(y),
-            BinOpVariant::Lt => Uinteger(u64::from(x < y)),
-            BinOpVariant::Le => Uinteger(u64::from(x <= y)),
-            BinOpVariant::Gt => Uinteger(u64::from(x > y)),
-            BinOpVariant::Ge => Uinteger(u64::from(x >= y)),
-            BinOpVariant::EqC => Uinteger(u64::from(x == y)),
-            BinOpVariant::Neq => Uinteger(u64::from(x != y)),
-            BinOpVariant::Add => Integer(x.wrapping_add(y)),
-            BinOpVariant::Sub => Integer(x.wrapping_sub(y)),
-            BinOpVariant::Mul => Integer(x.wrapping_mul(y)),
-            BinOpVariant::Div => Integer(x.wrapping_div(y)),
-            BinOpVariant::Mod => Integer(x.wrapping_rem(y)),
-            BinOpVariant::And => Integer(x & y),
-            BinOpVariant::Or => Integer(x | y),
-            BinOpVariant::Xor => Integer(x ^ y),
-            BinOpVariant::Shl => Integer(x << y),
-            BinOpVariant::Shr => Integer(x >> y),
+            BinOpVariant::Id => I64(y),
+            BinOpVariant::Lt => U64(u64::from(x < y)),
+            BinOpVariant::Le => U64(u64::from(x <= y)),
+            BinOpVariant::Gt => U64(u64::from(x > y)),
+            BinOpVariant::Ge => U64(u64::from(x >= y)),
+            BinOpVariant::EqC => U64(u64::from(x == y)),
+            BinOpVariant::Neq => U64(u64::from(x != y)),
+            BinOpVariant::Add => I64(x.wrapping_add(y)),
+            BinOpVariant::Sub => I64(x.wrapping_sub(y)),
+            BinOpVariant::Mul => I64(x.wrapping_mul(y)),
+            BinOpVariant::Div => I64(x.wrapping_div(y)),
+            BinOpVariant::Mod => I64(x.wrapping_rem(y)),
+            BinOpVariant::And => I64(x & y),
+            BinOpVariant::Or => I64(x | y),
+            BinOpVariant::Xor => I64(x ^ y),
+            BinOpVariant::Shl => I64(x << y),
+            BinOpVariant::Shr => I64(x >> y),
         }
     }
 
-    pub fn operate_uint(x: u64, y: u64, op: BinOpVariant) -> UntypedConstant {
+    pub fn operate_i32(x: i32, y: i32, op: BinOpVariant) -> UntypedConstant {
         match op {
-            BinOpVariant::Id => Uinteger(y),
-            BinOpVariant::Lt => Uinteger(u64::from(x < y)),
-            BinOpVariant::Le => Uinteger(u64::from(x <= y)),
-            BinOpVariant::Gt => Uinteger(u64::from(x > y)),
-            BinOpVariant::Ge => Uinteger(u64::from(x >= y)),
-            BinOpVariant::EqC => Uinteger(u64::from(x == y)),
-            BinOpVariant::Neq => Uinteger(u64::from(x != y)),
-            BinOpVariant::Add => Uinteger(x.wrapping_add(y)),
-            BinOpVariant::Sub => Uinteger(x.wrapping_sub(y)),
-            BinOpVariant::Mul => Uinteger(x.wrapping_mul(y)),
-            BinOpVariant::Div => Uinteger(x.wrapping_div(y)),
-            BinOpVariant::Mod => Uinteger(x.wrapping_rem(y)),
-            BinOpVariant::And => Uinteger(x & y),
-            BinOpVariant::Or => Uinteger(x | y),
-            BinOpVariant::Xor => Uinteger(x ^ y),
-            BinOpVariant::Shl => Uinteger(x << y),
-            BinOpVariant::Shr => Uinteger(x >> y),
+            BinOpVariant::Id => I32(y),
+            BinOpVariant::Lt => U64(u64::from(x < y)),
+            BinOpVariant::Le => U64(u64::from(x <= y)),
+            BinOpVariant::Gt => U64(u64::from(x > y)),
+            BinOpVariant::Ge => U64(u64::from(x >= y)),
+            BinOpVariant::EqC => U64(u64::from(x == y)),
+            BinOpVariant::Neq => U64(u64::from(x != y)),
+            BinOpVariant::Add => I32(x.wrapping_add(y)),
+            BinOpVariant::Sub => I32(x.wrapping_sub(y)),
+            BinOpVariant::Mul => I32(x.wrapping_mul(y)),
+            BinOpVariant::Div => I32(x.wrapping_div(y)),
+            BinOpVariant::Mod => I32(x.wrapping_rem(y)),
+            BinOpVariant::And => I32(x & y),
+            BinOpVariant::Or => I32(x | y),
+            BinOpVariant::Xor => I32(x ^ y),
+            BinOpVariant::Shl => I32(x << y),
+            BinOpVariant::Shr => I32(x >> y),
         }
     }
 
-    pub fn operate_float(x: f64, y: f64, op: BinOpVariant) -> Option<UntypedConstant> {
+    pub fn operate_u64(x: u64, y: u64, op: BinOpVariant) -> UntypedConstant {
+        match op {
+            BinOpVariant::Id => U64(y),
+            BinOpVariant::Lt => U64(u64::from(x < y)),
+            BinOpVariant::Le => U64(u64::from(x <= y)),
+            BinOpVariant::Gt => U64(u64::from(x > y)),
+            BinOpVariant::Ge => U64(u64::from(x >= y)),
+            BinOpVariant::EqC => U64(u64::from(x == y)),
+            BinOpVariant::Neq => U64(u64::from(x != y)),
+            BinOpVariant::Add => U64(x.wrapping_add(y)),
+            BinOpVariant::Sub => U64(x.wrapping_sub(y)),
+            BinOpVariant::Mul => U64(x.wrapping_mul(y)),
+            BinOpVariant::Div => U64(x.wrapping_div(y)),
+            BinOpVariant::Mod => U64(x.wrapping_rem(y)),
+            BinOpVariant::And => U64(x & y),
+            BinOpVariant::Or => U64(x | y),
+            BinOpVariant::Xor => U64(x ^ y),
+            BinOpVariant::Shl => U64(x << y),
+            BinOpVariant::Shr => U64(x >> y),
+        }
+    }
+
+    pub fn operate_u32(x: u32, y: u32, op: BinOpVariant) -> UntypedConstant {
+        match op {
+            BinOpVariant::Id => U32(y),
+            BinOpVariant::Lt => U64(u64::from(x < y)),
+            BinOpVariant::Le => U64(u64::from(x <= y)),
+            BinOpVariant::Gt => U64(u64::from(x > y)),
+            BinOpVariant::Ge => U64(u64::from(x >= y)),
+            BinOpVariant::EqC => U64(u64::from(x == y)),
+            BinOpVariant::Neq => U64(u64::from(x != y)),
+            BinOpVariant::Add => U32(x.wrapping_add(y)),
+            BinOpVariant::Sub => U32(x.wrapping_sub(y)),
+            BinOpVariant::Mul => U32(x.wrapping_mul(y)),
+            BinOpVariant::Div => U32(x.wrapping_div(y)),
+            BinOpVariant::Mod => U32(x.wrapping_rem(y)),
+            BinOpVariant::And => U32(x & y),
+            BinOpVariant::Or => U32(x | y),
+            BinOpVariant::Xor => U32(x ^ y),
+            BinOpVariant::Shl => U32(x << y),
+            BinOpVariant::Shr => U32(x >> y),
+        }
+    }
+
+    pub fn operate_f64(x: f64, y: f64, op: BinOpVariant) -> Option<UntypedConstant> {
         #[allow(clippy::float_cmp)]
         Some(match op {
-            BinOpVariant::Id => Float(y),
-            BinOpVariant::Lt => Uinteger(u64::from(x < y)),
-            BinOpVariant::Le => Uinteger(u64::from(x <= y)),
-            BinOpVariant::Gt => Uinteger(u64::from(x > y)),
-            BinOpVariant::Ge => Uinteger(u64::from(x >= y)),
-            BinOpVariant::EqC => Uinteger(u64::from(x == y)),
-            BinOpVariant::Neq => Uinteger(u64::from(x != y)),
-            BinOpVariant::Add => Float(x + y),
-            BinOpVariant::Sub => Float(x - y),
-            BinOpVariant::Mul => Float(x * y),
-            BinOpVariant::Div => Float(x / y),
+            BinOpVariant::Id => F64(y),
+            BinOpVariant::Lt => U64(u64::from(x < y)),
+            BinOpVariant::Le => U64(u64::from(x <= y)),
+            BinOpVariant::Gt => U64(u64::from(x > y)),
+            BinOpVariant::Ge => U64(u64::from(x >= y)),
+            BinOpVariant::EqC => U64(u64::from(x == y)),
+            BinOpVariant::Neq => U64(u64::from(x != y)),
+            BinOpVariant::Add => F64(x + y),
+            BinOpVariant::Sub => F64(x - y),
+            BinOpVariant::Mul => F64(x * y),
+            BinOpVariant::Div => F64(x / y),
+            _ => return None,
+        })
+    }
+
+    pub fn operate_f32(x: f32, y: f32, op: BinOpVariant) -> Option<UntypedConstant> {
+        #[allow(clippy::float_cmp)]
+        Some(match op {
+            BinOpVariant::Id => F32(y),
+            BinOpVariant::Lt => U64(u64::from(x < y)),
+            BinOpVariant::Le => U64(u64::from(x <= y)),
+            BinOpVariant::Gt => U64(u64::from(x > y)),
+            BinOpVariant::Ge => U64(u64::from(x >= y)),
+            BinOpVariant::EqC => U64(u64::from(x == y)),
+            BinOpVariant::Neq => U64(u64::from(x != y)),
+            BinOpVariant::Add => F32(x + y),
+            BinOpVariant::Sub => F32(x - y),
+            BinOpVariant::Mul => F32(x * y),
+            BinOpVariant::Div => F32(x / y),
             _ => return None,
         })
     }
@@ -142,13 +207,13 @@ impl UntypedConstant {
             return None;
         }
 
-        let left = self.coerce(right).unwrap_or(self);
-        let right = right.coerce(self).unwrap_or(right);
-
-        match (left, right) {
-            (Integer(x), Integer(y)) => Some(Self::operate_int(x, y, op.1)),
-            (Uinteger(x), Uinteger(y)) => Some(Self::operate_uint(x, y, op.1)),
-            (Float(x), Float(y)) => Self::operate_float(x, y, op.1),
+        match (self, right) {
+            (I32(x), I32(y)) => Some(Self::operate_i32(x, y, op.1)),
+            (U32(x), U32(y)) => Some(Self::operate_u32(x, y, op.1)),
+            (F32(x), F32(y)) => Self::operate_f32(x, y, op.1),
+            (I64(x), I64(y)) => Some(Self::operate_i64(x, y, op.1)),
+            (U64(x), U64(y)) => Some(Self::operate_u64(x, y, op.1)),
+            (F64(x), F64(y)) => Self::operate_f64(x, y, op.1),
             _ => None,
         }
     }
@@ -156,36 +221,73 @@ impl UntypedConstant {
 
 #[derive(Clone, Copy)]
 pub struct Constant {
-    meta: Meta,
-    constant: UntypedConstant,
+    pub meta: Meta,
+    pub constant: UntypedConstant,
 }
 
 impl Constant {
     pub fn i64(x: i64) -> Constant {
         Constant {
             meta: VALUE,
-            constant: Integer(x),
+            constant: I64(x),
         }
     }
 
     pub fn u64(x: u64) -> Constant {
         Constant {
             meta: VALUE,
-            constant: Uinteger(x),
+            constant: U64(x),
         }
     }
 
     pub fn f64(x: f64) -> Constant {
         Constant {
             meta: VALUE,
-            constant: Float(x),
+            constant: F64(x),
+        }
+    }
+
+    pub fn to_type(self) -> typ::Type {
+        typ::Type {
+            meta: self.meta,
+            item: ItemRef::StackType(match self.constant {
+                I32(_) => StackType::I32,
+                I64(_) => StackType::I64,
+                U32(_) => StackType::U32,
+                U64(_) => StackType::U64,
+                F32(_) => StackType::F32,
+                F64(_) => StackType::F64,
+            }),
+        }
+    }
+
+    pub fn coerce(self, to: typ::Type) -> Option<Constant> {
+        if self.meta != to.meta || self.meta.len() > 0 || self.meta.is_reference() {
+            return None;
+        }
+
+        if let ItemRef::StackType(x) = to.item {
+            match x {
+                StackType::I32 => self.constant.coerce_to_i32().map(I32),
+                StackType::U32 => self.constant.coerce_to_u32().map(U32),
+                StackType::I64 => self.constant.coerce_to_i64().map(I64),
+                StackType::U64 => self.constant.coerce_to_u64().map(U64),
+                StackType::F32 => self.constant.coerce_to_f32().map(F32),
+                StackType::F64 => self.constant.coerce_to_f64().map(F64),
+            }
+            .map(|x| Constant {
+                meta: self.meta,
+                constant: x,
+            })
+        } else {
+            None
         }
     }
 
     fn compile_to_type<S: Serializer>(
         self,
         module: &mut S,
-        contextual_type: Type,
+        contextual_type: typ::Type,
     ) -> Option<Expression<S>> {
         if self.meta != contextual_type.meta {
             return None;
@@ -224,7 +326,7 @@ impl Constant {
     pub fn compile<S: Serializer>(
         self,
         module: &mut S,
-        contextual_type: Option<Type>,
+        contextual_type: Option<typ::Type>,
     ) -> Expression<S> {
         contextual_type
             .and_then(|contextual_type| self.compile_to_type(module, contextual_type))
@@ -234,9 +336,12 @@ impl Constant {
                 }
 
                 match self.constant {
-                    Integer(x) => Expression(module.i64_const(x), I64),
-                    Uinteger(x) => Expression(module.i64_const(reinterpret_u64(x)), U64),
-                    Float(x) => Expression(module.f64_const(x), F64),
+                    U32(x) => Expression(module.i32_const(reinterpret_u32(x)), typ::U32),
+                    I32(x) => Expression(module.i32_const(x), typ::I32),
+                    F32(x) => Expression(module.f32_const(x), typ::F32),
+                    I64(x) => Expression(module.i64_const(x), typ::I64),
+                    U64(x) => Expression(module.i64_const(reinterpret_u64(x)), typ::U64),
+                    F64(x) => Expression(module.f64_const(x), typ::F64),
                 }
             })
     }
@@ -269,33 +374,15 @@ impl Constant {
         } else if self.meta.len() == 0 && right.meta.len() > 0 {
             right.operate_ptr(self, op)
         } else {
-            self.constant
+            let left = self.coerce(right.to_type()).unwrap_or(self);
+            let right = right.coerce(self.to_type()).unwrap_or(right);
+
+            left.constant
                 .operate(right.constant, op)
                 .map(|constant| Constant {
-                    meta: self.meta,
+                    meta: left.meta,
                     constant,
                 })
-        }
-    }
-
-    pub fn coerce(self, right: Constant) -> Option<Constant> {
-        if self.meta != right.meta || self.meta.len() > 0 || self.meta.is_reference() {
-            None
-        } else {
-            match right.constant {
-                Integer(_) => self.constant.coerce_to_i64().map(|x| Constant {
-                    meta: right.meta,
-                    constant: Integer(x),
-                }),
-                Uinteger(_) => self.constant.coerce_to_u64().map(|x| Constant {
-                    meta: right.meta,
-                    constant: Uinteger(x),
-                }),
-                Float(_) => self.constant.coerce_to_f64().map(|x| Constant {
-                    meta: right.meta,
-                    constant: Float(x),
-                }),
-            }
         }
     }
 
@@ -305,9 +392,12 @@ impl Constant {
             None
         } else {
             Some(match self.constant {
-                Integer(x) => x != 0,
-                Uinteger(x) => x != 0,
-                Float(x) => x != 0.0,
+                I32(x) => x != 0,
+                U32(x) => x != 0,
+                F32(x) => x != 0.0,
+                I64(x) => x != 0,
+                U64(x) => x != 0,
+                F64(x) => x != 0.0,
             })
         }
     }
@@ -332,6 +422,15 @@ fn f64_to_f32(r64: f64) -> Option<f32> {
 fn check_f64(x: f64) -> Option<f64> {
     let w = x.round();
     if (x - w).abs() < f64::EPSILON {
+        Some(w)
+    } else {
+        None
+    }
+}
+
+fn check_f32(x: f32) -> Option<f32> {
+    let w = x.round();
+    if (x - w).abs() < f32::EPSILON {
         Some(w)
     } else {
         None

@@ -423,7 +423,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         let start = self.start;
         let mutable = self.mutable();
         let ident = self.expect_ident(&Some(Token::Colon))?;
-        let typ = match self.tk {
+        let type_signature = match self.tk {
             Some(Token::Colon) => {
                 self.next();
                 self.parse_type()          
@@ -434,22 +434,18 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         match self.tk {
             Some(Token::BinOp(BinOp(true, BinOpVariant::Id))) => {
                 self.next();
-                let mut v = self.atom(typ);
-                if let Some(typ) = typ {
-                    match v {
-                        Value::Expression(Expression(_, ref mut xt)) => {
-                            if *xt != typ {
-                                self.error(Message::TypeMismatch, self.span());
-                            }
-
-                            if mutable {
-                                xt.meta = xt.meta.set_mutable();
-                            } else {
-                                xt.meta = xt.meta.unset_mutable();
-                            }
-                        },
-                        Value::Constant(_) => todo!(),
+                let mut v = self.atom(type_signature);
+                if let Some(type_signature) = type_signature {
+                    let current_type = v.to_type();
+                    if current_type != type_signature {
+                        self.error(Message::TypeMismatch, self.span());
                     }
+                    
+                    v.set_meta(if mutable {
+                        current_type.meta.set_mutable()
+                    } else {
+                        current_type.meta.unset_mutable()
+                    });
                 }
 
                 Some((ident, v))

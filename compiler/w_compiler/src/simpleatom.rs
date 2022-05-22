@@ -103,7 +103,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     if let Value::Expression(Expression(x, _)) = atom {
                         contents.push(x);
                     }
-                    self.next()
+                    self.next();
                 }
                 None => {
                     let end_ = self.end;
@@ -215,7 +215,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 ))
             } else {
                 self.error(Message::IfCannotReturn, self.span());
-                return self.unreachable();
+                self.unreachable()
             }
         } else {
             match true_branch {
@@ -224,7 +224,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 }
                 _ => {
                     self.error(Message::IfCannotReturn, self.span());
-                    return self.unreachable();
+                    self.unreachable()
                 }
             }
         }

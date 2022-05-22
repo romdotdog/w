@@ -86,12 +86,12 @@ impl Display for Meta {
             write!(f, "&mut ")?;
         }
 
-        for i in 0..self.len() {
+        for _ in 0..self.len() {
             let a = 0b1000_0000 << self.len();
-            if self.0 & a != 0 {
-                write!(f, "*mut ")?;
-            } else {
+            if self.0 & a == 0 {
                 write!(f, "*")?;
+            } else {
+                write!(f, "*mut ")?;
             }
         }
 
