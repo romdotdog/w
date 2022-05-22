@@ -1,0 +1,6 @@
+tests/errors/labels-as-identifiers.w:4:1: error: ':' expected here
+}
+^
+tests/errors/labels-as-identifiers.w:4:1: error: only a loop or block can follow a label
+}
+^

@@ -1,3 +1,6 @@
 tests/errors/optimizable-if-false.w:2:8: error: condition evaluates to false
     if 0 {
        ^
+tests/errors/optimizable-if-false.w:12:8: error: condition evaluates to false
+    if c ^ c {
+       ^^^^^
