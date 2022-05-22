@@ -420,13 +420,13 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     }
 
     fn parse_decl(&mut self) -> Option<(&'ast str, Value<S>)> {
-        let start = self.start;
         let mutable = self.mutable();
         let ident = self.expect_ident(&Some(Token::Colon))?;
         let type_signature = match self.tk {
             Some(Token::Colon) => {
                 self.next();
-                self.parse_type()          
+                let (a, b) = spanned!(self, { self.parse_type() });
+                a.map(|a| (a, b)) // stopgap     
             }
             _ => None
         };
@@ -434,11 +434,11 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         match self.tk {
             Some(Token::BinOp(BinOp(true, BinOpVariant::Id))) => {
                 self.next();
-                let mut v = self.atom(type_signature);
-                if let Some(type_signature) = type_signature {
+                let mut v = self.atom(type_signature.map(|x| x.0));
+                if let Some((type_signature, span)) = type_signature {
                     let current_type = v.to_type();
                     if current_type != type_signature {
-                        self.error(Message::TypeMismatch, self.span());
+                        self.error(Message::TypeMismatch, span);
                     }
                     
                     v.set_meta(if mutable {
