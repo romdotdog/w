@@ -357,7 +357,6 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         }
 
                         let end = self.end;
-                        self.next();
 
                         match self.tk {
                             Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => {}
@@ -367,6 +366,8 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                             ),
                         }
                     }
+
+                    self.next();
                 }
                 Some(ref ch @ (Token::Union | Token::Struct)) => {
                     let is_struct = ch == &Token::Struct;

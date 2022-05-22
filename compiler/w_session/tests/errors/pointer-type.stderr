@@ -1,0 +1,3 @@
+tests/errors/pointer-type.w:1:12: error: type mismatch
+fn main(): *i32 {}
+           ^^^^
