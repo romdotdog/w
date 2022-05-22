@@ -55,6 +55,7 @@ errors!(
     TooManyArgs => "too many arguments",
     UnresolvedType => "unresolved type",
     UnresolvedIdentifier => "identifier does not exist",
+    AlreadyDefined => "identifier already defined",
     InvalidCoercion => "invalid coercion",
     InvalidOperation => "invalid operation",
     ReferenceCoercion => "cannot coerce to reference",

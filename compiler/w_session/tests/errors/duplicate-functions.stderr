@@ -1,0 +1,3 @@
+tests/errors/duplicate-functions.w:2:4: error: identifier already defined
+fn main() {}
+   ^^^^

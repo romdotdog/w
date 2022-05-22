@@ -263,6 +263,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         debug_assert_eq!(self.tk, Some(Token::Fn));
         self.next();
 
+        let name_span = self.span();
         let name = self.expect_ident(&Some(Token::LeftParen)).unwrap(); // TODO
         let paren_end = match self.tk {
             Some(Token::LeftParen) => {
@@ -316,10 +317,23 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             _ => (VOID, Span::new(self.end, self.end + 1)),
         };
 
-        let top = self.symbols.get_top();
-        for param in params.iter() {
-            self.symbols.push(param.ident, Binding::Type(param.typ))
+        if self
+            .registry
+            .push(name, Item::Fn(name, params.clone(), return_signature))
+            .is_none()
+        {
+            self.error(Message::AlreadyDefined, name_span);
         }
+
+        let top = self.symbols.get_top();
+        for param in &params {
+            self.symbols.push(param.ident, Binding::Type(param.typ));
+        }
+
+        let params = params
+            .drain(..)
+            .map(|p| (p.ident, p.typ.resolve()))
+            .collect();
 
         self.flow.set_return_type(return_signature);
         let atom = self.atom(Some(return_signature));
@@ -337,7 +351,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         // TODO: exports, mangling
         self.module.add_function(
             name,
-            params.iter().map(|p| (p.ident, p.typ.resolve())).collect(),
+            params,
             match return_signature {
                 t if t != VOID => vec![t.resolve()],
                 _ => Vec::new(),

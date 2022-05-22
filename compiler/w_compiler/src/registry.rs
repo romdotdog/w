@@ -17,6 +17,7 @@ pub struct Registry<'ast> {
 }
 
 impl<'ast> Registry<'ast> {
+    #[must_use]
     pub fn push(&mut self, name: &'ast str, item: Item<'ast>) -> Option<usize> {
         if let Entry::Vacant(x) = self.map.entry(name) {
             let r = self.items.len();
