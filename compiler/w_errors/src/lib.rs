@@ -50,6 +50,7 @@ errors!(
     MustBeMut => "must be &mut",
     TypeMismatch => "type mismatch",
     UselessConstant => "useless constant",
+    MustReturnValue => "must return value",
     TooManyArgs => "too many arguments",
     UnresolvedType => "unresolved type",
     UnresolvedIdentifier => "identifier does not exist",

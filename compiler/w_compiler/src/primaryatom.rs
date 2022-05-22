@@ -1,8 +1,9 @@
 use crate::{
+    spanned,
     symbol_stack::Binding,
     types::{
         expression::Expression,
-        typ::{Type, U32},
+        typ::{Type, U32, VOID},
     },
     Value,
 };
@@ -115,21 +116,28 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     }
 
     fn parse_ret(&mut self) -> Value<S> {
-        let start = self.start;
-        let mut end = self.end;
         debug_assert_eq!(self.tk, Some(Token::Return));
+        let span = self.span();
         self.next();
 
-        let a = if self.can_begin_atom() {
-            let typ = self.flow.get_return_type();
-            assert!(typ.is_some());
-            Some(self.atom(typ))
-        } else {
+        let typ = self.flow.get_return_type().unwrap();
+        let r = if self.can_begin_atom() {
+            let (atom, span) = spanned!(self, { self.atom(Some(typ)) });
+            let Expression(atom, atom_type) = atom.compile(&mut self.module, Some(typ));
+            if atom_type == typ {
+                Some(atom)
+            } else {
+                self.error(Message::TypeMismatch, span);
+                Some(self.module.unreachable())
+            }
+        } else if typ == VOID {
             None
+        } else {
+            self.error(Message::MustReturnValue, span);
+            Some(self.module.unreachable())
         };
 
-        //Some(Spanned(Atom::Return(a), Span::new(start, end)))
-        todo!()
+        Value::Expression(Expression(self.module.return_(r), VOID))
     }
 
     fn unop(&mut self, u: UnOp, contextual_type: Option<Type>) -> Value<S> {

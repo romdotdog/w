@@ -2,7 +2,7 @@ use crate::{
     registry::Item,
     spanned,
     symbol_stack::Binding,
-    types::{typ::VOID, IdentPair, expression::Expression},
+    types::{expression::Expression, typ::VOID, IdentPair},
 };
 
 use super::{Compiler, Fill, Handler, Next};
@@ -321,6 +321,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             self.symbols.push(param.ident, Binding::Type(param.typ))
         }
 
+        self.flow.set_return_type(return_signature);
         let atom = self.atom(Some(return_signature));
         self.symbols.free_frame(top);
 

@@ -1,0 +1,3 @@
+tests/errors/return-void-typecheck.w:2:5: error: must return value
+    return;
+    ^^^^^^

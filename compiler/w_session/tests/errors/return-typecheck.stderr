@@ -1,0 +1,3 @@
+tests/errors/return-typecheck.w:2:12: error: type mismatch
+    return 2.1;
+           ^^^

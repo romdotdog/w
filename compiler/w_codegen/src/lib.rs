@@ -129,7 +129,7 @@ pub trait Serializer {
     fn f64_ge(&mut self, left: Self::ExpressionRef, right: Self::ExpressionRef) -> Self::ExpressionRef;
 
 
-    fn return_(&mut self, value: Option<Self::ExpressionRef>);
+    fn return_(&mut self, value: Option<Self::ExpressionRef>) -> Self::ExpressionRef;
     fn unreachable(&mut self) -> Self::ExpressionRef;
     fn add_function(
         &mut self,
