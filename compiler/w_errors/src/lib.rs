@@ -61,7 +61,7 @@ errors!(
     ReferenceCoercion => "cannot coerce to reference",
     NeedType => "need type here",
     BranchesSameTypes => "branches must return the same types",
-    IfCannotReturn => "if statement cannot have a result",
+    BranchReturnVoid => "branch must return void",
     ConditionTrue => "condition evaluates to true",
     ConditionFalse => "condition evaluates to false"
 );

@@ -214,7 +214,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     true_branch.1,
                 ))
             } else {
-                self.error(Message::IfCannotReturn, self.span()); // TODO: fix span
+                self.error(Message::BranchesSameTypes, self.span()); // TODO: fix span
                 self.unreachable()
             }
         } else {
@@ -223,7 +223,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     Value::Expression(Expression(self.module.if_(cond.0, x, None), VOID))
                 }
                 _ => {
-                    self.error(Message::IfCannotReturn, self.span()); // TODO: fix span
+                    self.error(Message::BranchReturnVoid, self.span()); // TODO: fix span
                     self.unreachable()
                 }
             }
