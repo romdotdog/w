@@ -10,7 +10,7 @@ use crate::{
     Expression, Value,
 };
 
-use super::{Compiler, Fill, Handler, Next, NoFill};
+use super::{Compiler, Handler};
 use w_codegen::Serializer;
 use w_errors::Message;
 use w_lexer::token::{Token, UnOp};
@@ -240,14 +240,14 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
                 Some(Token::Period) => {
                     self.next();
-                    /*lhs = self.take(|this, t| match t {
+                    /*lhs = self.take(|self, t| match t {
                         Some(Token::Ident(s)) => Next(Some(Spanned(
-                            Atom::Access(Box::new(lhs), Spanned(s, this.span())),
-                            Span::new(start, this.end),
+                            Atom::Access(Box::new(lhs), Spanned(s, self.span())),
+                            Span::new(start, self.end),
                         ))),
                         tk => {
                             // TODO: review
-                            this.error(Message::MissingIdentifier, this.span());
+                            self.error(Message::MissingIdentifier, self.span());
                             Fill(None, tk)
                         }
                     })?;*/
@@ -385,54 +385,62 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 return self.unreachable();
             }
             _ => {
-                self.take(|this, t| match t {
-                    Some(Token::Integer(n)) => Next(Value::Constant(Constant::i64(n))),
-                    Some(Token::Uinteger(n)) => Next(Value::Constant(Constant::u64(n))),
-                    Some(Token::Float(n)) => Next(Value::Constant(Constant::f64(n))),
+                match self.tk {
+                    Some(Token::Integer(n)) => {
+                        self.next();
+                        Value::Constant(Constant::i64(n))
+                    }
+                    Some(Token::Uinteger(n)) => {
+                        self.next();
+                        Value::Constant(Constant::u64(n))
+                    }
+                    Some(Token::Float(n)) => {
+                        self.next();
+                        Value::Constant(Constant::f64(n))
+                    }
                     Some(Token::String(s)) => todo!(),
                     Some(Token::Char(s)) => todo!(),
                     Some(Token::Ident(s)) => {
-                        let span = this.span();
-                        this.next(); // fill
-                        if let Some(Token::Colon) = this.tk {
-                            this.error(Message::IdentifierIsNotLabel, span);
+                        let span = self.span();
+                        self.next(); // fill
+                        if let Some(Token::Colon) = self.tk {
+                            self.error(Message::IdentifierIsNotLabel, span);
                             // TODO: not label behavior
                         };
-                        if let Some(binding) = this.symbols.find(s) {
+                        if let Some(binding) = self.symbols.find(s) {
                             match binding {
-                                Binding::Type(t) => NoFill(Value::Expression(Expression(
-                                    this.module.local_get(s),
-                                    t,
-                                ))),
-                                Binding::Constant(c) => NoFill(Value::Constant(c)),
+                                Binding::Type(t) => {
+                                    Value::Expression(Expression(self.module.local_get(s), t))
+                                }
+                                Binding::Constant(c) => Value::Constant(c),
                             }
                         } else {
-                            this.error(Message::UnresolvedIdentifier, span);
-                            NoFill(this.unreachable())
+                            self.error(Message::UnresolvedIdentifier, span);
+                            self.unreachable()
                         }
                     }
                     Some(Token::Label(x)) => {
-                        this.next(); // fill
-                        match this.tk {
-                            Some(Token::Colon) => this.next(),
-                            _ => this.error(Message::MissingColon, this.span()),
+                        self.next();
+                        match self.tk {
+                            Some(Token::Colon) => self.next(),
+                            _ => self.error(Message::MissingColon, self.span()),
                         };
 
-                        NoFill(match this.tk {
-                            Some(Token::LeftBracket) => this.parse_block(Some(x), contextual_type),
-                            Some(Token::Loop) => this.parse_loop(Some(x), contextual_type),
+                        match self.tk {
+                            Some(Token::LeftBracket) => self.parse_block(Some(x), contextual_type),
+                            Some(Token::Loop) => self.parse_loop(Some(x), contextual_type),
                             _ => {
                                 // TODO: parse atom?
-                                this.error(Message::CannotFollowLabel, this.span());
-                                this.unreachable()
+                                self.error(Message::CannotFollowLabel, self.span());
+                                self.unreachable()
                             }
-                        })
+                        }
                     }
-                    tk => {
-                        this.error(Message::UnexpectedToken, this.span());
-                        Fill(this.unreachable(), tk)
+                    _ => {
+                        self.error(Message::UnexpectedToken, self.span());
+                        self.unreachable()
                     }
-                })
+                }
             }
         };
 

@@ -5,7 +5,7 @@ use crate::{
     util::symbol_stack::Binding,
 };
 
-use super::{Compiler, Fill, Handler, Next};
+use super::{Compiler, Handler};
 use std::{
     collections::{hash_map::Entry, HashMap},
     convert::TryInto,
@@ -89,11 +89,15 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             });
 
             // take identifier
-            let (sident, s) = self.take(|this, t| match t {
+            let (sident, s) = match self.tk {
                 // take
-                Some(Token::Ident(s)) => Next(Some((this.span(), s))),
-                t => Fill(None, t),
-            })?;
+                Some(Token::Ident(s)) => {
+                    let span = self.span();
+                    self.next();
+                    (span, s)
+                }
+                _ => return None,
+            };
 
             bracketcomma!(
                 {
@@ -122,30 +126,21 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
             if let Some(Token::BinOp(BinOp(true, BinOpVariant::Id))) = self.tk {
                 self.next();
-                discriminant = self.take(|this, t| {
-                    // take
-                    let i = match t {
+                discriminant = {
+                    let i = match self.tk {
                         Some(Token::Integer(n)) => n,
                         Some(Token::Uinteger(n)) => {
                             if let Ok(n) = n.try_into() {
                                 n
                             } else {
-                                match h.entry(s) {
-                                    Entry::Vacant(e) => {
-                                        e.insert(discriminant);
-                                    }
-                                    Entry::Occupied(_) => {
-                                        this.error(Message::DuplicateEnumField, sident);
-                                    }
-                                }
-
-                                this.error(Message::IntegerNoFit, this.span());
-                                return Next(discriminant + 1);
+                                self.error(Message::IntegerNoFit, self.span());
+                                self.next();
+                                discriminant
                             }
                         }
-                        t => {
-                            this.error(Message::MissingInteger, this.span());
-                            return Fill(discriminant + 1, t);
+                        _ => {
+                            self.error(Message::MissingInteger, self.span());
+                            discriminant
                         }
                     };
 
@@ -153,13 +148,15 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         Entry::Vacant(e) => {
                             e.insert(i);
                         }
-                        Entry::Occupied(_) => this.error(
+                        Entry::Occupied(_) => self.error(
                             Message::DuplicateEnumField,
-                            Span::new(sident.start, this.end),
+                            Span::new(sident.start, self.end),
                         ),
                     }
-                    Next(i + 1)
-                });
+
+                    self.next();
+                    i + 1
+                };
 
                 bracketcomma!({}, {});
             }

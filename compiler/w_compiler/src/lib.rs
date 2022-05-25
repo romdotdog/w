@@ -22,7 +22,6 @@ mod util;
 
 use handler::{Handler, Status, ImportlessHandler, ImportlessHandlerHandler};
 
-
 pub struct Compiler<'ast, H: Handler<'ast>, S: Serializer> {
     session: &'ast H, // TODO: lifetime review
     src_ref: &'ast H::SourceRef,
@@ -40,16 +39,6 @@ pub struct Compiler<'ast, H: Handler<'ast>, S: Serializer> {
     flow: Flow,
     registry: Registry<'ast>
 }
-
-enum Take<'ast, T> {
-    Next(T),
-    Fill(T, Option<Token<'ast>>),
-    // self.next() already called
-    // dangerous if used improperly
-    NoFill(T),
-}
-
-use Take::{Fill, Next, NoFill};
 
 #[macro_export]
 macro_rules! spanned {
@@ -201,25 +190,6 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         Value::Expression(self.unreachable_expr())
     }
 
-    /// for owning enum fields
-    fn take<T, F>(&mut self, f: F) -> T
-    where
-        F: FnOnce(&mut Self, Option<Token<'ast>>) -> Take<'ast, T>,
-    {
-        let t = self.tk.take();
-        match f(self, t) {
-            Take::Next(t) => {
-                self.next();
-                t
-            }
-            Take::Fill(t, tk) => {
-                self.tk = tk;
-                t
-            }
-            Take::NoFill(t) => t,
-        }
-    }
-
     pub fn make_load(&mut self, ptr: Expression<S>) -> Value<S> {
         let Expression(ptr, typ) = ptr;
         Value::Expression(if let Some(meta) = typ.meta.deref() { // TODO: 64 bit loads
@@ -303,28 +273,30 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
             self.error(Message::MissingIdentifier, span);
             None
         } else {
-            self.take(|this, t| {
-                Next(match t {
-                    // take
-                    Some(Token::Ident(s)) => {
-                        // struct ident {
-                        //        ^^^^^
-                        Some(s)
-                    }
-                    Some(Token::Label(_)) => {
-                        // struct $label {
-                        //        ^^^^^^
-                        this.error(Message::LabelIsNotIdentifier, this.span());
-                        None
-                    }
-                    _ => {
-                        // struct ! {
-                        //        ^
-                        this.error(Message::MalformedIdentifier, this.span());
-                        None
-                    }
-                })
-            })
+            match self.tk {
+                // take
+                Some(Token::Ident(s)) => {
+                    // struct ident {
+                    //        ^^^^^
+                    self.next();
+                    Some(s)
+                }
+                Some(Token::Label(_)) => {
+                    // struct $label {
+                    //        ^^^^^^
+                    self.error(Message::LabelIsNotIdentifier, self.span());
+                    self.next();
+                    None
+                }
+                _ => {
+                    // struct ! {
+                    //        ^
+                    self.error(Message::MalformedIdentifier, self.span());
+                    self.next();
+                    None
+                }
+            }
+            
         }
     }
 
@@ -399,23 +371,25 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 					todo!()
                 }
                 _ => {
-                    return self.take(|this, t| match t {
+                    match self.tk {
                         Some(Token::Ident(s)) => {
                             let item_ref = if let Some(t) = ItemRef::from_str(s) {
                                 t
-                            } else if let Some(index) = this.registry.resolve(s) {
+                            } else if let Some(index) = self.registry.resolve(s) {
                                 ItemRef::Ref(index)
                             } else {
-                                this.error(Message::UnresolvedType, this.span());
-                                return Next(None)
+                                self.error(Message::UnresolvedType, self.span());
+                                self.next();
+                                return None;
                             };
-                            Next(Some(Type { meta: typ.meta, item: item_ref }))
+                            self.next();
+                            return Some(Type { meta: typ.meta, item: item_ref })
                         }
-                        t => {
-                            this.error(Message::MalformedType, this.span());
-                            Fill(None, t)
+                        _ => {
+                            self.error(Message::MalformedType, self.span());
+                            return None;
                         }
-                    })
+                    }
                 }
             }
         }

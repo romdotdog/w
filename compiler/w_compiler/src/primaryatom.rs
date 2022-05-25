@@ -8,7 +8,7 @@ use crate::{
     Value,
 };
 
-use super::{Compiler, Fill, Handler, Next};
+use super::{Compiler, Handler};
 use w_codegen::Serializer;
 use w_errors::Message;
 use w_lexer::token::{BinOp, BinOpVariant, Token, UnOp};
@@ -92,17 +92,21 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         let label = match self.tk {
             Some(Token::Arrow) => {
                 self.next();
-                self.take(|this, t| match t {
-                    Some(Token::Label(x)) => Next(Some(x)),
+                match self.tk {
+                    Some(Token::Label(x)) => {
+                        self.next();
+                        Some(x)
+                    }
                     Some(Token::Ident(_)) => {
-                        this.error(Message::IdentifierIsNotLabel, this.span());
-                        Next(None)
+                        self.error(Message::IdentifierIsNotLabel, self.span());
+                        self.next();
+                        None
                     }
-                    tk => {
-                        this.error(Message::MissingLabel, this.span());
-                        Fill(None, tk)
+                    _ => {
+                        self.error(Message::MissingLabel, self.span());
+                        None
                     }
-                })
+                }
             }
             _ => None,
         };
