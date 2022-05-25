@@ -1,8 +1,8 @@
 use crate::{
-    registry::Item,
     spanned,
-    symbol_stack::Binding,
-    types::{expression::Expression, typ::VOID, IdentPair},
+    types::{typ::VOID, IdentPair},
+    util::registry::Item,
+    util::symbol_stack::Binding,
 };
 
 use super::{Compiler, Fill, Handler, Next};

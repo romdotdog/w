@@ -1,12 +1,12 @@
 use crate::{
-    registry::Item,
     spanned,
-    symbol_stack::Binding,
     types::{
         constant::Constant,
         itemref::ItemRef,
         typ::{Type, I32, U32, UNREACHABLE, VOID},
     },
+    util::registry::Item,
+    util::symbol_stack::Binding,
     Expression, Value,
 };
 

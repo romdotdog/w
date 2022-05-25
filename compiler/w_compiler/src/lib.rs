@@ -1,7 +1,8 @@
 #![allow(clippy::missing_panics_doc)]
 
-use locals::Flow;
-use registry::Registry;
+use util::locals::Flow;
+use util::registry::Registry;
+use util::symbol_stack::SymbolStack;
 use types::itemref::{ItemRef, HeapType, StackType};
 use types::{IdentPair, Value};
 use types::expression::Expression;
@@ -10,19 +11,16 @@ use w_codegen::{Serializer};
 use w_errors::Message;
 use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token};
 use w_lexer::Lexer;
+use w_utils::span::Span;
 
 pub mod handler;
 mod primaryatom;
 mod simpleatom;
 mod toplevel;
 mod types;
-mod symbol_stack;
-mod locals;
-mod registry;
-mod spanned;
+mod util;
 
 use handler::{Handler, Status, ImportlessHandler, ImportlessHandlerHandler};
-use symbol_stack::SymbolStack;
 
 
 pub struct Compiler<'ast, H: Handler<'ast>, S: Serializer> {
@@ -52,7 +50,15 @@ enum Take<'ast, T> {
 }
 
 use Take::{Fill, Next, NoFill};
-use w_utils::span::Span;
+
+#[macro_export]
+macro_rules! spanned {
+    ($self: ident, $b: block) => {{
+        let start = $self.start;
+        let res = $b;
+        (res, w_utils::span::Span::new(start, $self.end))
+    }};
+}
 
 impl<'ast, H: ImportlessHandler<'ast>, S: Serializer> Compiler<'ast, ImportlessHandlerHandler<'ast, H>, S> {
     pub fn compile_string(session: &'ast ImportlessHandlerHandler<'ast, H>, module: S, src: &'ast str) -> S {

@@ -1,10 +1,10 @@
 use crate::{
     spanned,
-    symbol_stack::Binding,
     types::{
         expression::Expression,
         typ::{Type, U32, VOID},
     },
+    util::symbol_stack::Binding,
     Value,
 };
 
