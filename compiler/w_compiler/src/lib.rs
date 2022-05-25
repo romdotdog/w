@@ -326,12 +326,13 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         let mut typ = VOID;
 
         if let Some(Token::AmbiguousOp(AmbiguousOp::Ampersand)) = self.tk {
+            let span = self.span();
             self.next();
             typ.meta = typ.meta.set_reference();
             if let Some(Token::Mut) = self.tk {
                 self.next();
             } else {
-                self.error(Message::MustBeMut, self.span());
+                self.error(Message::MustBeMut, span);
             }
         }
 

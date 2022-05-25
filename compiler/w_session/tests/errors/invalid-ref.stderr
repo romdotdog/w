@@ -1,0 +1,6 @@
+tests/errors/invalid-ref.w:1:12: error: must be &mut
+fn main(): &i32 {}
+           ^
+tests/errors/invalid-ref.w:1:12: error: type mismatch
+fn main(): &i32 {}
+           ^^^^
