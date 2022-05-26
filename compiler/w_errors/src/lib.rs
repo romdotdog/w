@@ -58,6 +58,8 @@ errors!(
     AlreadyDefined => "identifier already defined",
     InvalidCoercion => "invalid coercion",
     InvalidOperation => "invalid operation",
+    InvalidAccess => "cannot access a type which doesn't have fields",
+    InvalidField => "field does not exist",
     ReferenceCoercion => "cannot coerce to reference",
     NeedType => "need type here",
     BranchesSameTypes => "branches must return the same types",

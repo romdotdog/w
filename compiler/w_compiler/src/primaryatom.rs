@@ -11,7 +11,7 @@ use crate::{
 use super::{Compiler, Handler};
 use w_codegen::Serializer;
 use w_errors::Message;
-use w_lexer::token::{BinOp, BinOpVariant, Token, UnOp};
+use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
 
 impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     pub(crate) fn parse_let(&mut self) -> Value<S> {

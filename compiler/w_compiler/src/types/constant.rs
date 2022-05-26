@@ -287,75 +287,78 @@ impl UntypedConstant {
 
 #[derive(Clone, Copy)]
 pub struct Constant {
-    pub meta: Meta,
+    pub typ: typ::Type,
     pub constant: UntypedConstant,
 }
 
 impl Constant {
     pub fn i64(x: i64) -> Constant {
         Constant {
-            meta: VALUE,
+            typ: typ::I64,
             constant: I64(x),
         }
     }
 
     pub fn u64(x: u64) -> Constant {
         Constant {
-            meta: VALUE,
+            typ: typ::U64,
             constant: U64(x),
         }
     }
 
     pub fn f64(x: f64) -> Constant {
         Constant {
-            meta: VALUE,
+            typ: typ::F64,
             constant: F64(x),
         }
     }
 
-    pub fn to_type(self) -> typ::Type {
-        typ::Type {
-            meta: self.meta,
-            item: ItemRef::StackType(match self.constant {
-                I32(_) => StackType::I32,
-                I64(_) => StackType::I64,
-                U32(_) => StackType::U32,
-                U64(_) => StackType::U64,
-                F32(_) => StackType::F32,
-                F64(_) => StackType::F64,
-            }),
+    pub fn i32(x: i32) -> Constant {
+        Constant {
+            typ: typ::I32,
+            constant: I32(x),
+        }
+    }
+
+    pub fn u32(x: u32) -> Constant {
+        Constant {
+            typ: typ::U32,
+            constant: U32(x),
+        }
+    }
+
+    pub fn f32(x: f32) -> Constant {
+        Constant {
+            typ: typ::F32,
+            constant: F32(x),
         }
     }
 
     pub fn coerce(self, to: typ::Type) -> Option<Constant> {
-        if self.meta != to.meta || self.meta.len() > 0 || self.meta.is_reference() {
+        if self.typ.meta != to.meta || self.typ.meta.len() > 0 || self.typ.meta.is_reference() {
             return None;
         }
 
         if let ItemRef::StackType(x) = to.item {
             match x {
-                StackType::I32 => self.constant.coerce_to_i32().map(I32),
-                StackType::U32 => self.constant.coerce_to_u32().map(U32),
-                StackType::I64 => self.constant.coerce_to_i64().map(I64),
-                StackType::U64 => self.constant.coerce_to_u64().map(U64),
-                StackType::F32 => self.constant.coerce_to_f32().map(F32),
-                StackType::F64 => self.constant.coerce_to_f64().map(F64),
+                StackType::I32 => self.constant.coerce_to_i32().map(Self::i32),
+                StackType::U32 => self.constant.coerce_to_u32().map(Self::u32),
+                StackType::I64 => self.constant.coerce_to_i64().map(Self::i64),
+                StackType::U64 => self.constant.coerce_to_u64().map(Self::u64),
+                StackType::F32 => self.constant.coerce_to_f32().map(Self::f32),
+                StackType::F64 => self.constant.coerce_to_f64().map(Self::f64),
             }
-            .map(|x| Constant {
-                meta: self.meta,
-                constant: x,
-            })
         } else {
             None
         }
     }
 
     pub fn cast(self, to: typ::Type) -> Option<Constant> {
-        if self.meta.is_reference() != to.meta.is_reference() {
+        if self.typ.meta.is_reference() != to.meta.is_reference() {
             return None;
         }
 
-        if self.meta.len() > 0 || to.meta.len() > 0 {
+        if self.typ.meta.len() > 0 || to.meta.len() > 0 {
             return None;
         }
 
@@ -363,81 +366,39 @@ impl Constant {
             ItemRef::Void => todo!(),
             ItemRef::Unreachable => todo!(),
             ItemRef::HeapType(_) => todo!(),
-            ItemRef::StackType(x) => Some(Constant {
-                meta: self.meta,
-                constant: match x {
-                    StackType::I32 => I32(self.constant.cast_to_i32()),
-                    StackType::U32 => U32(self.constant.cast_to_u32()),
-                    StackType::I64 => I64(self.constant.cast_to_i64()),
-                    StackType::U64 => U64(self.constant.cast_to_u64()),
-                    StackType::F32 => F32(self.constant.cast_to_f32()),
-                    StackType::F64 => F64(self.constant.cast_to_f64()),
-                },
+            ItemRef::StackType(x) => Some(match x {
+                StackType::I32 => Self::i32(self.constant.cast_to_i32()),
+                StackType::U32 => Self::u32(self.constant.cast_to_u32()),
+                StackType::I64 => Self::i64(self.constant.cast_to_i64()),
+                StackType::U64 => Self::u64(self.constant.cast_to_u64()),
+                StackType::F32 => Self::f32(self.constant.cast_to_f32()),
+                StackType::F64 => Self::f64(self.constant.cast_to_f64()),
             }),
             ItemRef::Ref(_) => todo!(),
         }
     }
 
-    fn compile_to_type<S: Serializer>(
+    // does not typecheck
+    pub fn compile_to_type<S: Serializer>(
         self,
         module: &mut S,
         contextual_type: typ::Type,
-    ) -> Option<Expression<S>> {
-        if self.meta != contextual_type.meta {
-            return None;
-        }
-
-        if self.meta.len() > 0 {
-            // MUST be i32 (when in wasm32)
-            return self
-                .constant
-                .coerce_to_i64()
-                .and_then(|x| x.try_into().ok())
-                .map(|x| Expression(module.i32_const(x), contextual_type));
-        }
-
-        if let ItemRef::StackType(x) = contextual_type.item {
-            match x {
-                StackType::I32 => self.constant.coerce_to_i32().map(|x| module.i32_const(x)),
-                StackType::U32 => self
-                    .constant
-                    .coerce_to_u32()
-                    .map(|x| module.i32_const(reinterpret_u32(x))),
-                StackType::I64 => self.constant.coerce_to_i64().map(|x| module.i64_const(x)),
-                StackType::U64 => self
-                    .constant
-                    .coerce_to_u64()
-                    .map(|x| module.i64_const(reinterpret_u64(x))),
-                StackType::F32 => self.constant.coerce_to_f32().map(|x| module.f32_const(x)),
-                StackType::F64 => self.constant.coerce_to_f64().map(|x| module.f64_const(x)),
-            }
-            .map(|x| Expression(x, contextual_type))
-        } else {
-            None
-        }
+    ) -> Expression<S> {
+        self.coerce(contextual_type).unwrap_or(self).compile(module)
     }
 
-    pub fn compile<S: Serializer>(
-        self,
-        module: &mut S,
-        contextual_type: Option<typ::Type>,
-    ) -> Expression<S> {
-        contextual_type
-            .and_then(|contextual_type| self.compile_to_type(module, contextual_type))
-            .unwrap_or_else(|| {
-                if self.meta.len() > 0 {
-                    todo!();
-                }
-
-                match self.constant {
-                    U32(x) => Expression(module.i32_const(reinterpret_u32(x)), typ::U32),
-                    I32(x) => Expression(module.i32_const(x), typ::I32),
-                    F32(x) => Expression(module.f32_const(x), typ::F32),
-                    I64(x) => Expression(module.i64_const(x), typ::I64),
-                    U64(x) => Expression(module.i64_const(reinterpret_u64(x)), typ::U64),
-                    F64(x) => Expression(module.f64_const(x), typ::F64),
-                }
-            })
+    pub fn compile<S: Serializer>(self, module: &mut S) -> Expression<S> {
+        Expression(
+            match self.constant {
+                U32(x) => module.i32_const(reinterpret_u32(x)),
+                I32(x) => module.i32_const(x),
+                F32(x) => module.f32_const(x),
+                I64(x) => module.i64_const(x),
+                U64(x) => module.i64_const(reinterpret_u64(x)),
+                F64(x) => module.f64_const(x),
+            },
+            self.typ,
+        )
     }
 
     fn binop_ptr(self, offset: Constant, op: BinOp) -> Option<Constant> {
@@ -446,7 +407,7 @@ impl Constant {
             self.constant
                 .binop(offset.constant, op) // TODO: improve?
                 .map(|constant| Constant {
-                    meta: self.meta,
+                    typ: self.typ,
                     constant,
                 })
         } else {
@@ -459,22 +420,22 @@ impl Constant {
             return None;
         }
 
-        if self.meta.is_reference() || right.meta.is_reference() {
+        if self.typ.meta.is_reference() || right.typ.meta.is_reference() {
             return None;
         }
 
-        if self.meta.len() > 0 && right.meta.len() == 0 {
+        if self.typ.meta.len() > 0 && right.typ.meta.len() == 0 {
             self.binop_ptr(right, op)
-        } else if self.meta.len() == 0 && right.meta.len() > 0 {
+        } else if self.typ.meta.len() == 0 && right.typ.meta.len() > 0 {
             right.binop_ptr(self, op)
         } else {
-            let left = self.coerce(right.to_type()).unwrap_or(self);
-            let right = right.coerce(self.to_type()).unwrap_or(right);
+            let left = self.coerce(right.typ).unwrap_or(self);
+            let right = right.coerce(self.typ).unwrap_or(right);
 
             left.constant
                 .binop(right.constant, op)
                 .map(|constant| Constant {
-                    meta: left.meta,
+                    typ: left.typ,
                     constant,
                 })
         }
@@ -482,7 +443,7 @@ impl Constant {
 
     /// does not typecheck
     pub fn is_true(self) -> Option<bool> {
-        if self.meta.len() > 0 || self.meta.is_reference() {
+        if self.typ.meta.len() > 0 || self.typ.meta.is_reference() {
             None
         } else {
             Some(match self.constant {

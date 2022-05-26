@@ -25,8 +25,8 @@ impl<S: Serializer> Value<S> {
 
     pub fn to_type(&self) -> Type {
         match self {
-            Value::Expression(Expression(_, t)) => *t,
-            Value::Constant(c) => c.to_type(),
+            Value::Expression(x) => x.1,
+            Value::Constant(c) => c.typ,
         }
     }
 
@@ -36,7 +36,18 @@ impl<S: Serializer> Value<S> {
                 t.meta = meta;
             }
             Value::Constant(c) => {
-                c.meta = meta;
+                c.typ.meta = meta;
+            }
+        }
+    }
+
+    pub fn set_type(&mut self, typ: Type) {
+        match self {
+            Value::Expression(Expression(_, t)) => {
+                *t = typ;
+            }
+            Value::Constant(c) => {
+                c.typ = typ;
             }
         }
     }
@@ -55,7 +66,13 @@ impl<S: Serializer> Value<S> {
     pub fn compile(self, module: &mut S, contextual_type: Option<Type>) -> Expression<S> {
         match self {
             Value::Expression(x) => x,
-            Value::Constant(x) => x.compile(module, contextual_type),
+            Value::Constant(c) => {
+                if let Some(typ) = contextual_type {
+                    c.compile_to_type(module, typ)
+                } else {
+                    c.compile(module)
+                }
+            }
         }
     }
 }

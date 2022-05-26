@@ -190,7 +190,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
         Value::Expression(self.unreachable_expr())
     }
 
-    pub fn make_load(&mut self, ptr: Expression<S>) -> Value<S> {
+    pub fn deref(&mut self, ptr: Expression<S>) -> Value<S> {
         let Expression(ptr, typ) = ptr;
         Value::Expression(if let Some(meta) = typ.meta.deref() { // TODO: 64 bit loads
             Expression(self.module.i32_load(0, ptr), Type { meta, item: typ.item })
@@ -218,7 +218,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
     pub fn operate_values(&mut self, lhs: Value<S>, rhs: Value<S>, op: BinOp) -> Value<S> {
         match (lhs, rhs) {
             (Value::Constant(l), Value::Expression(r @ Expression(_, t))) => {
-                let l = l.compile(&mut self.module, Some(t));
+                let l = l.compile_to_type(&mut self.module, t);
                 if l.1 == t {
                     self.operate_values(
                         Value::Expression(l), 
@@ -231,7 +231,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                 }
             },
             (Value::Expression(l @ Expression(_, t)), Value::Constant(r)) => {
-                let r = r.compile(&mut self.module, Some(t));
+                let r = r.compile_to_type(&mut self.module, t);
                 if r.1 == t {
                     self.operate_values(
                         Value::Expression(l), 
@@ -296,7 +296,6 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     None
                 }
             }
-            
         }
     }
 

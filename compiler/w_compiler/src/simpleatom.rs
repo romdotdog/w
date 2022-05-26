@@ -13,7 +13,7 @@ use crate::{
 use super::{Compiler, Handler};
 use w_codegen::Serializer;
 use w_errors::Message;
-use w_lexer::token::{Token, UnOp};
+use w_lexer::token::{AmbiguousOp, BinOp, BinOpVariant, Token, UnOp};
 use w_utils::span::Span;
 
 impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
@@ -84,7 +84,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                         Value::Constant(x) => {
                             if let Some(contextual_type) = contextual_type {
                                 let Expression(x, xt) =
-                                    x.compile(&mut self.module, Some(contextual_type));
+                                    x.compile_to_type(&mut self.module, contextual_type);
                                 contents.push(x);
                                 typ = xt;
                             } else {
@@ -227,6 +227,84 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                     self.unreachable()
                 }
             }
+        }
+    }
+
+    pub(crate) fn field_access(&mut self, lhs: Value<S>) -> Value<S> {
+        debug_assert_eq!(self.tk, Some(Token::Period));
+        let period_span = self.span();
+        self.next();
+        let ident_span = self.span();
+        if let Some(field) = self.expect_ident(&None) {
+            let lhs_type = lhs.to_type();
+            match lhs_type.item {
+                ItemRef::Unreachable => return self.unreachable(),
+                ItemRef::Void | ItemRef::HeapType(_) | ItemRef::StackType(_) => {
+                    self.error(Message::InvalidAccess, period_span);
+                    return self.unreachable();
+                }
+                ItemRef::Ref(r) => {
+                    let item = self.registry.get(r).unwrap();
+                    match item {
+                        Item::Enum(_) | Item::Global(_, _) | Item::Fn(_, _, _) => {
+                            self.error(Message::InvalidAccess, period_span);
+                            self.unreachable()
+                        }
+
+                        Item::Struct(x) => {
+                            if let Some(&(typ, offset)) = x.get(field) {
+                                let dest_type = Type {
+                                    meta: lhs_type.meta,
+                                    item: typ.item,
+                                };
+
+                                let offset = Constant::i32(offset);
+                                let op = BinOp(false, BinOpVariant::Add);
+                                // TODO: refactor
+                                match lhs {
+                                    Value::Expression(x) => {
+                                        let offset = offset.compile(&mut self.module);
+                                        Value::Expression(Expression(
+                                            x.binop(&mut self.module, offset, op).unwrap().0,
+                                            dest_type,
+                                        ))
+                                    }
+                                    Value::Constant(x) => Value::Constant(Constant {
+                                        typ: dest_type,
+                                        constant: x.binop(offset, op).unwrap().constant,
+                                    }),
+                                }
+                            } else {
+                                self.error(Message::InvalidField, ident_span);
+                                self.unreachable()
+                            }
+                        }
+                        Item::Union(x) => {
+                            if let Some(&typ) = x.get(field) {
+                                let dest_type = Type {
+                                    meta: lhs_type.meta,
+                                    item: typ.item,
+                                };
+
+                                match lhs {
+                                    Value::Expression(x) => {
+                                        Value::Expression(Expression(x.0, dest_type))
+                                    }
+                                    Value::Constant(x) => Value::Constant(Constant {
+                                        typ: dest_type,
+                                        constant: x.constant,
+                                    }),
+                                }
+                            } else {
+                                self.error(Message::InvalidField, ident_span);
+                                self.unreachable()
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            self.unreachable()
         }
     }
 
@@ -407,17 +485,7 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
                             self.error(Message::IdentifierIsNotLabel, span);
                             // TODO: not label behavior
                         };
-                        if let Some(binding) = self.symbols.find(s) {
-                            match binding {
-                                Binding::Type(t) => {
-                                    Value::Expression(Expression(self.module.local_get(s), t))
-                                }
-                                Binding::Constant(c) => Value::Constant(c),
-                            }
-                        } else {
-                            self.error(Message::UnresolvedIdentifier, span);
-                            self.unreachable()
-                        }
+                        self.resolve_ident(s, span)
                     }
                     Some(Token::Label(x)) => {
                         self.next();
@@ -446,4 +514,56 @@ impl<'ast, H: Handler<'ast>, S: Serializer> Compiler<'ast, H, S> {
 
         self.postfixatom(lhs)
     }
+
+    pub(crate) fn resolve_ident(&mut self, s: &'ast str, span: Span) -> Value<S> {
+        if let Some(binding) = self.symbols.find(s) {
+            match binding {
+                Binding::Type(t) => Value::Expression(Expression(self.module.local_get(s), t)),
+                Binding::Constant(c) => Value::Constant(c),
+            }
+        } else {
+            self.error(Message::UnresolvedIdentifier, span);
+            self.unreachable()
+        }
+    }
+
+    pub(crate) fn lvalue(&mut self, contextual_type: Option<Type>) -> LValue<S> {
+        match self.tk {
+            Some(Token::AmbiguousOp(AmbiguousOp::Asterisk)) => {
+                self.next();
+                LValue::Pointer(self.primaryatom(None))
+            }
+            Some(Token::Ident(s)) => {
+                let span = self.span();
+                self.next();
+                match self.tk {
+                    Some(Token::Period | Token::LeftSqBracket) => {
+                        let mut lhs_ptr = None;
+                        loop {
+                            let lhs = match lhs_ptr {
+                                Some(v) => self.deref(match v {
+                                    Value::Expression(x) => x,
+                                    Value::Constant(c) => todo!(),
+                                }),
+                                None => self.resolve_ident(s, span),
+                            };
+
+                            lhs_ptr = Some(match self.tk {
+                                Some(Token::Period) => self.field_access(lhs),
+                                Some(Token::LeftSqBracket) => todo!(),
+                                _ => break LValue::Pointer(lhs),
+                            });
+                        }
+                    }
+                    _ => LValue::Ident(s),
+                }
+            }
+            _ => LValue::RValue(self.primaryatom(contextual_type)),
+        }
+    }
+}
+pub(crate) enum LValue<'ast, S: Serializer> {
+    Pointer(Value<S>),
+    Ident(&'ast str),
+    RValue(Value<S>),
 }
